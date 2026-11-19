@@ -107,6 +107,16 @@ public class OrderListFilterTests
     }
 
     [Fact]
+    public void Parse_CustomerNameWithNul_ReturnsCustomerNameErrorWithoutEchoingInput()
+    {
+        var (filter, errors) = OrderListFilter.Parse(null, null, "zzq\0zzq");
+
+        var message = Assert.Single(Assert.Single(errors, e => e.Key == OrderListFilter.CustomerNameKey).Value);
+        Assert.DoesNotContain("zzq", message, StringComparison.Ordinal);
+        Assert.Null(filter.CustomerName);
+    }
+
+    [Fact]
     public void Parse_CustomerNameWithSpaces_IsTrimmed()
     {
         var (filter, _) = OrderListFilter.Parse(null, null, "  acme  ");

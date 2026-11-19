@@ -58,7 +58,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | Rung | Files | PR |
 |------|-------|----|
 | Docs | this file, `INDEX.md`, question records (spec and readiness, merged first) | - |
-| R1 | date-range and customer-name filters: `src/Api/Features/Orders/` (service, endpoint, DTO), tests | - |
+| R1 | date-range and customer-name filters: `src/Api/Features/Orders/` (service, endpoint, DTO), `src/Infrastructure/Persistence` (constant only: `Order.CustomerNameMaxLength` and `OrderConfiguration`), tests | - |
 | R2 | status filter on the BC-001 states, after `VS-005` lands: same folder, tests | - |
 
 ## Revision log
@@ -70,6 +70,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-19 | R1 design added under S3 "S3 Design: R1 (solution-architect)" and the Design table filled; `TQ-005`, `TQ-006` raised (non-blocking); a time-zone BQ returned to the session to record (solution-architect, trial) |
 | 2026-11-19 | `BQ-007` recorded and answered (`OD-005`, UTC days), so the date assumption is a recorded decision; `OD-006` records the pickup exception for R1 (requirements-analyst, trial) |
 | 2026-11-19 | R1 implemented (date-range and customer-name filters, unit and integration tests); status In progress in `INDEX.md`; rung and PR stay `-` until merge (code-engineer, trial) |
+| 2026-11-19 | Review round 1 findings recorded: `TQ-007`, `BQ-008`, `TQ-008`, `TQ-009` (non-blocking), `BQ-006` note and priority P1; R1 files row corrected (requirements-analyst, trial) |
 
 ---
 
@@ -286,7 +287,15 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-005 | TQ | tech-lead | none (R1 binds its new parameters as strings) | no, non-blocking (added by solution-architect) |
 | TQ-006 | TQ | tech-lead | none (ASCII folding is locale-independent; R1 tests the container locale) | no, non-blocking (added by solution-architect) |
 | BQ-007 | BQ | product-owner | R1 (date semantics, was a working assumption) | yes, `OD-005` |
+| TQ-007 | TQ | tech-lead | none (accepted until answered: SEC-001, no rate limit or query timeout) | no, non-blocking (security-engineer review) |
+| BQ-008 | BQ | product-owner | none (accepted until answered: SEC-002, customer name in URL query strings) | no, non-blocking (security-engineer review) |
+| TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | no, non-blocking (regression-detective review) |
+| TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | no, non-blocking (security-engineer review) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
+
+BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'; it must be answered before R1 reaches an environment where non-staff identities can obtain a token for the audience, and a named authorization policy is advised meanwhile.
+
+Accepted until answered: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
 
 Blockers (rows that block a rung) are all resolved for R1. The three open rows are non-blocking by owner decision; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
 

@@ -5,6 +5,7 @@ using Api.Features.Orders;
 using Api.Options;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -20,13 +21,13 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private static DateTimeOffset Utc(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int microsecond = 0) =>
         new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero).AddTicks(microsecond * 10L);
 
-    private async Task<Guid> SeedAsync(string customerName, DateTimeOffset createdAt)
+    private async Task<Guid> SeedAsync(string customerName, DateTimeOffset createdAt, Guid? id = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var order = new Order
         {
-            Id = Guid.CreateVersion7(),
+            Id = id ?? Guid.CreateVersion7(),
             CustomerName = customerName,
             TotalAmount = 10m,
             Status = "open",
@@ -55,14 +56,26 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var token = Token();
         var older = await SeedAsync($"{token} a", Utc(1990, 1, 1));
         var newer = await SeedAsync($"{token} b", Utc(1990, 1, 2));
+        var pageSize = factory.Services.GetRequiredService<IOptions<OrdersOptions>>().Value.DefaultPageSize;
+        int expectedTotal;
+        List<Guid> expectedIds;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            expectedTotal = await db.Orders.CountAsync(Ct);
+            expectedIds = await db.Orders.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id)
+                .Take(pageSize).Select(o => o.Id).ToListAsync(Ct);
+        }
 
-        var unfiltered = await ListAsync("?pageSize=1000");
-        var emptyFilters = await ListAsync("?pageSize=1000&createdFrom=&createdTo=&customerName=");
+        var unfiltered = await ListAsync("");
+        var emptyFilters = await ListAsync("?createdFrom=&createdTo=&customerName=");
 
+        // Against the database directly, so a default predicate added for "no filter" would be caught.
+        Assert.Equal(expectedTotal, unfiltered.TotalCount);
+        Assert.Equal(expectedIds, unfiltered.Items.Select(i => i.Id));
         Assert.Equal(unfiltered.TotalCount, emptyFilters.TotalCount);
         Assert.Equal(unfiltered.Items.Select(i => i.Id), emptyFilters.Items.Select(i => i.Id));
-        Assert.True(unfiltered.TotalCount >= 2);
-        // Seeded rows are the oldest, so check their order through the name filter, not the clamped first page.
+        // Seeded rows are the oldest, so check their order through the name filter, not the first page.
         var seeded = await ListAsync($"?customerName={token}");
         Assert.Equal([newer, older], seeded.Items.Select(i => i.Id));
     }
@@ -125,6 +138,8 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [InlineData("createdFrom=11/19/2026", "createdFrom")]
     [InlineData("createdTo=abc", "createdTo")]
     [InlineData("createdFrom=2026-11-20&createdTo=2026-11-19", "createdTo")]
+    [InlineData("customerName=%00", "customerName")]
+    [InlineData("customerName=ac%00me", "customerName")]
     public async Task List_InvalidFilter_ReturnsValidationProblem(string query, string expectedKey)
     {
         var response = await factory.CreateClient().GetAsync("/api/orders?" + query, Ct);
@@ -148,6 +163,17 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var errors = await AssertValidationProblemAsync(response, "createdFrom");
         Assert.True(errors.TryGetProperty("createdTo", out _));
+    }
+
+    [Fact]
+    public async Task List_InvalidFilters_ErrorKeysAreExactlyTheCamelCaseParameterNames()
+    {
+        var response = await factory.CreateClient().GetAsync(
+            "/api/orders?createdFrom=abc&createdTo=def&customerName=" + new string('x', Order.CustomerNameMaxLength + 1), Ct);
+
+        var errors = await AssertValidationProblemAsync(response, "createdFrom");
+        var keys = errors.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(["createdFrom", "createdTo", "customerName"], keys);
     }
 
     private static async Task<JsonElement> AssertValidationProblemAsync(HttpResponseMessage response, string expectedKey)
@@ -204,6 +230,41 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var page = await ListAsync($"?customerName={token}&createdTo=9999-12-31");
 
         Assert.Equal([id], Ids(page));
+    }
+
+    [Fact]
+    public async Task List_EqualCreatedAt_AreOrderedByIdAscending()
+    {
+        // Ids differ in the first byte, so PostgreSQL's uuid order equals the order of these hex strings.
+        var suffix = Guid.NewGuid().ToString()[^12..];
+        var low = Guid.Parse($"10000000-0000-0000-0000-{suffix}");
+        var high = Guid.Parse($"20000000-0000-0000-0000-{suffix}");
+        var token = Token();
+        var sameInstant = Utc(1998, 4, 1, 8);
+        // Insert the higher id first, so the physical row order cannot produce the expected order by accident.
+        await SeedAsync($"{token} high", sameInstant, high);
+        await SeedAsync($"{token} low", sameInstant, low);
+
+        var page = await ListAsync($"?customerName={token}");
+
+        Assert.Equal([low, high], page.Items.Select(i => i.Id));
+    }
+
+    [Theory]
+    [InlineData("createdFrom=0001-01-01&createdTo=9999-12-31", true)]
+    [InlineData("createdFrom=0001-01-01", true)]
+    [InlineData("createdTo=9999-12-31", true)]
+    [InlineData("createdTo=0001-01-01", false)]
+    [InlineData("createdFrom=9999-12-31", false)]
+    public async Task List_ExtremeDates_ReturnOkAndMatchByRange(string dates, bool expectRow)
+    {
+        var token = Token();
+        var id = await SeedAsync($"{token} a", Utc(1999, 7, 1));
+
+        var page = await ListAsync($"?customerName={token}&{dates}");
+
+        Assert.Equal(expectRow ? [id] : [], Ids(page));
+        Assert.Equal(expectRow ? 1 : 0, page.TotalCount);
     }
 
     [Fact]

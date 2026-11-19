@@ -62,6 +62,12 @@ public sealed record OrderListFilter(DateOnly? CreatedFrom, DateOnly? CreatedTo,
                 errors[CustomerNameKey] = [$"{CustomerNameKey} must be at most {Order.CustomerNameMaxLength} characters."];
                 name = null;
             }
+            else if (name.Contains('\0'))
+            {
+                // PostgreSQL rejects 0x00 in text (error 22021), which would surface as a 500; other control characters are valid text.
+                errors[CustomerNameKey] = [$"{CustomerNameKey} must not contain the NUL character."];
+                name = null;
+            }
         }
 
         return (new OrderListFilter(from, to, name), errors);

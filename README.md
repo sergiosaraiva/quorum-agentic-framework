@@ -162,7 +162,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 | GitHub workflow `ai-pr-review.yml` | not run end to end in this template: it needs your repository, secret and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
 | Agents, skills, hooks | linted for structure only; behaviour was not evaluated on real tasks |
 | pgvector search quality | not measured; the default embedding is a hash stub |
-| Prices and model ids in the cost doc | re-verified 2026-11-19 against the pricing page and API reference; still a snapshot, check before budgeting |
+| Prices and model ids in the cost doc | prices re-verified 2026-11-19 against the pricing page; model ids and effort defaults from the API reference cached 2026-11-03; still a snapshot, check before budgeting |
 
 ## Status and caveats
 

@@ -17,7 +17,7 @@ The Quorum cost guide lists levers in the order to try them:
 8. Use task budgets on long runs.
 9. Run the local AI CI first so the paid GitHub review starts from clean diffs.
 
-Prompt caching: the cache-read price is a fraction of the input price. In the price figures verified on 2026-11-19 against the Anthropic pricing page and API reference, cache reads cost $0.20 per million tokens on Opus 5.5 and Fable 5.2 and $0.10 on Sonnet 5.5, against input prices of $4.00, $8.00 and $2.00. Cache writes cost more than input: on Opus 5.5, $5.00 for a 5-minute write and $8.00 for a 1-hour write. Minimum cacheable sizes vary by model and must be checked.
+Prompt caching: the cache-read price is a fraction of the input price. In the prices verified on 2026-11-19 against the Anthropic pricing page, cache reads cost $0.20 per million tokens on Opus 5.5 and Fable 5.2 and $0.10 on Sonnet 5.5, against input prices of $4.00, $8.00 and $2.00. Cache writes cost more than input: on Opus 5.5, $5.00 for a 5-minute write and $8.00 for a 1-hour write. Minimum cacheable sizes vary by model and must be checked.
 
 Batch: the Batch API gives a 50 percent discount for work that can wait, with results arriving asynchronously in any order. Suitable jobs are nightly knowledge-base re-embedding, bulk chunk review and overnight regression sweeps.
 

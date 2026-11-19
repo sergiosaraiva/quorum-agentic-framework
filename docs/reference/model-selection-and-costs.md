@@ -2,7 +2,7 @@
 
 This page tells you which Claude model to give each agent, why, and what it costs. Prices and model IDs change often. Treat every number here as a snapshot and check the [official pricing page](https://platform.claude.com/docs/en/about-claude/pricing) before you budget.
 
-Page written 2026-11-18. Figures re-verified 2026-11-19 against two sources: the [Anthropic pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (fetched 2026-11-19) and the Anthropic API reference model table (cached 2026-11-03). Prices still change often; re-check before you budget.
+Page written 2026-11-18. Prices were re-verified on 2026-11-19 against the [Anthropic pricing page](https://platform.claude.com/docs/en/about-claude/pricing) (fetched 2026-11-19). Model ids, effort defaults and advisor rules come from the Anthropic API reference model table (a copy cached 2026-11-03). Prices still change often; re-check before you budget.
 
 ## 1. The Claude 5 family at a glance
 
@@ -28,7 +28,7 @@ Cache-write prices, per MTok (a write costs more than plain input; reads are the
 Notes:
 - All four models list a 1M-token context window in the API model table. The pricing page says the standard-pricing 1M window applies to models 4.6 and later, except Haiku 5.5, which is billed at the higher tier above 100K tokens.
 - The Batch API gives a 50% discount for work that can wait (results arrive asynchronously, in any order).
-- Prompt caching cuts the price of repeated prefixes (system prompts, CLAUDE.md, agent bodies, the KB context you resend). The cache-read column above is the discounted price; the cache-write table gives the cost of writing the prefix, which is charged again whenever the cache has expired (5 minutes or 1 hour after the last use) and the prefix is written anew. Minimum cacheable sizes vary by model and are not listed here: check the pricing page.
+- Prompt caching cuts the price of repeated prefixes (system prompts, CLAUDE.md, agent bodies, the KB context you resend). The cache-read column above is the discounted price, and its ratio to input differs by model (pricing page: 0.025x on Fable 5.2, 0.05x on Opus 5.5 and Sonnet 5.5, 0.1x on Haiku 5.5); the cache-write table gives the cost of writing the prefix, which is charged again whenever the cache has expired (5 minutes or 1 hour after the last use) and the prefix is written anew. Minimum cacheable sizes vary by model and are not listed here: check the pricing page.
 - Fast mode runs the same model at up to 2.5x output speed for a premium: Opus 5.5 at $8 / $40 and Fable 5.2 at $16 / $80 per MTok. The premium stacks with the caching multipliers, and fast mode is not available with the Batch API. Use it for interactive sessions where waiting costs more than tokens, never for unattended CI.
 - On Fable 5.2 and Opus 5.5, thinking cannot be switched off. Effort is the control. On Sonnet 5.5, `thinking: disabled` returns a 400 error; to turn thinking off, send type `between_tools` (only at effort `high` or below).
 - Older models (Opus 4.x, Sonnet 4.6, Haiku 4.5) are listed on the pricing page at higher per-token prices than their 5.x successors (input and output both: for example Opus 4.5 at $5 / $25 against Opus 5.5 at $4 / $20, Sonnet 4.6 at $3 / $15 against $2 / $10, Haiku 4.5 at $1 / $5 against $0.10 / $0.50); Opus 4 and 4.1 are retired on some platforms. Move to the current generation unless you have a reason not to.

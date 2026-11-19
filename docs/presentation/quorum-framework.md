@@ -381,7 +381,7 @@ Highest priority among `Ready` slices whose hard dependencies are `Done` goes fi
 | Haiku 5.5 | Prompt sharpening, triage, bulk simple work | $0.10 / $0.50 |
 | Fable 5.2 | Hardest long-horizon work, used sparingly | $8 / $40 |
 
-Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Price figures were re-verified on 2026-11-19 against the Anthropic pricing page and API reference; check the pricing page before budgeting (see `docs/reference/model-selection-and-costs.md`).
+Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Prices were re-verified on 2026-11-19 against the Anthropic pricing page (model ids and effort defaults come from the API reference cached 2026-11-03); check the pricing page before budgeting (see `docs/reference/model-selection-and-costs.md`).
 
 ---
 

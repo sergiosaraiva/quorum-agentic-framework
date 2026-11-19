@@ -46,8 +46,8 @@ Notes:
 | Prompt sharpening, classification, routing, log triage, bulk summaries | Haiku | Cheap and quick. Output is checked or low-stakes. |
 | A task that failed twice on Sonnet | Opus once, then return to Sonnet | Pay for judgment only where it is needed. |
 | Hardest long-horizon work (large refactor plan, migration strategy, incident root cause) | Fable 5.2 | Highest capability. At $8 / $40 per MTok it is twice Opus input price, so reserve it. |
-| Local AI CI before you push | Sonnet (the script default; Haiku for a first pass) | A cheap rehearsal, run often, capped at 3 rounds. It does not replace the GitHub gate. |
-| GitHub AI CI on every PR | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | The review is the control. Do not economize on the reviewer. |
+| Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 3 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
+| GitHub AI CI on every PR (optional, needs `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
 
 Rule of thumb: spend on the checker, save on the maker. Reviewer errors cost an escaped defect. Implementer errors cost a review round.
 
@@ -105,7 +105,7 @@ An executor model does the work. A stronger advisor model is consulted at key po
 6. Cap loops: the 3-round review cap bounds the worst case at a known number of calls.
 7. Cap output: set `max_tokens` and ask for structured findings, not essays.
 8. Use task budgets on long agent runs so the model paces itself instead of being cut off.
-9. Run the local AI CI first so the paid GitHub review starts from clean diffs and ends in fewer rounds.
+9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs and ends in fewer rounds.
 
 ## 7. Worked example: cost of one review round
 

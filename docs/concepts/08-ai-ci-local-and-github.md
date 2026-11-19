@@ -1,6 +1,6 @@
 # 08. AI CI: local and GitHub
 
-Quorum reviews every change twice with AI before a human merges it: once on the developer's machine, once on the pull request. They use the same idea (an independent reviewer reads the diff and reports evidence) but sit at different points in the flow and have different strengths. The scripts are the source of truth; verify details in `scripts/ai_review_local.py` and `.github/workflows/ai-pr-review.yml`. Anything described below as an optional extension is not implemented in the template.
+Quorum reviews every change with AI before a human merges it. The required review is local: the in-session reviewer pair plus `scripts/ai_review_local.py`, which uses the `claude` CLI with the user's own sign-in and needs no API key. A second, optional review runs on the pull request when the repository secret `ANTHROPIC_API_KEY` is set; without it that job is skipped and its green check is not a review. They use the same idea (an independent reviewer reads the diff and reports evidence) but sit at different points in the flow and have different strengths. The scripts are the source of truth; verify details in `scripts/ai_review_local.py` and `.github/workflows/ai-pr-review.yml`. Anything described below as an optional extension is not implemented in the template.
 
 ## Purpose of each
 
@@ -10,12 +10,12 @@ Quorum reviews every change twice with AI before a human merges it: once on the 
 | Runs | On the branch, before the first push and after later changes | On each PR push, in GitHub Actions |
 | Trigger | A person or agent runs the script | The pull request event |
 | Output | Findings in the terminal and under `.ai-review/`, fed straight back to the producer | One summary comment and up to 20 inline comments on the PR |
-| Model | Default `sonnet` (`--model` overrides): a cheap rehearsal | Default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
+| Model | Default `sonnet` (`--model` overrides; `opus` for risky changes) | Default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
 | Reviewers run | `quality-guardian` and `regression-detective` prompts only | the same two reviewer agents |
 | Cost control | Cheaper model; capped rounds | Round cap in the workflow; escalation label |
-| Role | Cheap, fast rehearsal that catches obvious problems before they cost a CI round. It does not replace the GitHub gate | The gate: visible to the team, the record of review |
+| Role | The required gate with the in-session pair: catches problems before the push. Capped at 3 rounds, then a human | Optional, stronger second gate when `ANTHROPIC_API_KEY` is set: visible to the team, the record of review |
 
-The local loop exists because a CI round costs minutes, tokens and reviewer attention. Catching the blocking defects before pushing keeps the PR history clean and the cap unused for real surprises. The GitHub loop exists because local review depends on discipline; the PR check is the gate nobody can forget.
+The local loop exists because a CI round costs minutes, tokens and reviewer attention. Catching the blocking defects before pushing keeps the PR history clean and the cap unused for real surprises. The GitHub loop exists because local review depends on discipline; with the key set, the PR check is a second gate nobody can forget.
 
 ## Flow
 
@@ -25,7 +25,8 @@ flowchart TD
   L -->|findings| F[Producer fixes]
   F --> L
   L -->|clean| PUSH[Push and open PR]
-  PUSH --> G[GitHub AI CI]
+  PUSH -->|no key| H
+  PUSH -->|only with ANTHROPIC_API_KEY| G[GitHub AI CI, optional]
   G -->|findings as comments| F2[Producer fixes and pushes]
   F2 --> PUSH
   G -->|clean round| H[Human merge decision]
@@ -34,7 +35,7 @@ flowchart TD
 
 ## Local AI CI
 
-The script builds a review prompt from the branch diff against a base (`python3 scripts/ai_review_local.py --base origin/main`), splits the diff into chunks under a size limit, runs `claude -p` headless on each chunk with the `quality-guardian` and `regression-detective` instructions, merges the structured findings and prints them with severity and evidence. The producer fixes blocking findings and re-runs.
+The script builds a review prompt from the branch diff against a base (`python3 scripts/ai_review_local.py --base origin/main --require`), splits the diff into chunks under a size limit, runs `claude -p` headless on each chunk with the `quality-guardian` and `regression-detective` instructions, merges the structured findings and prints them with severity and evidence. The producer fixes blocking findings and re-runs.
 
 | Flag | Meaning |
 |------|---------|
@@ -44,12 +45,13 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--max-rounds` | round cap (default 3); at the cap the script exits with code 3 |
 | `--out-dir` | where findings and round state are written (default `.ai-review`) |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
+| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH; use it for the gate |
 | `--reset` | reset the round counter after a human review |
 | `--dry-run` | print the prompt without calling a model |
 
 | Aspect | Behaviour |
 |--------|-----------|
-| Model | A cheaper default is acceptable because the GitHub review follows. Do not go below what can follow the code |
+| Model | `sonnet` by default; use `--model opus` for auth, data model, migrations, money or core logic. Do not go below what can follow the code |
 | Rounds | Capped (default three), matching the session loop-back rule; at the cap, stop and report |
 | Scope | The whole branch diff, not only the last commit |
 | Output | A reply with no `findings` list, or malformed output, is an error (non-zero exit), never a silent pass; `{"findings": []}` is a valid clean result |
@@ -118,8 +120,8 @@ Each round costs the tokens of the diff plus context in, and the findings out. T
 |---------|-------|--------|
 | Speed of feedback | Seconds to minutes, before pushing | Minutes after each push |
 | Visible record for the team | No | Yes: comments, threads, labels |
-| Cannot be skipped | No, depends on habit | Yes, required check |
+| Cannot be skipped | Required by the Pre-Push Branch Gate; enforced by process, not CI | Only with `ANTHROPIC_API_KEY` and a required check; skipped otherwise |
 | Clean PR history | Yes, fixes happen before the PR | Fixes appear as follow-up commits |
 | Independent of the producer's machine | No | Yes: clean checkout, clean context |
 
-Use local to avoid wasting a PR round; use GitHub as the gate and the record. Neither replaces the in-session pair of reviewers ([07](07-independent-validation.md)) or the human merge decision.
+Use local as the required gate (and to avoid wasting a PR round); add GitHub as an optional second gate and the team record when you set `ANTHROPIC_API_KEY`. Neither replaces the in-session pair of reviewers ([07](07-independent-validation.md)) or the human merge decision.

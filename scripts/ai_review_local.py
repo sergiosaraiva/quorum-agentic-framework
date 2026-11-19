@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Local AI review rehearsal: run the review prompts on your branch before you push.
+"""Local AI review: run the review prompts on your branch before you push.
 
 Collects `git diff <base>...HEAD`, splits it into chunks under a size limit (no code is dropped),
 builds one review prompt per chunk from the pr-review skill plus the quality-guardian and
-regression-detective instructions only, runs `claude -p` headless (default model: sonnet, a cheap
-rehearsal), merges the findings and writes them to `.ai-review/`. It does NOT replace the GitHub AI
-review, which is the gate (it uses a stronger model and the base branch's reviewer instructions).
+regression-detective instructions only, runs `claude -p` headless with the user's own `claude` sign-in
+(no API key; default model: sonnet, use --model opus for risky changes), merges the findings and writes
+them to `.ai-review/`. With the in-session reviewer pair it is the required review gate; the GitHub AI
+review is an optional second gate that runs only when ANTHROPIC_API_KEY is set.
 
-Exit codes: 0 no blocking findings, 1 blocking findings, 2 usage or environment error,
+Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and
+--require is not set; 1 blocking findings; 2 usage or environment error;
 3 round cap reached (hand the branch to a human).
 
 Standard library only. Use --dry-run to print the prompt without calling the model.

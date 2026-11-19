@@ -1,12 +1,12 @@
 ---
 name: pr-review
-description: Review rules for the GitHub AI PR review workflow - what to review, finding tiers, evidence, the summary and inline comment format, the round cap and the needs-human-review escalation. Read by the workflow and by the local rehearsal script. Use when asked to review a PR or when the AI PR review workflow runs. Not for local pre-push review (running-local-ai-review) or running tests (CI handles them).
+description: Rules for the GitHub AI PR review workflow and the local review prompts - what to review, finding tiers, evidence, the summary and inline comment format, the round cap and the needs-human-review escalation. Read by the workflow and by the local review script. Use when asked to review a PR or when the AI PR review workflow runs. Not for running the local review (running-local-ai-review) or running tests (CI handles them).
 disable-model-invocation: true
 ---
 
 # PR review
 
-Reviewers are read-only and independent of the author. Build and tests are CI's job. The workflow is `.github/workflows/ai-pr-review.yml`; the local rehearsal is `scripts/ai_review_local.py` (`running-local-ai-review`).
+Reviewers are read-only and independent of the author. Build and tests are CI's job. The workflow is `.github/workflows/ai-pr-review.yml`; the local review, the required gate, is `scripts/ai_review_local.py` (`running-local-ai-review`); the workflow is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set.
 
 ## What the workflow does
 

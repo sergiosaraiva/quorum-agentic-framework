@@ -69,6 +69,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-19 | Owner answers recorded (`OD-002`, `OD-003`, `OD-004`); slice split into R1 (date range, customer name) and R2 (status filter, after `VS-005`); criteria 7-9 written |
 | 2026-11-19 | R1 design added under S3 "S3 Design: R1 (solution-architect)" and the Design table filled; `TQ-005`, `TQ-006` raised (non-blocking); a time-zone BQ returned to the session to record (solution-architect, trial) |
 | 2026-11-19 | `BQ-007` recorded and answered (`OD-005`, UTC days), so the date assumption is a recorded decision; `OD-006` records the pickup exception for R1 (requirements-analyst, trial) |
+| 2026-11-19 | R1 implemented (date-range and customer-name filters, unit and integration tests); status In progress in `INDEX.md`; rung and PR stay `-` until merge (code-engineer, trial) |
 
 ---
 

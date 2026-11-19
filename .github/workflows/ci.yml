@@ -32,8 +32,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
-      # The template ships no package-lock.json (a lockfile embeds the registry URL of whoever made it).
-      # Create it once with `cd frontend && npm install`, commit it, and this job starts running.
+      # The committed package-lock.json resolves from the public npm registry. If it is removed, the job skips itself;
+      # regenerate it with `cd frontend && npm install` (a lockfile embeds the registry URL of whoever made it).
       - name: Frontend skipped
         if: hashFiles('frontend/package-lock.json') == ''
         run: echo "::notice::frontend/package-lock.json is missing; frontend build and tests skipped (see frontend/CLAUDE.md, Lockfile)"

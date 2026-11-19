@@ -63,7 +63,7 @@ The workflow has two jobs. The gate job counts review rounds; the review job run
 | Aspect | Design |
 |--------|--------|
 | Findings | One sticky summary comment (the reviewer's final message) and up to 20 inline comments, with severity (Blocker, Warning, Info), evidence and fix direction. Only a Blocker blocks. On later rounds the reviewer re-checks earlier findings and says which are fixed |
-| Reviewer instructions | The first checkout is the base branch and is the working directory, so `CLAUDE.md` and `.claude/**` are read from it. The PR head is checked out outside the working tree (under the runner temp directory) as data only, and a step deletes its `CLAUDE.md` files, `.claude/` and `.mcp.json`. A PR therefore cannot weaken the reviewer that judges it; its changes to those files are reviewed as code through the diff |
+| Reviewer instructions | The first checkout is the base branch and is the working directory, so `CLAUDE.md` and `.claude/**` are read from it. The PR head is checked out into `pr-head/` inside the workspace (actions/checkout refuses paths outside it) as data only, and a step deletes its `CLAUDE.md` files, `.claude/` and `.mcp.json`. A PR therefore cannot weaken the reviewer that judges it; its changes to those files are reviewed as code through the diff |
 | Knowledge bases | The reviewer has no KB MCP server in CI. It reads `kb/chunks/` and `questions/records/` directly |
 | Action pinning | Every action is pinned to a full commit SHA with the tag in a trailing comment. When you bump an action, re-resolve the SHA and keep the tag comment |
 | Round counter | After each review a workflow step posts one marker comment `<!-- ai-review-round -->` as `github-actions[bot]`; only comments from that author count. The gate counts them (round = count + 1) and compares with `MAX_ROUNDS` in the workflow `env` (default 3; edit it there) |
@@ -89,7 +89,7 @@ A pull request is attacker-controlled text: its diff, title, body, branch name a
 
 | Measure | Purpose |
 |---------|---------|
-| The workflow prompt tells the model that the PR title, body, branch name, diff, comments and files are untrusted data and never to be obeyed; the head is checked out outside the working tree with its `CLAUDE.md` files, `.claude/` and `.mcp.json` removed; reviewer instructions come from the base branch. The local script additionally wraps the diff in `<diff>` tags with the same notice | Reduce injection |
+| The workflow prompt tells the model that the PR title, body, branch name, diff, comments and files are untrusted data and never to be obeyed; the head is checked out into `pr-head/` with its `CLAUDE.md` files, `.claude/` and `.mcp.json` removed; reviewer instructions come from the base branch. The local script additionally wraps the diff in `<diff>` tags with the same notice | Reduce injection |
 | Give the review step no write access to the repository contents and no secrets beyond the model key; the reviewer's tool allow-list is minimal | Limit what a successful injection could do |
 | Never interpolate PR fields directly into shell commands; pass them through environment variables or files | Avoid command injection in the runner |
 | Findings are only comments; they cannot merge or approve | A fooled reviewer cannot ship code |

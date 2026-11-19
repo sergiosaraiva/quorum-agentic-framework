@@ -1,0 +1,15 @@
+:root {
+  --color-bg: #ffffff;
+  --color-text: #1a1a1a;
+  --color-muted: #5f6368;
+  --color-error: #b00020;
+  --space-2: 0.5rem;
+  --space-4: 1rem;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}

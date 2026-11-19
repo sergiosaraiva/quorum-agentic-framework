@@ -286,8 +286,12 @@ def hash_embedding(text: str, dim: int = DEFAULT_DIM) -> list[float]:
 
 def _http_embedding(text: str, dim: int) -> list[float]:
     """OpenAI-compatible `POST {EMBED_BASE_URL}/embeddings` (verify the request shape for your provider)."""
-    base = os.environ["EMBED_BASE_URL"].rstrip("/")
-    payload = json.dumps({"model": os.environ["EMBED_MODEL"], "input": text}).encode()
+    base, model = os.environ.get("EMBED_BASE_URL", ""), os.environ.get("EMBED_MODEL", "")
+    if not base or not model:
+        raise RuntimeError("EMBED_PROVIDER=http needs EMBED_BASE_URL and EMBED_MODEL (EMBED_API_KEY is optional); "
+                           "unset EMBED_PROVIDER to use the keyless hash stub")
+    base = base.rstrip("/")
+    payload = json.dumps({"model": model, "input": text}).encode()
     headers = {"Content-Type": "application/json"}
     key = os.environ.get("EMBED_API_KEY")
     if key:

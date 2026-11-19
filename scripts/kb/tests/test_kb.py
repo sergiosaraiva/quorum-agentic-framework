@@ -56,6 +56,15 @@ class EmbeddingTests(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertAlmostEqual(sum(x * x for x in a), 1.0, places=6)
 
+    def test_http_provider_without_config_gives_a_clear_error(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"EMBED_PROVIDER": "http"}, clear=False):
+            for k in ("EMBED_BASE_URL", "EMBED_MODEL"):
+                os.environ.pop(k, None)
+            with self.assertRaisesRegex(RuntimeError, "EMBED_BASE_URL"):
+                lib.embed("x")
+
 
 class LintTests(unittest.TestCase):
     def test_shipped_examples_are_clean(self):

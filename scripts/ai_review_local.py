@@ -269,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--claude-bin", default=os.environ.get("CLAUDE_BIN", "claude"))
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
+    ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing")
     ap.add_argument("--dry-run", action="store_true", help="print the prompt, do not call the model")
     args = ap.parse_args(argv)
 
@@ -305,8 +306,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Round cap {args.max_rounds} reached: ask a human to review, then run with --reset.")
         return 3
     if shutil.which(args.claude_bin) is None:
-        print(f"error: '{args.claude_bin}' not found on PATH", file=sys.stderr)
-        return 2
+        # No CLI means no credentials to use: skip rather than fail, unless the caller insists.
+        if args.require:
+            print(f"error: '{args.claude_bin}' not found on PATH", file=sys.stderr)
+            return 2
+        print(f"AI review skipped: '{args.claude_bin}' not found on PATH (install Claude Code and sign in, or set "
+              "CLAUDE_BIN; pass --require to make this an error).", file=sys.stderr)
+        return 0
 
     rnd = state["rounds"] + 1
     collected: list[dict] = []

@@ -134,6 +134,22 @@ class StateTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("--reset", err.getvalue())
 
+    def test_missing_claude_cli_skips_unless_required(self):
+        import contextlib
+        import io
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(air, "get_diff", return_value="diff --git a/x b/x\n+x\n"), \
+                mock.patch.object(air, "current_branch", return_value="t"):
+            args = ["--out-dir", tmp, "--claude-bin", "no-such-claude-binary"]
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(air.main(args), 0)
+            self.assertIn("skipped", err.getvalue())
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(air.main(args + ["--require"]), 2)
+
     def test_wrong_shape_state_is_rejected(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:

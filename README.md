@@ -121,6 +121,19 @@ The example knowledge-base content describes an invented "Acme Orders" domain. R
 
 Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-bin --timeout --reset --dry-run`. Run `python3 scripts/ai_review_local.py --dry-run` to see the prompt without calling a model. The GitHub review posts one summary and up to 20 inline comments per round, with the reviewer instructions read from the base branch. It does not resolve threads, tier models by path or chunk large diffs; those are optional extensions, not implemented in the template.
 
+## Keys and secrets
+
+The template contains no keys. Every key is optional and has a placeholder; when one is missing the related feature is skipped, not failed.
+
+| Key | Where it goes | When unset |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | repository secret (GitHub review) | the review job is skipped with a notice; the PR stays green |
+| `claude` sign-in | your machine (local review) | `scripts/ai_review_local.py` skips; `--require` makes it an error |
+| `EMBED_API_KEY` | `.env` (optional, `EMBED_PROVIDER=http` only) | the default hash provider needs no key |
+| `POSTGRES_PASSWORD`, `DATABASE_URL` | `.env` (only for the optional PostgreSQL backend) | local file backend works without them |
+
+The template also assumes no cloud provider: containers and PostgreSQL only, and the deployment target is a placeholder (`{{DEPLOY_TARGET}}`).
+
 ## Documentation
 
 | Read | For |

@@ -5,7 +5,7 @@ topics: [models, cost]
 links: [QF-009, QF-031, QF-024]
 sources: ["docs/reference/model-selection-and-costs.md"]
 ---
-The Quorum model guide assigns models by the cost of being wrong, and it treats every price as a figure taken from Anthropic's published API reference on 2026-11-03 (the guide itself was written 2026-11-18), to be verified on the official pricing page. The current family is Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5, each listed with a one-million-token context that the guide marks as unverified.
+The Quorum model guide assigns models by the cost of being wrong, and it treats every price as a snapshot re-verified on 2026-11-19 against the Anthropic pricing page, with ids and effort defaults from the API reference cached 2026-11-03 (guide written 2026-11-18). The current family is Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5, each listed with a one-million-token context; Haiku 5.5 is billed at a higher tier above 100K tokens.
 
 | Situation | Model |
 |-----------|-------|

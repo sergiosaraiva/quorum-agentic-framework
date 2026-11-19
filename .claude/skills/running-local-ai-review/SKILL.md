@@ -1,11 +1,11 @@
 ---
 name: running-local-ai-review
-description: Runs scripts/ai_review_local.py to rehearse the AI PR review on the current branch before pushing, with a capped number of rounds and a cheaper default model. It runs the quality-guardian and regression-detective prompts only and does not replace the GitHub review gate. Use before the first push of a branch and after fixing review findings. Not for reviewing an open PR on GitHub (pr-review) or running the test suite.
+description: Runs scripts/ai_review_local.py, the required local AI review of the current branch before pushing, with a capped number of rounds and no API key. It runs the quality-guardian and regression-detective prompts only; together with the in-session reviewer pair it is the review gate. Use before the first push of a branch and after fixing review findings. Not for reviewing an open PR on GitHub (pr-review) or running the test suite.
 ---
 
 # Running the local AI review
 
-The script rehearses the GitHub AI review on your branch diff before you push. It saves CI rounds and cost. It is a rehearsal, not the gate: the GitHub review (`pr-review`) uses a stronger default model and the base branch's reviewer instructions, and it still runs after the push. It does not replace tests or the agent pair `quality-guardian || regression-detective`.
+The script reviews your branch diff with the `claude` CLI and your own sign-in; no `ANTHROPIC_API_KEY` is needed. It is the required AI review: together with the in-session pair `quality-guardian || regression-detective` over the whole branch (Pre-Push Branch Gate) it is the gate, and a human then merges. The GitHub review (`pr-review`) is an optional, stronger second gate that runs only when `ANTHROPIC_API_KEY` is set; without the key its job is skipped and the green check is not a review. The script does not replace tests.
 
 ## What it does
 
@@ -16,7 +16,7 @@ The script rehearses the GitHub AI review on your branch diff before you push. I
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
 | 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
 
-Exit codes: 0 no blocking findings, 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
+Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
 
 ## Flags
 
@@ -29,6 +29,7 @@ Exit codes: 0 no blocking findings, 1 blocking findings, 2 usage or environment 
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
+| `--require` | Exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH; use it for the gate |
 | `--reset` | Reset the round counter (use after a human review) |
 | `--dry-run` | Print the first prompt, call no model, spend nothing |
 
@@ -36,8 +37,8 @@ The round number is kept in `.ai-review/state.json`; there is no `--round` flag.
 
 ```bash
 python3 scripts/ai_review_local.py --dry-run                       # inspect the prompt
-python3 scripts/ai_review_local.py --base origin/main              # rehearsal, default model
-python3 scripts/ai_review_local.py --base origin/main --model opus # stronger pass for risky changes
+python3 scripts/ai_review_local.py --base origin/main --require     # the gate command, default model
+python3 scripts/ai_review_local.py --base origin/main --require --model opus # stronger pass for risky changes
 python3 scripts/ai_review_local.py --reset                         # after a human review
 ```
 
@@ -69,5 +70,5 @@ Three counters exist and none shares state: the in-session Loop-Back cap (no sto
 ## Order
 
 1. Build, tests and format green locally.
-2. Local rehearsal, up to 3 rounds.
-3. Push and open the PR; the GitHub review (`pr-review`) takes over and is the gate.
+2. In-session pair over the whole branch, then this script with `--require`, up to 3 rounds (`--model opus` for risky changes).
+3. Push and open the PR; a human merges. If `ANTHROPIC_API_KEY` is set, the GitHub review (`pr-review`) also runs as an optional second gate.

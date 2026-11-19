@@ -96,7 +96,7 @@ What blocks (severity mapping, same everywhere):
 | `quality-guardian`, `regression-detective`, `security-engineer` | Critical, High | Medium, Low |
 | `ux-usability-specialist` | Blocker, Major | Minor, Note |
 | `documentation-reviewer` | status `ungrounded`, `conflict` or `gate-failure` with confidence >= 0.8 | other statuses, style findings |
-| GitHub AI review (`pr-review` skill) | Blocker | Warning, Info |
+| AI review (`pr-review` skill; local, and GitHub when `ANTHROPIC_API_KEY` is set) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
 
 - Never skip a stage because an earlier iteration passed it.
 - Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched (the requirements or design may need revisiting). A single shared budget of 3 applies across both gates of a framework-doc change.
@@ -107,7 +107,7 @@ Three independent counters; none shares state with another:
 |---------|----------------|--------|
 | Loop-Back cap (3 per gate chain) | In the session only; no stored state | Each new gate chain |
 | Local `scripts/ai_review_local.py --max-rounds` (default 3) | `.ai-review/state.json`, one entry per branch (`{"branches": {name: {rounds, findings}}}`) | `--reset` clears the current branch's entry; a corrupt or old-format file exits 2 until `--reset` |
-| GitHub `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml` (default 3) | `<!-- ai-review-round -->` marker comments by `github-actions[bot]` on the PR, counted across pushes | A human deletes the markers or raises `MAX_ROUNDS` |
+| GitHub `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml` (default 3; only with `ANTHROPIC_API_KEY`) | `<!-- ai-review-round -->` marker comments by `github-actions[bot]` on the PR, counted across pushes | A human deletes the markers or raises `MAX_ROUNDS` |
 
 ## Independent Review Rule
 
@@ -130,7 +130,7 @@ Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. The local script (`scripts/ai_review_local.py`, skill `running-local-ai-review`) is a cheap rehearsal that runs the quality-guardian and regression-detective prompts on a cheaper model; it does not replace the GitHub gate. After the push, GitHub AI review runs (`.github/workflows/ai-pr-review.yml`, skill `pr-review`); fix its findings round by round until a round is clean; the `MAX_ROUNDS` cap and the `needs-human-review` label bound it.
+Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`; no API key; `--model opus` for auth, data model, migrations, money or core logic; cap 3 via `--max-rounds`, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; fix its findings (`MAX_ROUNDS`, label `needs-human-review`). Without the key it is skipped; green is not a review.
 
 ## Citation Format (Mandatory)
 

@@ -25,7 +25,7 @@ An AI assistant working alone tends to fail in three ways: it invents plausible 
 5. **CLAUDE.md files**: a root guide plus small guides next to the code they govern. The nearest one wins.
 6. **Vertical slices** (`docs/slices/`): plan features end to end with ids, dependencies, readiness analysis and priorities.
 7. **Independent validation**: no single point of failure. The producer never approves its own work.
-8. **Two AI CIs**: a local review script before you push, and a GitHub workflow on every pull request.
+8. **Two AI CIs**: a local review script before you push (the required gate with the in-session pair), and an optional GitHub workflow on every pull request when `ANTHROPIC_API_KEY` is set.
 9. **Model and cost guidance**: which Claude model and effort level for each agent, with prices and levers. See [docs/reference/model-selection-and-costs.md](docs/reference/model-selection-and-costs.md).
 
 ## The pipeline
@@ -112,14 +112,17 @@ The example knowledge-base content describes an invented "Acme Orders" domain. R
 
 | | Local | GitHub |
 |---|---|---|
-| Entry | `python3 scripts/ai_review_local.py --base origin/main` | `.github/workflows/ai-pr-review.yml` |
+| Entry | `python3 scripts/ai_review_local.py --base origin/main --require` | `.github/workflows/ai-pr-review.yml` |
 | When | Before the first push | Every pull request |
 | Reviewers | quality-guardian and regression-detective prompts | the same two reviewer agents, instructions read from the base branch |
-| Model | default `sonnet`: a cheap rehearsal that does not replace the GitHub gate | default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
+| Model | default `sonnet`; use `--model opus` for auth, data model, migrations, money or core logic | default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
 | Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
-| Needs | the `claude` CLI | repository secret `ANTHROPIC_API_KEY`; without it the review job is skipped and the PR stays green |
+| Needs | the `claude` CLI and your own sign-in; no API key | repository secret `ANTHROPIC_API_KEY`; without it the review job is skipped by design and the PR stays green, which is not a review |
+| Status | required gate, together with the in-session reviewer pair; a human then merges | optional, stronger second gate for adopters who set the key |
 
-Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-bin --timeout --reset --dry-run`. Run `python3 scripts/ai_review_local.py --dry-run` to see the prompt without calling a model. The GitHub review posts one summary and up to 20 inline comments per round, with the reviewer instructions read from the base branch. It does not resolve threads, tier models by path or chunk large diffs; those are optional extensions, not implemented in the template.
+The local review and the in-session pair are the required gate. The GitHub review runs only when `ANTHROPIC_API_KEY` is set; a green check without it means the job was skipped.
+
+Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-bin --timeout --require --reset --dry-run`. Run `python3 scripts/ai_review_local.py --dry-run` to see the prompt without calling a model. The GitHub review posts one summary and up to 20 inline comments per round, with the reviewer instructions read from the base branch. It does not resolve threads, tier models by path or chunk large diffs; those are optional extensions, not implemented in the template.
 
 ## Keys and secrets
 
@@ -128,7 +131,7 @@ The template contains no keys. Every key is optional and has a placeholder; when
 | Key | Where it goes | When unset |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | repository secret (GitHub review) | the review job is skipped with a notice; the PR stays green |
-| `claude` sign-in | your machine (local review) | `scripts/ai_review_local.py` skips; `--require` makes it an error |
+| `claude` CLI and sign-in | your machine (local review, required) | with a missing `claude` binary the script skips (exit 0) unless `--require` is passed, which makes it exit 2; use `--require` for the gate |
 | `EMBED_API_KEY` | `.env` (optional, `EMBED_PROVIDER=http` only) | the default hash provider needs no key |
 | `POSTGRES_PASSWORD`, `DATABASE_URL` | `.env` (only for the optional PostgreSQL backend) | local file backend works without them |
 
@@ -159,7 +162,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 | Framework lint, local review script | unit tests under `scripts/tests/` (`python3 -m unittest discover -s scripts/tests`) |
 | Sample backend (Orders) | xUnit unit and integration tests (Testcontainers needs Docker) |
 | Frontend skeleton | builds and passes its 10 tests; `frontend/package-lock.json` is committed (public npm registry), so the CI frontend job runs. If your organisation uses a private registry, regenerate it (see `frontend/CLAUDE.md`) |
-| GitHub workflow `ai-pr-review.yml` | not run end to end in this template: it needs your repository, secret and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
+| GitHub workflow `ai-pr-review.yml` | optional second gate, not run end to end in this template: it needs your repository, `ANTHROPIC_API_KEY` and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
 | Agents, skills, hooks | linted for structure only; behaviour was not evaluated on real tasks |
 | pgvector search quality | not measured; the default embedding is a hash stub |
 | Prices and model ids in the cost doc | a snapshot, partly unsourced (marked "verify") |

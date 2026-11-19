@@ -71,7 +71,7 @@ The only catalogue of skills. Each row: purpose and the agents that use it. `mai
 |-------|---------|---------|
 | implementing-vertical-slice-features | Build one feature end to end in the right file order | code-engineer, solution-architect |
 | planning-vertical-slices | Plan as slices: ids, dependencies, readiness, priority, rungs, INDEX | requirements-analyst, solution-architect |
-| running-local-ai-review | Pre-push local rehearsal of the AI review (cheap model, capped rounds; not the gate) | main, code-engineer |
-| pr-review | GitHub AI PR review rules: tiers, comment format, round cap, escalation (never auto-triggered) | quality-guardian, regression-detective (via CI) |
+| running-local-ai-review | Required local AI review before push (no API key, capped rounds; with the in-session pair it is the gate) | main, code-engineer |
+| pr-review | Rules for the GitHub review and the local review prompts: tiers, comment format, round cap, escalation (never auto-triggered) | quality-guardian, regression-detective (via CI) |
 | maintaining-agent-framework | `scripts/framework_lint.py`, size budgets, freshness, evaluating framework changes | documentation-curator, main |
 | routing-to-skills | Map a task or path to the right skills | main, any agent |

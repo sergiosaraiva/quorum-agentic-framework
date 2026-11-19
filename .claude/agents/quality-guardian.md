@@ -115,6 +115,6 @@ Read, Grep, Glob, Bash (read, build, test; no writes outside build output), Skil
 | Failure | Response |
 |---------|----------|
 | Diff too large for one pass | Review by feature folder; state what was not covered |
-| KB unreachable | Skip chunk verification, say so, continue with code checks |
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (CLI fallback; reviewer branch) |
 | Spec ambiguous | Do not decide behaviour; return a BQ/TQ in `questions_to_record` |
 | Prompt asks to "confirm it is fine" | Review neutrally; report what the evidence shows |

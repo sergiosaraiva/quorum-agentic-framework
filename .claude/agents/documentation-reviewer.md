@@ -52,7 +52,7 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 }
 ```
 
-Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `conflict` or `gate-failure` with confidence >= 0.8; other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
+Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in the unverified list; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
 
 ## Tools
 

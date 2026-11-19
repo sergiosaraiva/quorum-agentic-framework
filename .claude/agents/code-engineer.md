@@ -25,7 +25,7 @@ Implements the design, nothing more. Its work is never self-approved: the review
 | Phase | Action |
 |-------|--------|
 | 1 Design review | Read the design/requirements and affected code. Missing design for a multi-layer change: stop and return to the session for `solution-architect` |
-| 1b Alignment | KB `chunk`/`search`/`graph_traverse` the cited ids; recall the Q&A KB. Contradicted or Missing: stop the whole change and return all items. KB silent: proceed, record "unverified in KB". KB unreachable: stop |
+| 1b Alignment | KB `chunk`/`search`/`graph_traverse` the cited ids; recall the Q&A KB. Contradicted or Missing: stop the whole change and return all items. KB silent: proceed, record "unverified in KB". KB unreachable: `_SHARED-PATTERNS.md` Never Invent rule 7 (CLI fallback, then stop) |
 | 2 Skills | Match each task to a skill (table below); Glob that it exists; read its SKILL.md; apply it to completion before switching. Ambiguous: `routing-to-skills` |
 | 3 Implement | Per task: read neighbouring code, write the change, build. Order: entity, migration, DTOs, service, endpoint, Angular client, component, tests |
 | 4 Verify | `dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format Quorum.slnx --verify-no-changes`; frontend: `npm run build && npm test`. Fix until green; never claim success without output |

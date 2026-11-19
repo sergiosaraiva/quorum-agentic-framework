@@ -57,7 +57,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 |-------|---------|------|
 | Critical | Auth bypass, cross-tenant access, secret exposure, remote code execution, integrity safeguard removed | Blocks (loop-back) |
 | High | Exploitable with realistic preconditions, significant data exposure | Blocks (loop-back) |
-| Medium | Defence-in-depth gap, hard-to-reach exploit | Fix or record an accepted-risk decision |
+| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; the session records it before merge (a question record, or an accepted-risk `OD` per `questions/CLAUDE.md`) |
 | Low / Info | Hardening, hygiene | Report only |
 
 ## Context Contract
@@ -76,7 +76,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 }
 ```
 
-Findings loop back to the producer; cap 3 rounds, then escalate to a human. Report only confidence >= 0.8 as findings; lower goes in `areas_not_reviewed` notes.
+Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `areas_not_reviewed` as unverified, with the severity it would have; below 0.50 is not reported.
 
 ## Tools
 

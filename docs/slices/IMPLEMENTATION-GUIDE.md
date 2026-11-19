@@ -29,7 +29,7 @@ Fewer rungs are fine for a small slice; never skip the order of dependencies.
 | `feature/VS-nnn-<name>` | one rung per branch; the base is the integration branch |
 | stacked rung | a rung that depends on an unmerged rung targets the parent branch; after the parent squash-merges, rebase and retarget |
 
-Rules: one rung per PR; the PR title starts with the slice id and rung (`VS-001 R2: orders service and endpoints`); merge only when the AI review loop is clean and threads are resolved.
+Rules: one rung per PR; the PR title starts with the slice id and rung (`VS-001 R2: orders service and endpoints`); merge only when the local AI review loop (and the GitHub loop, if `ANTHROPIC_API_KEY` is set) is clean and threads are resolved.
 
 ## 4. Readiness analysis (steps S1..S5)
 
@@ -67,13 +67,13 @@ Before starting a slice (or a rung) that was analysed earlier, compare the analy
 |------|-------|
 | Behaviour | every acceptance criterion has a test that fails without the change |
 | Grounding | behaviour cites KB chunk or record ids; no open blockers |
-| Review | quality-guardian and regression-detective clean; findings dispositioned |
+| Review | quality-guardian and regression-detective clean; local AI review clean (or capped and human-reviewed); findings dispositioned |
 | Tests | unit and integration green; Angular tests green for UI |
 | Migration | reviewed, additive or with an approved rollout |
 | Docs | docs and CLAUDE.md updated; `INDEX.md` row updated |
 | Auth | every endpoint has an explicit auth decision |
 | Observability | structured logs and a metric or alarm where the slice adds a failure mode |
-| CI | build, tests, format and AI review green |
+| CI | build, tests and format green; AI review green if the GitHub review is enabled (a skipped review is not a review) |
 
 ## 8. PR checklist
 
@@ -81,7 +81,7 @@ Before starting a slice (or a rung) that was analysed earlier, compare the analy
 - [ ] Alignment check filled in (KB chunk ids, record ids, slice id)
 - [ ] `INDEX.md` status and rung updated
 - [ ] Commit body has the `AI:` metadata line
-- [ ] Local AI review run (`scripts/ai_review_local.py`), findings addressed
+- [ ] Local AI review run (`scripts/ai_review_local.py --require`), findings addressed
 - [ ] No secrets, no hard-coded environment values
 - [ ] Migration reviewed (if any)
 - [ ] Tests added for every behaviour change

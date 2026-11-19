@@ -56,7 +56,7 @@ flowchart LR
       C --> Q[quality] & G[regression]
       Q & G --> T[tests] --> D[docs curator] --> V[docs reviewer]
     end
-    A --> L[Local AI CI] --> P[Pull request] --> GH[GitHub AI CI] --> M[Merge]
+    A --> L[Local AI CI] --> P[Pull request] --> GH[GitHub AI CI, optional] --> M[Merge]
 ```
 
 ---
@@ -193,13 +193,13 @@ A critical system must never rely on one checker, and the author is never the ch
 |---|---|---|
 | Runs | On your machine, before the first push | On every PR, in GitHub Actions |
 | Entry | `scripts/ai_review_local.py` | `.github/workflows/ai-pr-review.yml` |
-| Purpose | Catch the obvious cheaply and fast | Independent gate the author cannot skip |
-| Model | Default `sonnet`: a cheap rehearsal | Default `opus` (variable `AI_REVIEW_MODEL` overrides) |
+| Purpose | Required gate with the in-session pair; no API key | Optional second gate the author cannot skip; needs `ANTHROPIC_API_KEY` |
+| Model | Default `sonnet`; `--model opus` for risky changes | Default `opus` (variable `AI_REVIEW_MODEL` overrides) |
 | Reviewers | quality-guardian and regression-detective prompts | the same two agents, read from the base branch |
 | Output | `.ai-review/` findings (JSON and Markdown) | one summary plus up to 20 inline comments |
 | Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
 
-The local run lowers the paid run's round count but does not replace it. The GitHub run is the control. Thread resolution, path-based model tiers and diff chunking are optional extensions, not implemented.
+The local run is the required review. The GitHub run is an optional second gate: without the key it is skipped and its green check is not a review. Thread resolution, path-based model tiers and diff chunking are optional extensions, not implemented.
 
 ---
 
@@ -295,7 +295,7 @@ From `src/Api/CLAUDE.md`: loaded only when you work under `src/Api/`, it adds to
 |---|---|
 | Testing and quality (8) | `creating-xunit-tests` unit; `writing-integration-tests` Testcontainers; `writing-angular-tests` Vitest; `writing-playwright-e2e-tests` journeys; `running-mutation-tests` Stryker; `load-and-performance-testing` k6; `detecting-regressions` B1-B6 taxonomy; `verifying-cross-file-coupling` drift checks |
 | Documentation and knowledge (7) | `reviewing-documentation` grounding review; `updating-internal-docs` terse style; `updating-external-docs` natural style; `writing-kb-chunks`; `reviewing-kb-chunks`; `recording-decisions` BQ, TQ, OD; `writing-world-class-prompts` |
-| Planning, process and framework (6) | `implementing-vertical-slice-features` file order; `planning-vertical-slices` ids, readiness, priority; `running-local-ai-review` pre-push rehearsal; `pr-review` GitHub review prompt; `maintaining-agent-framework` lint and budgets; `routing-to-skills` task to skill |
+| Planning, process and framework (6) | `implementing-vertical-slice-features` file order; `planning-vertical-slices` ids, readiness, priority; `running-local-ai-review` required pre-push review; `pr-review` review prompt (local and optional GitHub); `maintaining-agent-framework` lint and budgets; `routing-to-skills` task to skill |
 
 ---
 
@@ -381,7 +381,7 @@ Highest priority among `Ready` slices whose hard dependencies are `Done` goes fi
 | Haiku 5.5 | Prompt sharpening, triage, bulk simple work | $0.10 / $0.50 |
 | Fable 5.2 | Hardest long-horizon work, used sparingly | $8 / $40 |
 
-Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Price figures were taken from Anthropic's published API reference on 2026-11-03: verify them on the pricing page, and see `docs/reference/model-selection-and-costs.md` for which figures are unsourced.
+Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Prices were re-verified on 2026-11-19 against the Anthropic pricing page (model ids and effort defaults come from the API reference cached 2026-11-03); check the pricing page before budgeting (see `docs/reference/model-selection-and-costs.md`).
 
 ---
 
@@ -394,7 +394,7 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 | `high` | coding, review, requirements analysis (most agents here) |
 | `xhigh`, `max` | hard agentic work; measuring a ceiling |
 
-- Effort is the quality-versus-cost dial inside one model. Tune per agent, after measuring real tasks. The per-model defaults are unsourced: verify them.
+- Effort is the quality-versus-cost dial inside one model. Tune per agent, after measuring real tasks. The per-model defaults come from the Anthropic API reference (cached 2026-11-03).
 - **Advisor pattern**: a cheaper executor does the work and consults a stronger advisor before committing to an approach, when stuck and before declaring done. Same idea as independent review, applied inside one task.
 - The advisor does not replace the reviewer agents: it is early correction, they are the independent final check.
 
@@ -406,8 +406,8 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 2. State the pipeline lane in one line.
 3. **Alignment gate**: check the spec against both KBs, cite chunk ids, record any gap as a question.
 4. Design, build, then review in parallel with independent agents.
-5. Tests and docs, then the **local AI CI** (a cheap rehearsal).
-6. Push, open a PR, **GitHub AI CI** loops until a round is clean (`MAX_ROUNDS`, default 3).
+5. Tests and docs, then the **local AI CI** (required, rounds capped at 3, then a human).
+6. Push, open a PR; if `ANTHROPIC_API_KEY` is set, **GitHub AI CI** also loops until a round is clean (`MAX_ROUNDS`, default 3). A human merges.
 7. Merge, update the slice status, record any new decision.
 
 ---
@@ -420,7 +420,7 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 4. Check the two MCP servers register (`.mcp.json`).
 5. Build your first slice list with the planning skill.
 6. Tune models and effort per agent after measuring a few real tasks.
-7. Add the repository secret for the GitHub AI CI.
+7. Optional: add the repository secret `ANTHROPIC_API_KEY` for the GitHub AI CI.
 
 Full guide: `docs/concepts/10-adopting-the-template.md`.
 

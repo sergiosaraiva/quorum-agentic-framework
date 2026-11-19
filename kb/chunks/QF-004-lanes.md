@@ -16,4 +16,4 @@ Quorum scales process to risk with four lanes, all defined in `.claude/agents/_S
 
 Iterate batches one review pair per batch of changes instead of per change, and always runs cheap checks such as build, format and affected tests. A change that touches migrations, entity changes, authentication or authorization, tenancy, integrity safeguards or secrets goes back to the Full lane. The size threshold is an example that an adopting team tunes: about 150 added lines and 5 files.
 
-Never waived in any lane: the Immutable Rules in the root `CLAUDE.md` and the grounding rule. Every change that is merged also passes the AI review on its pull request.
+Never waived in any lane: the Immutable Rules in the root `CLAUDE.md` and the grounding rule. Outside the Trivial lane (no review gate) and the Spike lane (never merged), every change also passes the review pair and the local AI review, and the GitHub AI review when `ANTHROPIC_API_KEY` is set.

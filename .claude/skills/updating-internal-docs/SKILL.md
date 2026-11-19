@@ -57,7 +57,7 @@ The `core/CLAUDE.md` row is an illustration of the format; that file does not ex
 ## Example: new immutable rule
 
 ```markdown
-9. **Every outbound HTTP call has a timeout and a retry budget from Options.** A bare `HttpClient` call without both is a blocking review finding.
+9. **Every outbound HTTP call has a timeout and a retry budget from Options.** A bare `HttpClient` call without both is a High review finding.
 ```
 
 State the rule, its consequence and who enforces it in one or two lines.

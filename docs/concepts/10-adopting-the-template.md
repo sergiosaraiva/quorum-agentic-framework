@@ -60,7 +60,7 @@ Run `python3 scripts/kb/ingest.py` for both KBs; each run re-embeds everything. 
 
 ### 9. Register the MCP servers
 
-`.mcp.json` at the repo root (from step 2) registers `business-kb` and `qa-kb`, each launching `python3 scripts/kb/mcp_server.py` with the right arguments; add `--backend pg` (or `KB_BACKEND=pg`) and the database environment variables if you use pgvector. Restart Claude Code, then in a session list the tools and confirm `mcp__business-kb__search` and `mcp__qa-kb__search` respond. If they do not, agents fall back to reading files and lose ranked search; fix this before relying on the gate in [04](04-never-invent.md).
+`.mcp.json` at the repo root (from step 2) registers `business-kb` and `qa-kb`, each launching `python3 scripts/kb/mcp_server.py` with the right arguments; add `--backend pg` (or `KB_BACKEND=pg`) and the database environment variables if you use pgvector. Restart Claude Code, then in a session list the tools and confirm `mcp__business-kb__search` and `mcp__qa-kb__search` respond. If they do not, agents with Bash fall back to `python3 scripts/kb/search.py`, which keeps the BM25 ranking, and agents without Bash read the files directly, which does not; fix the servers before relying on the gate in [04](04-never-invent.md).
 
 ### 10. Set up CI
 

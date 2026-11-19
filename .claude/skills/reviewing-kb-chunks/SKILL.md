@@ -9,13 +9,15 @@ Read-only. Report findings with evidence; never edit. Fixes go back to `document
 
 ## Passes (in order)
 
-| Pass | Check | Blocking when |
-|------|-------|---------------|
-| 1 Grounding | Extract every factual claim; open each file in `sources` and verify it. Score grounded / partial / ungrounded / stale. "Not shown" must not be restated as "not implemented" | Any ungrounded or stale claim |
-| 2 Citation existence | Every `sources` path and every `links` chunk_id exists; ids unique | A dangling reference |
-| 3 Style and slop | Hedging, meta-commentary, restated title, summary sentence, marketing, a fact stated twice, terminology drift from sibling chunks, conversion noise | Noise or invented content; slop alone is minor |
-| 4 Shape | Self-contained (no outward-pointing pronouns), one topic, 40-350 words (the lint limit; aim for 80 to 300; outside that is a target miss only), flat formatting, frontmatter complete (`chunk_id`, `title`, `topics`, `links`, `sources`; optional `example`) | Missing frontmatter, two topics |
-| 5 Cross-chunk | A fact belonging to another topic is linked, not re-explained; run a `business-kb` search for near-duplicates | Duplicated mechanism |
+| Pass | Check | Status when it fails |
+|------|-------|----------------------|
+| 1 Grounding | Extract every factual claim; open each file in `sources` and verify it. Score grounded / partial / ungrounded / stale. "Not shown" must not be restated as "not implemented" | `ungrounded` or `stale` |
+| 2 Citation existence | Every `sources` path and every `links` chunk_id exists; ids unique | `dangling-link` (also a `gate-failure` when `check_chunks.py` reports it) |
+| 3 Style and slop | Hedging, meta-commentary, restated title, summary sentence, marketing, a fact stated twice, terminology drift from sibling chunks, conversion noise | `noise` or `slop` |
+| 4 Shape | Self-contained (no outward-pointing pronouns), one topic, 40-350 words (the lint limit; aim for 80 to 300; outside that is a target miss only), flat formatting, frontmatter complete (`chunk_id`, `title`, `topics`, `links`, `sources`; optional `example`) | `not-self-contained`, `two-topics`; missing frontmatter is a `gate-failure` when `check_chunks.py` reports it |
+| 5 Cross-chunk | A fact belonging to another topic is linked, not re-explained; run a `business-kb` search for near-duplicates | `redundant` |
+
+Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, `stale`, `conflict` and `gate-failure` (reported at confidence >= 0.8) block; every other status is `minor` and is dispositioned.
 
 ## Output
 

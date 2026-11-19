@@ -67,7 +67,7 @@ Per finding: location in the doc, quoted claim, status, confidence, evidence (fi
 ## Quality Checklist
 
 - [ ] Every claim checked against code or an external source
-- [ ] Below-0.80 items noted as reviewed, not reported as blocking
+- [ ] 0.50-0.79 items listed in `coverage_gaps` as unverified with their would-be status, never blocking; below 0.50 not reported
 - [ ] Stale distinguished from ungrounded
 - [ ] Coverage gaps reported separately
 - [ ] Business claims traced to KB ids or flagged

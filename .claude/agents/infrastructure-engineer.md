@@ -110,4 +110,5 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
 |---------|----------|
 | Deploy configuration lives in another repo not provided | Produce the file contents and target path as a patch description; mark `unaudited` for anything depending on it |
 | Reviewer finds a wildcard permission | Narrow it; cap 3 rounds then escalate to a human |
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (authoring branch) |
 | Cost unknown | State the assumption set and mark the estimate low-confidence |

@@ -43,11 +43,11 @@ A finding without evidence cannot be acted on or disputed. Every finding carries
 | Fix direction | The smallest change that would address it |
 | Test hint | The test that would have caught it, if one exists |
 
-A bare "looks fine" is not a result. A clean review states what was checked, so silence cannot be mistaken for coverage. The tools use different scales, so `.claude/agents/_SHARED-PATTERNS.md` maps them: Critical = Blocker, High = Major (both block); Medium, Low and Minor do not; a documentation-reviewer finding of type `ungrounded`, `conflict` or `gate-failure` with confidence of at least 0.8 blocks; in the PR review a Blocker blocks and Warning or Info do not.
+A bare "looks fine" is not a result. A clean review states what was checked, so silence cannot be mistaken for coverage. The tools use different scales, so `.claude/agents/_SHARED-PATTERNS.md` maps them: Critical and High block (the ux scale's Blocker and Major block too); Medium and Low do not; a documentation-reviewer finding of status `ungrounded`, `stale`, `conflict` or `gate-failure` blocks (confidence only decides what is reported: 0.50 to 0.79 is listed as unverified, and unverified items never block); in the PR review a Blocker blocks and Warning or Info do not.
 
 ## Blocking, non-blocking, dispositions
 
-Blocking findings (data loss, security, broken contract, violated Immutable Rule, unauthorised endpoint) stop the pipeline. Non-blocking findings do not stop it but are never dropped silently: each is given a disposition in the hand-off (fixed now, deferred with a recorded question or work item, or declined with a reason). Reviewers also must not raise a finding that a rule explicitly lists as a known non-issue, so the same false alarm is not re-argued each round.
+Blocking findings (Critical or High severity, for example data loss, an exploitable security hole, a broken contract, a violated Immutable Rule or an unauthorised endpoint) stop the pipeline. A Medium security finding does not block; before merge the session records it as an open question and, once the owner accepts the risk, as a decision. Non-blocking findings do not stop it but are never dropped silently: each is given a disposition in the hand-off (fixed now, deferred with a recorded question or work item, or declined with a reason). Reviewers also must not raise a finding that a rule explicitly lists as a known non-issue, so the same false alarm is not re-argued each round.
 
 ## The loop and its cap
 

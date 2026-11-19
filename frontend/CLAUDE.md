@@ -40,4 +40,4 @@ A DTO change in `src/Api/Features/**/Dtos.cs` must be mirrored in the feature's 
 
 ## Lockfile
 
-CI installs with `npm ci`, which needs `frontend/package-lock.json`; the frontend CI job is skipped while it is missing. Create it once on your machine against the registry your organisation uses (`cd frontend && npm install`) and commit it. The template does not ship one because a lockfile embeds the registry URL of whoever generated it.
+CI installs with `npm ci` from the committed `frontend/package-lock.json`, which resolves every package from the public npm registry. If your organisation uses a private registry, regenerate it against that registry (`cd frontend && rm package-lock.json && npm install`) and commit it. A lockfile embeds the registry URL of whoever generated it; never commit one that points at a private registry from a public repo. The CI job skips itself if the file is removed.

@@ -161,7 +161,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 | KB tooling (`scripts/kb`) | unit tests, run with `python3 -m unittest discover -s scripts/kb/tests`; chunk lint with `check_chunks.py` |
 | Framework lint, local review script | unit tests under `scripts/tests/` (`python3 -m unittest discover -s scripts/tests`) |
 | Sample backend (Orders) | xUnit unit and integration tests (Testcontainers needs Docker) |
-| Frontend skeleton | has specs but needs `npm ci` first; the template does not ship a lockfile (see `frontend/CLAUDE.md`), so the CI frontend job is skipped until you add one |
+| Frontend skeleton | builds and passes its 10 tests; `frontend/package-lock.json` is committed (public npm registry), so the CI frontend job runs. If your organisation uses a private registry, regenerate it (see `frontend/CLAUDE.md`) |
 | GitHub workflow `ai-pr-review.yml` | optional second gate, not run end to end in this template: it needs your repository, `ANTHROPIC_API_KEY` and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
 | Agents, skills, hooks | linted for structure only; behaviour was not evaluated on real tasks |
 | pgvector search quality | not measured; the default embedding is a hash stub |
@@ -172,7 +172,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 - This is a starting point, not a product. Replace every `{{PLACEHOLDER}}` and the example domain.
 - The default embedding provider is a deterministic hash stub for offline demos. It is not semantic. Configure a real embedding model before relying on vector search (see `scripts/kb/README.md`).
 - Model prices, model ids and GitHub Action versions change. Items marked "verify" need a check against current official documentation.
-- The Angular skeleton under `frontend/` was not built when the template was written. Create a lockfile with `npm install`, then `npm run build`.
+- The Angular skeleton under `frontend/` builds and its tests pass (verified 2026-11-19, Node 24, public registry). CI covers it through the committed lockfile.
 - The template assumes no cloud or deployment platform. Pick yours and record it as a TQ; agents never guess a platform or tool.
 
 ## License

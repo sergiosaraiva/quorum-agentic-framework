@@ -47,7 +47,7 @@ A bare "looks fine" is not a result. A clean review states what was checked, so 
 
 ## Where unverified items go
 
-An unverified item is a finding the reviewer could not confirm (confidence 0.50 to 0.79) or a check it could not run (for example chunk verification while the KB is unreachable). It never blocks. Each reviewer lists it in a fixed place, and the session reads all of them:
+An unverified item is a finding the reviewer could not confirm (confidence 0.50 to 0.79) or a check it could not run (for example chunk verification while the KB is unreachable). A check that could not run has no would-be severity: every reviewer writes it as `unverified: <check>, <reason>`. It never blocks. Each reviewer lists it in a fixed place, and the session reads all of them:
 
 | Reviewer | Where | Label |
 |----------|-------|-------|

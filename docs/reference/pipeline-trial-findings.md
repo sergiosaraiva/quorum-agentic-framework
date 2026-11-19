@@ -124,7 +124,7 @@ Repo evidence: the two commits `feat(orders): filter and search the order list (
 
 ## 4. Prioritised fix list
 
-Selection rule: the two High findings come first (A1, E1). The rest are ordered by how directly a trial agent was blocked or misled, then by how many findings one change closes. Findings not listed here (A4, B7 beyond rank 6, C6 to C11, D1 to D3, D7, E5 to E10, F4, F5, G1) scored lower on both measures.
+Selection rule: the two High findings come first (A1, E1). The rest are ordered by how directly a trial agent was blocked or misled, then by how many findings one change closes. Findings not listed here (A4, C6 to C11, D1 to D3, D7, E5 to E10, F4, F5, G1) scored lower on both measures.
 
 | Rank | Fix | Findings | Why first |
 |---|---|---|---|

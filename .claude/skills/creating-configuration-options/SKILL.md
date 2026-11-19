@@ -9,7 +9,7 @@ This skill owns the "no hard-coded values" rule; other skills point here. Princi
 
 ## Quick Reference
 
-- A value that can differ per environment, tenant or deployment, or that someone may need to tune (URLs, ids, names, thresholds, limits, rates, timeouts, page sizes, feature switches) never appears as a literal in logic. It comes from typed Options (appsettings/env vars), the database (tenant-varying), or deployment values (Helm). Secrets never in source
+- A value that can differ per environment, tenant or deployment, or that someone may need to tune (URLs, ids, names, thresholds, limits, rates, timeouts, page sizes, feature switches) never appears as a literal in logic. It comes from typed Options (appsettings/env vars), the database (tenant-varying), or deployment configuration. Secrets never in source
 - A fixed domain or protocol constant (HTTP header name, unit conversion factor, state-machine status string) is a named `const` declared once in the owning type, not an Options property
 - One `sealed class` per logical section, bound once, injected as `IOptions<T>`. `IOptionsMonitor<T>` only when the value genuinely changes without a restart
 - Validate at startup: `ValidateDataAnnotations().ValidateOnStart()`. Fail fast, not three requests into production
@@ -23,10 +23,10 @@ Can the value ever differ by environment, tenant or deployment, or will someone 
   No  -> named const in the owning type; no Options class
   Yes -> continue
 Differs per tenant?           -> database (tenant data), not appsettings
-Differs per environment?      -> Options class, value from appsettings / env (Helm `env` values)
+Differs per environment?      -> Options class, value from appsettings / env (deployment configuration)
 Changes only on redeploy?     -> IOptions<T>
 Changes at runtime (flag)?    -> IOptionsMonitor<T>
-Is a secret?                  -> secrets manager surfaced as env/config; user-secrets locally; never appsettings.json
+Is a secret?                  -> platform's secret store surfaced as env/config; user-secrets locally; never appsettings.json
 Extending an existing section?-> add a property to that class; a new class only for a new logical section
 ```
 
@@ -55,7 +55,7 @@ public sealed class ReportExportService(IOptions<ReportingOptions> options)
 }
 ```
 
-Secrets: locally `builder.Configuration.AddUserSecrets<Program>()` (`dotnet user-secrets set "Database:ConnectionString" "${VALUE}"`); in AWS an external-secrets sync surfaces the value as a normal configuration key. App code is identical; only the provider differs. Put an actionable message on `[Required]` telling a developer which `user-secrets set` command to run. `[Required]` on a non-nullable `int` with a default is redundant; use `int?` when "unset" must be distinguishable.
+Secrets: locally `builder.Configuration.AddUserSecrets<Program>()` (`dotnet user-secrets set "Database:ConnectionString" "${VALUE}"`); when deployed, the platform's secret store surfaces the value as a normal configuration key. App code is identical; only the provider differs. Put an actionable message on `[Required]` telling a developer which `user-secrets set` command to run. `[Required]` on a non-nullable `int` with a default is redundant; use `int?` when "unset" must be distinguishable.
 
 ## Quality Checklist
 
@@ -64,7 +64,7 @@ Secrets: locally `builder.Configuration.AddUserSecrets<Program>()` (`dotnet user
 - [ ] One options class per logical section, `SectionName` const beside it, no speculative properties
 - [ ] `ValidateDataAnnotations().ValidateOnStart()` on every registration
 - [ ] No secret in any `appsettings*.json`
-- [ ] A new option is also set where each environment is configured (Helm values, `.env.example`, `appsettings.json`); drift is checked by `verifying-cross-file-coupling`
+- [ ] A new option is also set where each environment is configured (deployment configuration, `.env.example`, `appsettings.json`); drift is checked by `verifying-cross-file-coupling`
 
 ## Common Mistakes
 
@@ -73,11 +73,11 @@ Secrets: locally `builder.Configuration.AddUserSecrets<Program>()` (`dotnet user
 | `if (rows > 500)`, `TimeSpan.FromSeconds(10)`, a literal vendor URL | Validated Options property |
 | Options property for something identical everywhere forever | `private const` |
 | `configuration["A:B"]` scattered in services | Bind once to a typed class |
-| Secret committed to appsettings | Secrets manager / user-secrets |
+| Secret committed to appsettings | Platform's secret store / user-secrets |
 | Tenant-specific value in appsettings | Tenant data in the database |
 | No startup validation | `ValidateOnStart()` |
 | One mega `AppOptions` | One class per section |
 
 ## Related Skills
 
-`creating-application-services`, `deploying-to-aws` (how values and secrets reach the pod), `verifying-cross-file-coupling`.
+`creating-application-services`, `deploying-the-application` (how values and secrets reach the running app), `verifying-cross-file-coupling`.

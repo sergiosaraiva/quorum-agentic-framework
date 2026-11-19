@@ -1,6 +1,6 @@
 ---
 name: implementing-observability
-description: Implements structured logging, metrics and distributed tracing for an ASP.NET Core + Angular app on AWS with ILogger JSON logs, OpenTelemetry (OTLP) and CloudWatch alarms that page a human on user-impact signals. Use when adding logging, tracing or metrics, wiring OpenTelemetry, defining alarms, or reviewing what a service emits.
+description: Implements structured logging, metrics and distributed tracing for an ASP.NET Core + Angular app with ILogger JSON logs, OpenTelemetry (OTLP) to the metrics and log backend the adopter chose, and alerts that page a human on user-impact signals. Use when adding logging, tracing or metrics, wiring OpenTelemetry, defining alarms, or reviewing what a service emits.
 ---
 
 # Implementing Observability
@@ -13,12 +13,12 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. Observability is a requ
 - Use OpenTelemetry's built-in instrumentations (ASP.NET Core, EF Core, `HttpClient`, runtime) once. Hand-write an `ActivitySource` or `Meter` only when a named SLO or a recurring incident cannot be answered by the built-ins
 - Alarm only on user-impact signals you would act on at 3am (error rate, p99 latency, queue depth). Each alarm has an owner and a runbook line
 - No logging or telemetry abstraction over `ILogger`/OpenTelemetry. Pick the right level (no chatty `Information` in loops). Never log PII, secrets or tokens
-- Sampling rate, exporter endpoint, service name and thresholds are configuration (`OTEL_*` env vars, Options, Helm values), not literals
+- Sampling rate, exporter endpoint, service name and thresholds are configuration (`OTEL_*` env vars, Options, deployment configuration), not literals
 - Audit (for auditors: who did what, append-only) and logging (technical diagnostics) are separate concerns with separate storage
 
 ## Quick Reference
 
-- JSON console logs with scopes so CloudWatch Logs Insights can query fields
+- JSON console logs with scopes so the log backend can query fields
 - Structured message templates (`{ReportId}`), never string interpolation
 - A correlation id (trace id) on every log line; propagate it to outbound calls and return it in error responses
 - Request-scoped context (tenant, user id) is added once by middleware through `logger.BeginScope`, not repeated at each call
@@ -29,8 +29,8 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. Observability is a requ
 
 ```
 Debug one request?             -> structured logs with the trace id
-Is the system healthy now?     -> metrics + CloudWatch alarms
-Where is the time going?       -> distributed tracing (OpenTelemetry -> X-Ray or your OTLP collector)
+Is the system healthy now?     -> metrics + alerts in the chosen backend
+Where is the time going?       -> distributed tracing (OpenTelemetry -> your OTLP collector)
 Would this page someone at 3am?-> alarm on error rate or p99, not raw CPU
 Need an audit trail?           -> separate append-only audit table/service, not logs
 ```
@@ -71,7 +71,7 @@ Alarm sketch (user-impact signals):
 | p99 latency | p99 above SLO for 10 min | page or ticket by severity |
 | Queue depth/age | oldest message age growing | ticket, page if customer-visible |
 
-Alarm definitions are infrastructure: define them as code with the tool your team chose (`implementing-infrastructure-as-code`); flag it if no path is confirmed. Do not click alarms into the console.
+Alarm definitions are infrastructure: define them as code with the tool your team chose (`implementing-infrastructure-as-code`); flag it if no path is confirmed. Never create alerts by hand in a console. The metrics and log backend is the adopter's choice, recorded in a TQ or OD record.
 
 ## Quality Checklist
 
@@ -94,4 +94,4 @@ Alarm definitions are infrastructure: define them as code with the tool your tea
 
 ## Related Skills
 
-`managing-application-lifecycle`, `deploying-to-aws`, `implementing-infrastructure-as-code`, `creating-configuration-options`.
+`managing-application-lifecycle`, `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-configuration-options`.

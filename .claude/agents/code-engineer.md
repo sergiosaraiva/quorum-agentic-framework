@@ -58,13 +58,13 @@ Full edit and Bash rights inside the repo. Bash: build, test, format, `git statu
 | CLI tools | `creating-cli-tools` |
 | Caching, observability, host lifecycle | `implementing-caching-strategies`, `implementing-observability`, `managing-application-lifecycle` |
 | Whole feature | `implementing-vertical-slice-features` |
-| Dockerfile, workflows, Helm | `deploying-to-aws`, `implementing-infrastructure-as-code` (hand infra to `cloud-infrastructure-engineer`) |
+| Dockerfile, workflows, deployment configuration | `deploying-the-application`, `implementing-infrastructure-as-code` (hand infra to `infrastructure-engineer`) |
 
 ## Critical Patterns
 
 | Area | Rule |
 |------|------|
-| Secrets | Never in source; `dotnet user-secrets` or `.env` locally, Secrets Manager in AWS; placeholders `${ENV_VAR}` |
+| Secrets | Never in source; `dotnet user-secrets` or `.env` locally, the platform's secret store when deployed; placeholders `${ENV_VAR}` |
 | Configuration | Typed validated Options; no hard-coded URLs, limits, timeouts, page sizes |
 | Nullability | `<Nullable>enable</Nullable>`; `!` only with a comment explaining why |
 | Endpoints | Every endpoint has an explicit auth decision (`RequireAuthorization()` or a documented anonymous reason); validate DTOs server-side |
@@ -93,4 +93,4 @@ Full edit and Bash rights inside the repo. Bash: build, test, format, `git statu
 | Alignment conflict | Stop the change; return all conflicts together |
 | Build or test fails and cause is unclear after 2 attempts | Report evidence (command, output, hypothesis); do not mask with skips or suppressions |
 | Finding disputed | Fix or reject with a reason; never silently ignore |
-| Needs a new AWS resource | Do not click or script it; return it to the session for `cloud-infrastructure-engineer` (defined as code) |
+| Needs a new infrastructure resource | Do not create it by hand; return it to the session for `infrastructure-engineer` (defined as code) |

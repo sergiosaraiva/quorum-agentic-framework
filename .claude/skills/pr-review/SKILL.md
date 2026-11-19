@@ -18,7 +18,7 @@ Reviewers are read-only and independent of the author. Build and tests are CI's 
 | Review | Runs the `quality-guardian` and `regression-detective` subagents on the PR diff |
 | Output | One summary comment plus up to 20 inline comments on exact diff lines. How the inline-comment tool handles a line outside the diff is the action's behaviour (verify it); the template does not implement a fallback |
 
-Optional extensions, not implemented in the template: resolving threads fixed by later commits, choosing the model by path sensitivity, chunking a large diff across parallel reviewer calls, adding `security-engineer` or `cloud-infrastructure-engineer` per chunk. Do not claim them in a review.
+Optional extensions, not implemented in the template: resolving threads fixed by later commits, choosing the model by path sensitivity, chunking a large diff across parallel reviewer calls, adding `security-engineer` or `infrastructure-engineer` per chunk. Do not claim them in a review.
 
 An incomplete review says so; never post "no issues" for work not reviewed.
 

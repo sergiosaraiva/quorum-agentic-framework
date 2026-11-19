@@ -22,7 +22,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. If the project keeps a 
 - No blanket soft delete. Where required: `deleted_at` / `deleted_by`, a partial unique index `WHERE deleted_at IS NULL`, a named EF query filter, never `is_deleted boolean`
 - Period-valid data: `daterange valid_during` + `EXCLUDE USING gist` (`btree_gist`), end-dated instead of updated in place
 - `DeleteBehavior` per relationship: `Cascade` only when the child is meaningless without the parent, else `Restrict` or `SetNull`
-- Per-customer settings: one typed single-row `<area>_setting` table, not key/value. Deploy-varying values stay in Options/Helm (`creating-configuration-options`)
+- Per-customer settings: one typed single-row `<area>_setting` table, not key/value. Deploy-varying values stay in Options/deployment configuration (`creating-configuration-options`)
 
 ## Multi-tenancy (optional, decide once)
 

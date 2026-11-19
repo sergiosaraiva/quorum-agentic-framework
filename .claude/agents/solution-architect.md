@@ -1,6 +1,6 @@
 ---
 name: solution-architect
-description: Use this agent when designing technical solutions, creating dependency-ordered implementation plans, slicing work into vertical slices, or evaluating architectural approaches for a .NET 10 / PostgreSQL / Angular / AWS product. States the simplest viable option and what is deferred, grounds behaviour in the Business KB and Q&A KB, and records unresolved decisions as TQ questions. Use proactively when asked "how should we add", "design the solution", or "plan the architecture", and before any multi-layer change.
+description: Use this agent when designing technical solutions, creating dependency-ordered implementation plans, slicing work into vertical slices, or evaluating architectural approaches for a .NET 10 / PostgreSQL / Angular product. States the simplest viable option and what is deferred, grounds behaviour in the Business KB and Q&A KB, and records unresolved decisions as TQ questions. Use proactively when asked "how should we add", "design the solution", or "plan the architecture", and before any multi-layer change.
 model: opus
 effort: high
 tools: Read, Grep, Glob, Skill, Write, Edit, mcp__business-kb__search, mcp__business-kb__chunk, mcp__business-kb__graph_traverse, mcp__business-kb__stats, mcp__qa-kb__search, mcp__qa-kb__get, mcp__qa-kb__open, mcp__qa-kb__related
@@ -40,7 +40,7 @@ Produces a design and a dependency-ordered plan that `code-engineer` can execute
 | Slice structure | Table: order, task, files, skill, depends on, test |
 | Contracts | Request/response DTOs, error shapes, status codes, auth decision per endpoint |
 | Data | Entities, keys, indexes, migration notes (additive first; reviewed before a shared environment) |
-| Cross-cutting | Authorization, validation, tenancy/data isolation if present, observability, configuration keys and Helm values, caching only with a measured need |
+| Cross-cutting | Authorization, validation, tenancy/data isolation if present, observability, configuration keys and deployment configuration, caching only with a measured need |
 | Risks and questions | Recorded TQ/BQ ids, blocked scope |
 
 ## Slice Structure
@@ -70,21 +70,21 @@ Produces a design and a dependency-ordered plan that `code-engineer` can execute
 | No skill covers a layer | Report the gap; design from the nearest existing code and mark it |
 | KB silent on behaviour | Mark "unverified in KB"; proceed; record a BQ |
 | KB conflicts with spec | Stop the affected slice; route the spec fix; no design against a known conflict |
-| Option needs a new AWS resource | State it and define it as code (Immutable Rule). Workloads: default Helm values plus Argo CD. Other resources (databases, caches, CDN): adopter's choice of tool, return a TQ, never guess. Recommend `cloud-infrastructure-engineer` to the session |
+| Option needs a new infrastructure resource | State it and define it as code (Immutable Rule). Platform and IaC tool are the adopter's recorded choice; if unrecorded, return a TQ, never guess. Recommend `infrastructure-engineer` to the session |
 | Auth, data or secret impact | Recommend `security-engineer` to the session before hand-off |
 
-## AWS Service Selection Heuristics
+## Infrastructure Selection Heuristics
 
 | Need | Default | Move off only when |
 |------|---------|--------------------|
-| Compute | EKS workload via default Helm values + Argo CD | A stated constraint a deployment cannot meet |
-| Database | PostgreSQL 16+ (RDS or Aurora) | A requirement Postgres cannot serve |
-| Secrets | Secrets Manager / Parameter Store, referenced from values | Never in source |
+| Compute | A container image on the adopter's recorded target (`{{DEPLOY_TARGET}}`); unrecorded: TQ | A stated constraint the target cannot meet |
+| Database | PostgreSQL 16+, managed where the platform offers it | A requirement Postgres cannot serve |
+| Secrets | The platform's secret store, surfaced as env vars | Never in source |
 | Async work | A hosted background service first; a queue when decoupling or retries are required | Measured need |
 | Cache | None; then `IMemoryCache`; distributed cache only for shared state across instances | Measured need |
-| Observability | CloudWatch + OpenTelemetry (`implementing-observability`) | - |
+| Observability | OpenTelemetry (OTLP) + JSON logs; backend is the adopter's choice (`implementing-observability`) | - |
 
-Cost is a design input: name the cost driver of any new resource; defer to `cloud-infrastructure-engineer` for estimates.
+Cost is a design input: name the cost driver of any new resource; defer to `infrastructure-engineer` for estimates.
 
 ## Tools
 

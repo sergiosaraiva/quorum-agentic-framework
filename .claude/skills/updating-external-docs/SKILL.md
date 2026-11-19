@@ -7,7 +7,7 @@ description: Use when writing or updating human-facing docs in full natural lang
 
 ## Quick Reference
 
-- Full sentences. Explain internal jargon in one clause the first time.
+- Full sentences. Explain an internal term in one clause the first time.
 - The reader is a person reading once: optimize for clarity, not density.
 - Every behaviour claim is grounded in shipped code or a KB record, never aspirational. Product behaviour comes from the business KB; cite the chunk id where the doc keeps references.
 - Release notes say what changed and why it matters to the reader, not an implementation diary.
@@ -33,7 +33,7 @@ description: Use when writing or updating human-facing docs in full natural lang
 | Do | Do not |
 |----|--------|
 | Say why, not just what | Assume the reader has your context |
-| Define jargon on first use | Drop an unexpanded acronym |
+| Define an internal term on first use | Drop an unexpanded acronym |
 | Show a concrete example of the feature in use | Describe abstractly |
 | Active voice, present tense for current behaviour | Passive voice; mixing "will" and "does" |
 | One term per concept for the whole doc | Switch between "workspace" and "environment" |
@@ -47,7 +47,7 @@ Adapted from Orwell's rules and Simplified Technical English (apply as guidance;
 2. Short word over long: use not utilize, start not initiate.
 3. Cut every word you can ("in order to", "the fact that").
 4. Active voice; name the actor when it matters.
-5. Everyday word over jargon when equally accurate; keep a term that carries real technical precision.
+5. Everyday word over an insider term when equally accurate; keep a term that carries real technical precision.
 6. One main statement per sentence; split at "and it also" or a semicolon.
 7. Procedures: one action per step, imperative, in order, with the expected result.
 8. Break any rule sooner than write something unclear.
@@ -93,7 +93,7 @@ Descriptive link text, headings in order, alt text for images, tables with heade
 ## Quality Checklist
 
 - [ ] Every claim true of the shipped system; planned items labelled "planned"
-- [ ] One term per concept; jargon defined once
+- [ ] One term per concept; internal terms defined once
 - [ ] Active voice, short sentences, no stock metaphors
 - [ ] Concrete example or request/response included
 - [ ] Code and identifiers verbatim; no line-number citations

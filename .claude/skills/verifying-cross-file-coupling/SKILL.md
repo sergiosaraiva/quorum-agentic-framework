@@ -1,6 +1,6 @@
 ---
 name: verifying-cross-file-coupling
-description: Use when verifying that files which must agree have not drifted. Six coupling categories C1-C6 (DTO and TypeScript, EF Core and raw SQL, options and Helm values, container and app config, dependency and image-tag pins, duplicated formulas). Used by regression-detective and documentation-reviewer.
+description: Use when verifying that files which must agree have not drifted. Six coupling categories C1-C6 (DTO and TypeScript, EF Core and raw SQL, options and deployment configuration, container and app config, dependency and image-tag pins, duplicated formulas). Used by regression-detective and documentation-reviewer.
 ---
 
 # Verifying Cross-File Coupling
@@ -11,12 +11,12 @@ description: Use when verifying that files which must agree have not drifted. Si
 |------|----------|--------|--------|
 | C1 | DTO and TypeScript interface | `src/Api/Features/**/Dtos.cs` | `frontend/src/app/**/*.model.ts` or inline interface |
 | C2 | EF Core entity or query shape and raw SQL | `src/Infrastructure/**/Entities`, configurations | hand-written SQL: migrations, reports, seed scripts |
-| C3 | `appsettings*.json` / `IOptions<T>` and Helm values | `**/*Options.cs`, `appsettings.json` | Helm values `env` entries in the GitOps repo |
-| C4 | Container or deployment config and app startup expectations | `Dockerfile`, compose file, Helm `probes`/`resources`/`env` | `Program.cs` required config, health endpoints |
+| C3 | `appsettings*.json` / `IOptions<T>` and deployment configuration | `**/*Options.cs`, `appsettings.json` | Deployment configuration `env` entries (possibly in another repo) |
+| C4 | Container or deployment config and app startup expectations | `Dockerfile`, compose file, deployment health checks/resources/`env` | `Program.cs` required config, health endpoints |
 | C5 | Version pins and their other pin sites | `*.csproj`, `package.json`, an image tag | lock files; every other file pinning the same image (compose, Testcontainers constant, `Dockerfile FROM`) must show the identical tag |
 | C6 | Duplicated business formula | any two files computing the "same" thing | - |
 
-**Cross-repo note**: if Helm values live in a separate GitOps repository, check C3/C4 only when that file is supplied with the diff. Otherwise report them as `unaudited (blocked)`; never reconstruct a values file from memory.
+**Cross-repo note**: if deployment configuration lives in a separate repository, check C3/C4 only when that file is supplied with the diff. Otherwise report them as `unaudited (blocked)`; never reconstruct a values file from memory.
 
 ## Workflow
 

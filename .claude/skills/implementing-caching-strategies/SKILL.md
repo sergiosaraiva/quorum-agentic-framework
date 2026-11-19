@@ -1,6 +1,6 @@
 ---
 name: implementing-caching-strategies
-description: Implements caching only when a measured need exists, choosing tenant-safe HybridCache, IMemoryCache for single-instance-safe non-tenant data, or a distributed cache (Redis/ElastiCache) for data shared across scaled-out instances, with explicit expiration and invalidation. Use when a profiled read is slow or loads the database, or when reviewing a cache for staleness and tenant-leak risk.
+description: Implements caching only when a measured need exists, choosing tenant-safe HybridCache, IMemoryCache for single-instance-safe non-tenant data, or a distributed cache (Redis) for data shared across scaled-out instances, with explicit expiration and invalidation. Use when a profiled read is slow or loads the database, or when reviewing a cache for staleness and tenant-leak risk.
 ---
 
 # Implementing Caching Strategies
@@ -34,7 +34,7 @@ Never cache per-request authorization decisions, data needing read-your-writes, 
 Measured need?                         -> no: do not cache
 Tenant data?                           -> ITenantCache (HybridCache-backed), never raw IMemoryCache
 Non-tenant, process-wide, staleness ok?-> IMemoryCache with a comment
-Shared across instances and must agree?-> HybridCache with a distributed L2 (Redis/ElastiCache)
+Shared across instances and must agree?-> HybridCache with a distributed L2 (Redis)
 Changed by a write elsewhere?          -> explicit RemoveAsync in the write path; TTL alone is not correctness
 One tenant must be purged?             -> tag-based admin purge
 ```
@@ -65,7 +65,7 @@ await db.SaveChangesAsync(ct);
 await cache.RemoveAsync("countries:all", ct);   // invalidate explicitly
 ```
 
-Distributed L2 (only after a measured need): register `AddStackExchangeRedisCache(...)` with the endpoint from Options and a secret from the secrets manager; provision the cache cluster through your infrastructure-as-code tool (`implementing-infrastructure-as-code`, flag the tool choice).
+Distributed L2 (only after a measured need): register `AddStackExchangeRedisCache(...)` with the endpoint from Options and a secret from the platform's secret store; provision the cache cluster through your infrastructure-as-code tool (`implementing-infrastructure-as-code`, flag the tool choice).
 
 ## Quality Checklist
 

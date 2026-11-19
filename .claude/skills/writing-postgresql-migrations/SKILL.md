@@ -73,4 +73,4 @@ A pipeline job loops over tenant databases, applies the bundle per tenant, recor
 
 ## Related Skills
 
-`database`, `deploying-to-aws` (migrate job), `tuning-postgresql-queries` (does the index earn its place), `writing-integration-tests`.
+`database`, `deploying-the-application` (migrate step), `tuning-postgresql-queries` (does the index earn its place), `writing-integration-tests`.

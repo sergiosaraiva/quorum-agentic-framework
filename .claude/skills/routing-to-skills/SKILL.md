@@ -30,7 +30,7 @@ On-demand router. It recommends; the caller reads the skill and decides.
 | `e2e/**`, Playwright | `writing-playwright-e2e-tests` |
 | `tests/**` .NET | `creating-xunit-tests`, `writing-integration-tests` |
 | Mutation or load tests | `running-mutation-tests`, `load-and-performance-testing` |
-| `.github/workflows/**`, Dockerfile | `deploying-to-aws`, `implementing-infrastructure-as-code` |
+| `.github/workflows/**`, Dockerfile | `deploying-the-application`, `implementing-infrastructure-as-code` |
 | Logging, metrics, tracing | `implementing-observability` |
 | Hosting, health checks, shutdown | `managing-application-lifecycle` |
 | Caching | `implementing-caching-strategies` |

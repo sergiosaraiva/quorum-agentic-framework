@@ -1,6 +1,6 @@
 ---
 name: managing-application-lifecycle
-description: Manages ASP.NET Core host startup and shutdown, background services, health checks and graceful draining for Kubernetes (EKS) deployments. Use when adding a BackgroundService or hosted service, health/readiness endpoints, probes in Helm values, startup validation, or shutdown behaviour.
+description: Manages ASP.NET Core host startup and shutdown, background services, health checks and graceful draining for container deployments on the adopter's chosen platform. Use when adding a BackgroundService or hosted service, health/readiness endpoints, deployment health checks, startup validation, or shutdown behaviour.
 ---
 
 # Managing Application Lifecycle
@@ -18,10 +18,10 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`.
 ## Quick Reference
 
 - Minimal hosting (`WebApplication.CreateBuilder`), no `Startup.cs`
-- `/health/live`: the process is up (no dependency checks, `Predicate = _ => false`). `/health/ready`: dependencies reachable. Both anonymous, documented as such. Set the paths explicitly in the Helm values probes; do not assume the chart supplies defaults (verify against the chart's schema and render with `helm template`)
-- Use a `startup` probe for slow warm-up so liveness does not kill a starting pod
+- `/health/live`: the process is up (no dependency checks, `Predicate = _ => false`). `/health/ready`: dependencies reachable. Both anonymous, documented as such. Set the paths explicitly in the deployment's health-check configuration; do not assume platform defaults (verify against the platform's schema)
+- Use a startup check (or initial delay) for slow warm-up so liveness does not kill a starting instance
 - Recurring work: `BackgroundService` via `AddHostedService<T>()`, honouring `stoppingToken`, one `PeriodicTimer` loop, exceptions caught and logged so one failure does not end the loop
-- Kubernetes sends `SIGTERM`, then `SIGKILL` after `terminationGracePeriodSeconds`. The host drains in-flight requests by default; keep `HostOptions.ShutdownTimeout` below the grace period
+- Container platforms typically send `SIGTERM`, then `SIGKILL` after a grace period. The host drains in-flight requests by default; keep `HostOptions.ShutdownTimeout` below the platform's grace period
 - A background worker that handles per-tenant data takes the tenant only from the message envelope, one DI scope per message, never from the payload body
 - Fail fast on bad configuration (`ValidateOnStart()`), so a bad deploy never becomes ready
 
@@ -73,22 +73,22 @@ public sealed class ExpiredInviteCleaner(
 builder.Services.AddHostedService<ExpiredInviteCleaner>();
 ```
 
-Helm values probes (keys verified against your chart's schema):
+Health checks (illustrative shape; map to your platform's keys, verified against its schema):
 
 ```yaml
-probes:
-  startup:   { httpGet: { path: /health/live,  port: 8080 }, failureThreshold: 30, periodSeconds: 2 }
-  liveness:  { httpGet: { path: /health/live,  port: 8080 } }
-  readiness: { httpGet: { path: /health/ready, port: 8080 } }
+health_checks:
+  startup:   { path: /health/live,  port: 8080, failure_threshold: 30, interval_seconds: 2 }
+  liveness:  { path: /health/live,  port: 8080 }
+  readiness: { path: /health/ready, port: 8080 }
 ```
 
 ## Quality Checklist
 
 - [ ] Liveness has no dependency checks; readiness checks only real dependencies
-- [ ] Probe paths set explicitly in Helm values; health routes carry an explicit anonymous decision
+- [ ] Health-check paths set explicitly in deployment configuration; health routes carry an explicit anonymous decision
 - [ ] Background work is idempotent per replica, uses a new scope per iteration, honours `stoppingToken`
 - [ ] Intervals and timeouts come from Options; `ValidateOnStart()` on options
-- [ ] Shutdown timeout is below the pod grace period
+- [ ] Shutdown timeout is below the platform's shutdown grace period
 
 ## Common Mistakes
 
@@ -103,4 +103,4 @@ probes:
 
 ## Related Skills
 
-`implementing-observability`, `deploying-to-aws`, `implementing-infrastructure-as-code`, `creating-application-services`.
+`implementing-observability`, `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-application-services`.

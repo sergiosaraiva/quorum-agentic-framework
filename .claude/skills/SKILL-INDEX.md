@@ -9,11 +9,11 @@ The only catalogue of skills. Each row: purpose and the agents that use it. `mai
 | backend | Minimal API endpoints with authorization, error handling, DTO/service integration | code-engineer, quality-guardian |
 | creating-application-services | DI-registered services with correct lifetimes; interfaces only at real seams | code-engineer |
 | creating-dtos-and-validation | Request/response record DTOs with FluentValidation or DataAnnotations | code-engineer |
-| creating-configuration-options | Options pattern, validated at startup; no hard-coded values | code-engineer, cloud-infrastructure-engineer |
+| creating-configuration-options | Options pattern, validated at startup; no hard-coded values | code-engineer, infrastructure-engineer |
 | creating-cli-tools | System.CommandLine admin and CI tools (check "When NOT to build" first) | code-engineer |
 | implementing-caching-strategies | Caching only for a measured need; memory vs distributed | code-engineer, solution-architect |
-| implementing-observability | Structured logs, metrics, traces (CloudWatch, OpenTelemetry), alarms | code-engineer, cloud-infrastructure-engineer |
-| managing-application-lifecycle | Host startup/shutdown, background services, health checks, draining | code-engineer, cloud-infrastructure-engineer |
+| implementing-observability | Structured logs, metrics, traces (OpenTelemetry, JSON logs), alerts | code-engineer, infrastructure-engineer |
+| managing-application-lifecycle | Host startup/shutdown, background services, health checks, draining | code-engineer, infrastructure-engineer |
 
 ## Data
 
@@ -28,8 +28,8 @@ The only catalogue of skills. Each row: purpose and the agents that use it. `mai
 
 | Skill | Purpose | Used by |
 |-------|---------|---------|
-| deploying-to-aws | GitHub Actions with OIDC, image publish, GitOps promotion, base images | cloud-infrastructure-engineer, code-engineer |
-| implementing-infrastructure-as-code | Helm values and Argo CD manifests; every AWS resource as code | cloud-infrastructure-engineer |
+| deploying-the-application | Container image, CI stages, migrate step, deploy by digest, rollback, base images | infrastructure-engineer, code-engineer |
+| implementing-infrastructure-as-code | Every infrastructure resource as reviewed code in the recorded IaC tool | infrastructure-engineer |
 
 ## Frontend
 

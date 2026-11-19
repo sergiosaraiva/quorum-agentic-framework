@@ -36,7 +36,7 @@ For claims that were once grounded, check whether the cited code changed since (
 
 ### 4. Completeness
 
-Public surface with no documentation (exported Angular services, public endpoints, Helm values, scripts) goes to `coverage_gaps`, separately from findings against existing text. A design or proposal doc must state the simplest viable option, why each extra layer or config is needed (or "none"), and what is deferred; flag unjustified layers and environment-specific hard-coded values in examples.
+Public surface with no documentation (exported Angular services, public endpoints, deployment configuration, scripts) goes to `coverage_gaps`, separately from findings against existing text. A design or proposal doc must state the simplest viable option, why each extra layer or config is needed (or "none"), and what is deferred; flag unjustified layers and environment-specific hard-coded values in examples.
 
 ### 5. Confidence and status
 
@@ -50,7 +50,7 @@ Public surface with no documentation (exported Angular services, public endpoint
 
 ### 6. Style spot-check (external docs only)
 
-Check for failure modes first drafts miss: stock metaphors, passive voice with a known actor, one concept named by two terms, sentences carrying two actions, jargon without a one-clause gloss, aspirational statements phrased as shipped fact. Style findings carry no confidence value and never block grounding.
+Check for failure modes first drafts miss: stock metaphors, passive voice with a known actor, one concept named by two terms, sentences carrying two actions, an insider term without a one-clause gloss, aspirational statements phrased as shipped fact. Style findings carry no confidence value and never block grounding.
 
 ## Example
 

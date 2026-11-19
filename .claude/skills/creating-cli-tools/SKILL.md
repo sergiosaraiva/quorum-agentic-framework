@@ -20,7 +20,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. Tooling code goes throu
 - Own project at `scripts/<tool-name>/`, referencing `src/Infrastructure` for data access, so no web-hosting dependencies leak in. Pin `System.CommandLine` in `Directory.Packages.props` (verify the current stable version) with the first tool
 - Exit codes: `0` success, non-zero on any failure; CI depends on it
 - stdout for normal output, stderr for errors and warnings
-- Resolve connection strings and secrets exactly as the API does (env var, user-secrets, secrets manager); reuse the shared `DbContext` configuration, never duplicate connection logic
+- Resolve connection strings and secrets exactly as the API does (env var, user-secrets, the platform's secret store); reuse the shared `DbContext` configuration, never duplicate connection logic
 - Any command that mutates data supports `--dry-run`; irreversible ones also need `--yes`
 - A tool touching per-tenant data takes the tenant explicitly and fails closed; it never loops over a guessed connection string
 

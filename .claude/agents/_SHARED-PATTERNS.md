@@ -24,7 +24,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
      -> test-automator -> documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `cloud-infrastructure-engineer` run proactively on auth, data, API, secret or AWS changes. `prompt-engineer` runs on request, ahead of any agent.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infrastructure changes. `prompt-engineer` runs on request, ahead of any agent.
 
 | Lane | When | Stages |
 |------|------|--------|
@@ -134,7 +134,7 @@ Before a branch's first push and after any later change: run `quality-guardian` 
 
 ## Citation Format (Mandatory)
 
-Stored artifacts (docs, specs, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once), for example `src/Api/Program.cs` `UseAuthentication` call. Review output (a transient finding) keeps a `line` field as a pointer.
+Stored artifacts (docs, specifications, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once), for example `src/Api/Program.cs` `UseAuthentication` call. Review output (a transient finding) keeps a `line` field as a pointer.
 
 ## Anti-Hallucination Rules (All Agents)
 
@@ -151,7 +151,7 @@ Map changed paths to skills with `routing-to-skills` (path table) and `.claude/s
 
 | Agent class | Tools |
 |-------------|-------|
-| Writers (`code-engineer`, `test-automator`, `documentation-curator`, `cloud-infrastructure-engineer`) | Read, Write, Edit, Grep, Glob, Bash, Skill, KB read tools |
+| Writers (`code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer`) | Read, Write, Edit, Grep, Glob, Bash, Skill, KB read tools |
 | Reviewers (`quality-guardian`, `regression-detective`, `documentation-reviewer`, `security-engineer`) | Read, Grep, Glob, Bash (read, build, test only), Skill, KB read tools. No Write/Edit |
 | `ux-usability-specialist` | Reviewer tools plus `Write` for a scratch mockup pack in the OS temp directory only; never a repository file |
 | Analysts (`requirements-analyst`, `solution-architect`) | Read, Grep, Glob, Skill, KB read tools; Write/Edit only for question records and the design or requirements document |

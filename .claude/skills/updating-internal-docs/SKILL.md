@@ -8,7 +8,7 @@ description: Use when editing any CLAUDE.md, an agent body under .claude/agents,
 ## Quick Reference
 
 - Audience is an agent reading on every task, not a human reading once: terse, compact, tables over prose.
-- Common abbreviations are fine (`DTO`, `EF Core`, `OIDC`); do not spell out what every reader knows.
+- Common abbreviations are fine (`DTO`, `EF Core`, `JWT`); do not spell out what every reader knows.
 - Minimal edits: change what is wrong or new; do not rewrite unrelated sections.
 - Immutable rules stay immutable: add a new row; never soften an existing one without an explicit recorded decision.
 - Compact without losing information: every rule, id, path, threshold and dated decision survives a rewrite. If something moves, leave a pointer to its new owner.

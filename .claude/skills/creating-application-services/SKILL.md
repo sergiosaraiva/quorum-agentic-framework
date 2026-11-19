@@ -10,7 +10,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`.
 ## Quick Reference
 
 - A feature service is a `sealed class` registered as itself (`AddScoped<ReportService>()`). No interface by default
-- Add an interface only for a present reason: external I/O (typed HTTP client, AWS SDK client), tenant-varying behaviour, or 2+ real implementations today. "So it can be mocked" is not a reason for a service over `AppDbContext`: cover it with integration tests against real PostgreSQL
+- Add an interface only for a present reason: external I/O (typed HTTP client, cloud SDK client), tenant-varying behaviour, or 2+ real implementations today. "So it can be mocked" is not a reason for a service over `AppDbContext`: cover it with integration tests against real PostgreSQL
 - No repository/unit-of-work over EF Core (the `DbContext` already is one), no generic base service, no mediator/CQRS pipeline
 - Default lifetime `Scoped`. `Singleton` only for stateless or thread-safe helpers, never one holding a `DbContext`
 - Constructor injection only; no service locator (`IServiceProvider.GetService` inside a method)

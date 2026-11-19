@@ -34,7 +34,7 @@ Rough: "help design the export thing"
 
 Refined:
 ```
-Role: solution-architect for this .NET/Angular/AWS project.
+Role: solution-architect for this .NET/Angular/PostgreSQL project.
 Task: Design the "export report data as CSV or JSON" feature.
 Context: reports are served by the existing Reports slice; no export exists yet.
 Constraints:

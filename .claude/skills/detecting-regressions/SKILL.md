@@ -11,7 +11,7 @@ description: Use when scanning a diff for regressions. Regression taxonomy B1-B6
 |------|---------|--------|
 | B1 | Contract or schema drift | A record/entity field renamed or retyped without its Angular TypeScript counterpart updated |
 | B2 | Sibling-branch parity | Two structurally similar files (endpoints, services, handlers) where one changed and the other did not |
-| B3 | Config or environment coupling break | A configuration key renamed but its `IOptions<T>` binding, Helm values `env` entry or compose file not updated |
+| B3 | Config or environment coupling break | A configuration key renamed but its `IOptions<T>` binding, deployment configuration `env` entry or compose file not updated |
 | B4 | Formula or logic duplication drift | The same calculation in 2+ places, only one updated |
 | B5 | Required-invariant violation | A field required or non-null on one side becomes optional on the other, with no migration plan |
 | B6 | Silent exception swallow | Empty `catch`, `catch { return null; }`, `catch { return default; }`, or a client `catchError(() => of([]))` that turns an error into a value with no log or surfacing |

@@ -40,7 +40,7 @@ Slice too big (more than ~6 rungs or two outcomes)? Split. A slice with no user-
 | UX defined | Flows, states (loading, empty, error, data), microcopy, acceptance criteria; mockup approved if the screen is new |
 | Contracts | Request/response DTOs, errors, auth decision per endpoint, Angular client shape |
 | Test strategy | Unit, integration, e2e, and any performance or mutation gate named |
-| Security and infra | Auth, secrets, new AWS resources identified (`security-engineer`, `cloud-infrastructure-engineer`) |
+| Security and infra | Auth, secrets, new infrastructure resources identified (`security-engineer`, `infrastructure-engineer`) |
 
 Steps S1..S5 are defined in `docs/slices/IMPLEMENTATION-GUIDE.md` section 4. Result: `Ready` (zero open blockers), or `Blocked` with each blocker, owner and record id. Stamp the analysis with the baseline commit; at pickup, diff the baseline against current main (delta check) and re-analyse if the area changed.
 

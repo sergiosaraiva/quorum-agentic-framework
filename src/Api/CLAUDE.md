@@ -21,7 +21,7 @@ This file exists because it is loaded when you work under `src/Api/`; the neares
 | Auth | JWT bearer from the `Auth` section (`Authority`, `Audience`); the identity provider authenticates, the API authorizes via policies |
 | Errors | `Results.Problem` (RFC 9457 problem details); never leak exception text |
 | Pagination | every list endpoint takes `page` and `pageSize`, clamps `pageSize` to a configured maximum; paging arithmetic must not overflow on a huge `page` |
-| Health | `/health/live` (anonymous, no dependencies) and `/health/ready` (anonymous, returns no data, includes the database check tagged `ready`) for the Kubernetes probes |
+| Health | `/health/live` (anonymous, no dependencies) and `/health/ready` (anonymous, returns no data, includes the database check tagged `ready`) for liveness and readiness probes |
 | Logging | `ILogger<T>` structured messages; no secrets, tokens or personal data in logs |
 
 ## Do not

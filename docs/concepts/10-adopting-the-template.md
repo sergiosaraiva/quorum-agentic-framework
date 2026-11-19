@@ -64,7 +64,7 @@ Run `python3 scripts/kb/ingest.py` for both KBs; each run re-embeds everything. 
 
 ### 10. Set up CI
 
-Add the repository secret `ANTHROPIC_API_KEY` (and any AWS role identifiers for OIDC) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 3); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. Enable `.github/workflows/ai-pr-review.yml` and make its check required on the integration branch. The frontend CI job runs only once `frontend/package-lock.json` exists (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
+Add the repository secret `ANTHROPIC_API_KEY` (and any deployment credentials your platform needs, stored as secrets) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 3); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. Enable `.github/workflows/ai-pr-review.yml` and make its check required on the integration branch. The frontend CI job runs only once `frontend/package-lock.json` exists (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
 
 ### 11. Run your first slice
 

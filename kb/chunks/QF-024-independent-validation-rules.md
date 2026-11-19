@@ -13,7 +13,7 @@ The Independent Review Rule in `.claude/agents/_SHARED-PATTERNS.md` sets five pr
 |----------|---------|
 | Different role | The reviewer is never the writer's role: code from code-engineer is reviewed by quality-guardian, regression-detective and test-automator |
 | Fresh context | The reviewer gets the diff, the spec or design and the alignment result, not the writer's reasoning or conclusion |
-| Equal or stronger model | The reviewer's model is at least the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run Opus; documentation-reviewer runs Sonnet because it checks grounding mechanically against sources |
+| Equal or stronger model | The reviewer's model is at least the producer's. Judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run Opus; documentation-reviewer runs Sonnet because it checks grounding mechanically against sources |
 | Read-only | Reviewers have no Write or Edit tools; Bash is for read, build and test commands and must not write outside build output. They return findings in a structured form |
 | No anchoring | A prompt that hands over a hypothesis such as "confirm X is fine" is rewritten as a neutral task before delegation |
 

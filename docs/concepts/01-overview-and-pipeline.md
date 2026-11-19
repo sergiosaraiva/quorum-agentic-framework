@@ -22,10 +22,10 @@ Each agent is a Markdown file in `.claude/agents/` (see [09](09-agents-and-skill
 | documentation-curator | sonnet | Writes docs, `CLAUDE.md`, KB chunks | Docs |
 | documentation-reviewer | sonnet | Checks docs are grounded (no Write or Edit tools) | No |
 | security-engineer | opus | Auth, data, API and infrastructure security | No |
-| cloud-infrastructure-engineer | opus | AWS, Helm values, Argo CD, cost | Infra values |
+| infrastructure-engineer | opus | Infrastructure as code, deployment, cost | Infra config |
 | prompt-engineer | haiku | Sharpens a prompt before a complex hand-off | No |
 
-Producers (writers) are mostly Sonnet. The reviewer model is equal to or stronger than the producer's: the judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run Opus at high effort, because a reviewer weaker than the author cannot reliably catch the author's mistakes ([07](07-independent-validation.md)). `documentation-reviewer` runs Sonnet because it checks grounding mechanically against sources. Subagents cannot spawn subagents or ask the user: they return open items (`questions_to_record`) to the calling session, which records or asks.
+Producers (writers) are mostly Sonnet. The reviewer model is equal to or stronger than the producer's: the judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run Opus at high effort, because a reviewer weaker than the author cannot reliably catch the author's mistakes ([07](07-independent-validation.md)). `documentation-reviewer` runs Sonnet because it checks grounding mechanically against sources. Subagents cannot spawn subagents or ask the user: they return open items (`questions_to_record`) to the calling session, which records or asks.
 
 ## The full lane
 
@@ -54,7 +54,7 @@ flowchart LR
 6. **test-automator** runs after the reviewers are clean, turning their "a test would catch this" hints into tests.
 7. **documentation-curator** then **documentation-reviewer** update and then verify the docs.
 
-`security-engineer` and `cloud-infrastructure-engineer` run proactively whenever a change touches authentication, data access, secrets, AWS resources or Helm values; they sit outside the linear order. `prompt-engineer` runs on request.
+`security-engineer` and `infrastructure-engineer` run proactively whenever a change touches authentication, data access, secrets, infrastructure or deployment configuration; they sit outside the linear order. `prompt-engineer` runs on request.
 
 ## Lanes
 

@@ -13,7 +13,7 @@ The agent that produced a change never approves it. A model reviewing its own ou
 | Different role | The reviewer's brief is to find faults, not to complete the task | Producers optimise for finishing; reviewers for finding |
 | Fresh context | The reviewer is a separate subagent with its own context window and sees only the diff and the cited records, not the producer's reasoning | Reasoning that led to a bug convinces the reader of it too |
 | No edit tools | Reviewers have no Write or Edit tools. Their Bash is for reading, building and testing and must not write outside build output (the agent body says so; the tool list cannot enforce it). `ux-usability-specialist` may Write only scratch mockup files outside the source tree | A reviewer that can "just fix it" stops being a reviewer, and its fix would be unreviewed |
-| Equal or stronger model | The reviewer model is equal to or stronger than the producer's: judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run Opus at high effort; `documentation-reviewer` runs Sonnet because it checks grounding mechanically against sources | A weaker reviewer misses what a stronger author wrote |
+| Equal or stronger model | The reviewer model is equal to or stronger than the producer's: judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run Opus at high effort; `documentation-reviewer` runs Sonnet because it checks grounding mechanically against sources | A weaker reviewer misses what a stronger author wrote |
 | Non-overlapping scope | Each reviewer owns defined categories | Two reviewers on one concern means the other is unwatched |
 
 In the agent files this shows up as `model: opus`, `effort: high`, and an allow-list of tools without `Write`, `Edit` or `Agent`. Independence comes from a fresh context on each run, not from persistent memory, so reviewers declare no `memory`.
@@ -28,7 +28,7 @@ After code-engineer finishes, `quality-guardian` and `regression-detective` are 
 | regression-detective | Contract drift between API and Angular client, sibling-branch parity (two endpoints that should behave alike), config coupling, duplicated formulas drifting apart, required-invariant violations, silently swallowed exceptions |
 | ux-usability-specialist (UI changes only) | Usability and screen-level design consistency, in the same message |
 
-`test-automator` runs only after the reviewers are clean, so tests are written for the final code, and it consumes the reviewers' hints about which test would have caught each finding. Then documentation-curator updates docs and documentation-reviewer, a different agent, checks they are grounded. `security-engineer` and `cloud-infrastructure-engineer` review auth, data and infrastructure proactively, outside the line.
+`test-automator` runs only after the reviewers are clean, so tests are written for the final code, and it consumes the reviewers' hints about which test would have caught each finding. Then documentation-curator updates docs and documentation-reviewer, a different agent, checks they are grounded. `security-engineer` and `infrastructure-engineer` review auth, data and infrastructure proactively, outside the line.
 
 ## Evidence format
 

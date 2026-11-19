@@ -38,7 +38,7 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Anonymous on purpose: Kubernetes probes carry no credentials and the responses hold no data.
+// Anonymous on purpose: Liveness and readiness probes carry no credentials and the responses hold no data.
 // Liveness runs no checks (never touches the database); readiness runs the checks tagged "ready" (database).
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();

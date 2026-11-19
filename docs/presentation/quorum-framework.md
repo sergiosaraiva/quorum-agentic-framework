@@ -135,7 +135,7 @@ flowchart TD
 | documentation-curator | sonnet | Write docs, CLAUDE.md files, KB chunks |
 | documentation-reviewer | sonnet | Check every claim is grounded (no Write or Edit) |
 | security-engineer | opus | Auth, data, API, infrastructure, tenancy |
-| cloud-infrastructure-engineer | opus | AWS, Helm, Argo CD, cost |
+| infrastructure-engineer | opus | Infrastructure as code, deployment, cost |
 | prompt-engineer | haiku | Sharpen prompts before a hard task |
 
 Spend on the checker, save on the maker. See the cost reference.
@@ -155,7 +155,7 @@ flowchart LR
 
 - `ux-usability-specialist` only when a screen is added or redesigned.
 - `quality-guardian` and `regression-detective` run **in parallel**, with fresh context.
-- `security-engineer` and `cloud-infrastructure-engineer` run proactively on auth, data, API or AWS changes.
+- `security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes.
 
 ---
 
@@ -284,7 +284,7 @@ From `src/Api/CLAUDE.md`: loaded only when you work under `src/Api/`, it adds to
 |---|---|
 | Backend (8) | `backend` endpoints with auth and errors; `creating-application-services` DI services; `creating-dtos-and-validation` record DTOs; `creating-configuration-options` Options pattern; `creating-cli-tools` System.CommandLine tools; `implementing-caching-strategies` cache only for a measured need; `implementing-observability` logs, metrics, traces; `managing-application-lifecycle` startup, health, draining |
 | Data (4) | `database` EF Core conventions; `writing-postgresql-migrations` safe migrations; `tuning-postgresql-queries` plan-based tuning; `scaling-performance-test-data` scaled lab data |
-| Delivery and infrastructure (2) | `deploying-to-aws` Actions, OIDC, GitOps; `implementing-infrastructure-as-code` Helm values and Argo CD |
+| Delivery and infrastructure (2) | `deploying-the-application` build, CI stages, image deploy; `implementing-infrastructure-as-code` infrastructure as code, tool of your choice |
 | Frontend (4) | `frontend` standalone Angular; `managing-state-with-signals` signal stores; `creating-angular-api-clients` typed clients; `evaluating-usability` walkthrough and heuristics |
 
 ---

@@ -2,7 +2,7 @@
 
 Quorum is a template for building software with a team of [Claude Code](https://code.claude.com) agents that ground their work in a knowledge base, never invent, and never approve their own output.
 
-It ships a working reference stack (.NET 10, Angular, PostgreSQL, AWS), twelve agents, 39 skills in seven groups, two searchable knowledge bases (BM25 and link graph locally, pgvector optional), a vertical-slice planning method, and two AI review loops (local and on GitHub).
+It ships a working reference stack (.NET 10, Angular, PostgreSQL), twelve agents, 39 skills in seven groups, two searchable knowledge bases (BM25 and link graph locally, pgvector optional), a vertical-slice planning method, and two AI review loops (local and on GitHub).
 
 Start with the slides: [docs/presentation/quorum-framework.md](docs/presentation/quorum-framework.md).
 
@@ -43,7 +43,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
                                   documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `cloud-infrastructure-engineer` run proactively on auth, data, API or AWS changes. `prompt-engineer` sharpens a prompt on request.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes. `prompt-engineer` sharpens a prompt on request.
 
 | Agent | Model | Role |
 |---|---|---|
@@ -57,7 +57,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 | documentation-curator | sonnet | Write docs and KB chunks |
 | documentation-reviewer | sonnet | Check docs are grounded (no Write or Edit tools) |
 | security-engineer | opus | Auth, data, API and infrastructure security |
-| cloud-infrastructure-engineer | opus | AWS, Helm, Argo CD, cost |
+| infrastructure-engineer | opus | Infrastructure as code, deployment, cost |
 | prompt-engineer | haiku | Sharpen prompts |
 
 ## Repository map
@@ -157,7 +157,7 @@ Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-b
 - The default embedding provider is a deterministic hash stub for offline demos. It is not semantic. Configure a real embedding model before relying on vector search (see `scripts/kb/README.md`).
 - Model prices, model ids and GitHub Action versions change. Items marked "verify" need a check against current official documentation.
 - The Angular skeleton under `frontend/` was not built when the template was written. Create a lockfile with `npm install`, then `npm run build`.
-- Workloads use default Helm values plus Argo CD. Other AWS resources (databases, caches, CDN) are the adopter's choice of tool; agents record a TQ instead of guessing.
+- The template assumes no cloud or deployment platform. Pick yours and record it as a TQ; agents never guess a platform or tool.
 
 ## License
 

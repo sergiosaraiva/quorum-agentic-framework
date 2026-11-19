@@ -15,6 +15,6 @@ The full lane of the Quorum pipeline runs these stages in order:
 6. test-automator runs after every reviewer has returned, and turns the reviewers' `test_would_catch` hints into tests.
 7. documentation-curator writes the docs, then documentation-reviewer checks they are grounded.
 
-security-engineer and cloud-infrastructure-engineer sit outside the linear order and run proactively when a change touches authentication, data access, secrets, AWS resources or deployment values. prompt-engineer runs on request, ahead of any agent.
+security-engineer and infrastructure-engineer sit outside the linear order and run proactively when a change touches authentication, data access, secrets, infrastructure or deployment configuration. prompt-engineer runs on request, ahead of any agent.
 
 Before any coding or documentation task, the orchestrating session states the pipeline in one line: the lane, each stage with a few words of reason for any skip, and whether the alignment gate applies.

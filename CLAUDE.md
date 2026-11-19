@@ -1,6 +1,6 @@
 # {{PRODUCT_NAME}} - Project Guide
 
-A cloud-native product on AWS: .NET 10 backend, Angular frontend, PostgreSQL. Replace every `{{PLACEHOLDER}}` when you adopt this template. Statements here are design intent, not verified fact, for areas the landed code has not touched.
+A web product: .NET 10 backend, Angular frontend, PostgreSQL. Replace every `{{PLACEHOLDER}}` when you adopt this template. Statements here are design intent, not verified fact, for areas the landed code has not touched.
 
 ## Objective
 
@@ -44,9 +44,9 @@ Technical questions go to the technical role, business questions to the business
 | Database | PostgreSQL 16+, pgvector for the KBs | [`src/Infrastructure/CLAUDE.md`](src/Infrastructure/CLAUDE.md) |
 | Frontend | Angular (latest major), standalone components, signals, plain CSS/SCSS | [`frontend/CLAUDE.md`](frontend/CLAUDE.md) |
 | Auth | Any OIDC identity provider issuing JWTs; the API validates, the product authorizes | `Auth` options in `src/Api` |
-| Cloud | AWS on EKS. Workloads: default Helm values plus Argo CD (GitOps). Other AWS resources (databases, caches, CDN): the adopter's choice of tool, recorded as a TQ, never guessed. All defined as code | `cloud-infrastructure-engineer` agent |
-| CI/CD | GitHub Actions to AWS via OIDC, no long-lived keys | `.github/workflows/` |
-| Observability | CloudWatch plus OpenTelemetry (OTLP), structured JSON logs | `implementing-observability` skill |
+| Deployment | A container image plus a target you choose (`{{DEPLOY_TARGET}}`). The platform and its tools are the adopter's choice, recorded as a TQ, never guessed. All infrastructure is defined as code | `infrastructure-engineer` agent |
+| CI/CD | GitHub Actions; deploy with short-lived credentials where the platform supports them, no long-lived keys in the repo | `.github/workflows/` |
+| Observability | OpenTelemetry (OTLP), structured JSON logs; the backend is the adopter's choice | `implementing-observability` skill |
 | Testing | xUnit v3 built-in `Assert`, Testcontainers (PostgreSQL), Vitest, Playwright, k6, Stryker.NET | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
 
 ## Architecture Style
@@ -70,7 +70,7 @@ scripts/           # kb tooling, ai_review_local.py
 
 1. **Simplest design that meets the stated requirement.** No speculative generality; defer and record what was deferred.
 2. **Reuse first; an abstraction needs a present reason**: 2+ real consumers or a real seam (external I/O, test boundary). Rule of three before extracting shared code.
-3. **No hard-coded values in logic** (URLs, ids, thresholds, limits, timeouts, page sizes, tenant or environment values): typed validated Options, the database, or Helm values. Secrets never in source.
+3. **No hard-coded values in logic** (URLs, ids, thresholds, limits, timeouts, page sizes, tenant or environment values): typed validated Options, the database, or deployment configuration. Secrets never in source.
 4. **Vertical slice by default**; add a layer or project only to remove duplication or coupling that exists now.
 5. **Prefer built-in platform features** over custom code or a new dependency.
 6. **Ease of change**: small cohesive units, one reason to change, intent-revealing names.
@@ -81,9 +81,9 @@ scripts/           # kb tooling, ai_review_local.py
 
 Non-negotiable. Change this list only when the team explicitly changes the rule.
 
-1. **No secrets in source control.** Local: `dotnet user-secrets` or a gitignored `.env`. AWS: Secrets Manager or Parameter Store. Placeholders such as `${ENV_VAR}` in examples.
+1. **No secrets in source control.** Local: `dotnet user-secrets` or a gitignored `.env`. Deployed: the platform's secret store. Placeholders such as `${ENV_VAR}` in examples.
 2. **Every EF Core migration is reviewed before it touches a shared environment.** No `EnsureCreated()` outside local dev and tests.
-3. **Every AWS resource is defined as code**, never clicked in the console.
+3. **Every infrastructure resource is defined as code**, never created by hand in a console.
 4. **Nullable reference types are enabled project-wide**; no `!` suppression without a comment saying why the compiler is wrong.
 5. **Angular components are standalone**; no new `NgModule`-based feature.
 6. **No `any` in TypeScript** without a justifying comment; `strict: true`.
@@ -119,7 +119,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
                                   documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `cloud-infrastructure-engineer` run proactively on auth, data, API or AWS changes. `prompt-engineer` runs on request. Details: `.claude/agents/_SHARED-PATTERNS.md`.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes. `prompt-engineer` runs on request. Details: `.claude/agents/_SHARED-PATTERNS.md`.
 
 Before any coding or documentation task, state the pipeline in one line, with a few words of reason per skipped stage, for example: `Pipeline: full lane - requirements-analyst skip (small scope) - code-engineer -> QG||RD -> test-automator - docs: none - KB check: done (BC-001)`.
 
@@ -131,7 +131,7 @@ Beyond a trivial one-line fix, delegate; the producer never reviews its own work
 
 | Target | Delegate to |
 |--------|-------------|
-| `src/`, `frontend/` | full pipeline above (`cloud-infrastructure-engineer` for Helm values) |
+| `src/`, `frontend/` | full pipeline above (`infrastructure-engineer` for infrastructure and deployment config) |
 | `kb/**` chunks | `documentation-curator` then `documentation-reviewer` |
 | `.claude/agents/**`, `.claude/skills/**`, this file's governed sections | `documentation-curator`, then `quality-guardian` || `regression-detective`, then `documentation-reviewer` |
 | `docs/**`, `README.md` | `documentation-curator` then `documentation-reviewer`; generated files are regenerated, never hand-edited |

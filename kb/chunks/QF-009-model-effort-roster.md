@@ -19,7 +19,7 @@ Each Quorum agent has a default model and effort level, set in the `model:` and 
 | documentation-curator | sonnet | medium | Low-risk writing that is then reviewed |
 | documentation-reviewer | sonnet | high | Checks claims against sources, mostly lookup |
 | security-engineer | opus | high | Security misses are the costliest |
-| cloud-infrastructure-engineer | opus | high | Infrastructure mistakes have a large blast radius |
+| infrastructure-engineer | opus | high | Infrastructure mistakes have a large blast radius |
 | prompt-engineer | haiku | not set | Short, cheap, easy to inspect |
 
 The rationale is to spend on the checker and save on the maker: a reviewer error costs an escaped defect, while an implementer error costs a review round. A reviewer weaker than the author cannot reliably catch the author's mistakes, so no reviewer is set lower than the tier of the agent whose work it reviews.

@@ -97,7 +97,7 @@ The "Used by" column of `.claude/skills/SKILL-INDEX.md` is the source; the same 
 | test-automator | the testing skills plus `tuning-postgresql-queries` and `scaling-performance-test-data` |
 | documentation-curator | `updating-internal-docs`, `updating-external-docs`, `writing-kb-chunks`, `maintaining-agent-framework` |
 | documentation-reviewer | `reviewing-documentation`, `reviewing-kb-chunks`, `verifying-cross-file-coupling` |
-| cloud-infrastructure-engineer | `deploying-to-aws`, `implementing-infrastructure-as-code`, `creating-configuration-options`, `implementing-observability`, `managing-application-lifecycle` |
+| infrastructure-engineer | `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-configuration-options`, `implementing-observability`, `managing-application-lifecycle` |
 | prompt-engineer | `writing-world-class-prompts` |
 
 `recording-decisions` is used by every agent and `routing-to-skills` by the main session or any agent. code-engineer chooses a skill by the path it edits (the routing table is in `.claude/agents/code-engineer.md`, for example `*Endpoints.cs` to `backend`, `Dtos.cs` to `creating-dtos-and-validation`, migrations to `writing-postgresql-migrations`).
@@ -114,7 +114,7 @@ The "Used by" column of `.claude/skills/SKILL-INDEX.md` is the source; the same 
 
 ## Choosing models and effort per agent
 
-Defaults are in `docs/reference/model-selection-and-costs.md`: the reviewer model is equal to or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus` at high effort; `documentation-reviewer` runs `sonnet` because it checks grounding mechanically against sources; code, tests, requirements and docs run `sonnet`; prompt sharpening runs `haiku`. Change them with evidence (review quality, cost per round), one agent at a time.
+Defaults are in `docs/reference/model-selection-and-costs.md`: the reviewer model is equal to or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run `opus` at high effort; `documentation-reviewer` runs `sonnet` because it checks grounding mechanically against sources; code, tests, requirements and docs run `sonnet`; prompt sharpening runs `haiku`. Change them with evidence (review quality, cost per round), one agent at a time.
 
 ## Common mistakes
 

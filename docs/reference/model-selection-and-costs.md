@@ -6,7 +6,7 @@ Page written 2026-11-18. Price figures and model ids below were taken from Anthr
 
 ## 1. The Claude 5 family at a glance
 
-All prices are US dollars per million tokens (MTok) on the first-party Claude API. Amazon Bedrock and Google Vertex AI are billed by those platforms at their own rates.
+All prices are US dollars per million tokens (MTok) on the first-party Claude API. Cloud platforms that resell the models bill at their own rates.
 
 | Model | Model ID | Context (verify against the pricing page) | Input | Output | Cache read | Best for |
 |---|---|---|---|---|---|---|
@@ -54,10 +54,10 @@ Rule of thumb: spend on the checker, save on the maker. Reviewer errors cost an 
 | documentation-curator | sonnet | medium | Low-risk writing, then reviewed. |
 | documentation-reviewer | sonnet | high | Checks grounding mechanically against sources, so Sonnet suffices. |
 | security-engineer | opus | high | Security misses are the costliest. |
-| cloud-infrastructure-engineer | opus | high | Infrastructure mistakes have a large blast radius. |
+| infrastructure-engineer | opus | high | Infrastructure mistakes have a large blast radius. |
 | prompt-engineer | haiku | n/a | Short, cheap, easy to inspect. |
 
-The rule behind the table: the reviewer model is equal to or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run Opus; documentation-reviewer runs Sonnet because the check is mechanical lookup. Change these by editing the `model:` and `effort:` lines in `.claude/agents/<name>.md`, then run `python3 scripts/framework_lint.py`.
+The rule behind the table: the reviewer model is equal to or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run Opus; documentation-reviewer runs Sonnet because the check is mechanical lookup. Change these by editing the `model:` and `effort:` lines in `.claude/agents/<name>.md`, then run `python3 scripts/framework_lint.py`.
 
 ## 4. Effort levels
 

@@ -51,9 +51,9 @@ Rules:
 5. Record type: business or expected-behaviour question = BQ, `decider` a business role; technical question = TQ, `decider` the technical role. Who writes the record: an agent whose role includes question records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself; every other agent returns it in `questions_to_record` and the session (or `documentation-curator`) writes it. Format: `questions/README.md`, skill `recording-decisions`.
 6. "Flag" means record and continue. "Ask" means stop and ask, only when blocked on an owner decision no record settles, a scope change, or a destructive or outward-facing action the request did not cover. Batch every open item into one round, recommended option first.
 7. KB MCP unreachable (the only statement of this rule; agent failure rows point here), in order:
-   - Agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` narrows); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Agents without `Bash` (`requirements-analyst`, `solution-architect`) read `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep; only BM25 ranking is lost. Say in the output which was used.
-   - Neither possible, authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer`, `ux-usability-specialist` in `define` mode): stop and return to the session (`/mcp`); never proceed from memory.
-   - Read-only reviewers (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `ux-usability-specialist` in `review` mode): list `chunk verification skipped: KB unreachable` as an unverified item, never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
+   - Agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Agents without `Bash` (`requirements-analyst`, `solution-architect`) read `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep; only BM25 ranking (local backend) is lost. Say in the output which was used.
+   - Neither possible, authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer` and `ux-usability-specialist` when authoring or defining): stop and return to the session (`/mcp`); never proceed from memory.
+   - Read-only reviewers (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `infrastructure-engineer` and `ux-usability-specialist` when reviewing): list `chunk verification skipped: KB unreachable` as an unverified item (field per reviewer: `docs/concepts/07-independent-validation.md`), never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
 
 ## Pre-Development Alignment Gate (Mandatory)
 
@@ -92,17 +92,17 @@ A blocking finding at a review gate returns to the artifact's writer, not forwar
 | `test-automator` (code) | Re-invoke `code-engineer` with failing tests or gap; re-run the pair before re-running `test-automator` | Code pipeline complete; docs stage if docs change |
 | `documentation-reviewer` (docs, `.claude/**`, KB chunks) | Re-invoke `documentation-curator`; re-run the reviewer | Done |
 
-What blocks. This table is the only place that decides blocking; other files define severity labels and map them here. Severity alone decides, never confidence: 0.50-0.79 goes in the "unverified" list with its would-be severity (below 0.50: not reported). Unverified items never block; the report states each, and the session dispositions it like a non-blocking finding. A Medium security finding (from `security-engineer` or `quality-guardian`) does not block; before merge the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD.
+What blocks. This table is the only place that decides blocking; other files define severity labels and map them here. Among reported findings, severity alone decides, never confidence: 0.50-0.79 goes in the "unverified" list with its would-be severity (below 0.50: not reported). Unverified items never block; the report states each, and the session dispositions it like a non-blocking finding. A Medium security finding (from `security-engineer` or `quality-guardian`) does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD.
 
 | Reviewer | Blocks | Does not block |
 |----------|--------|----------------|
 | `quality-guardian`, `regression-detective`, `security-engineer` | Critical, High | Medium, Low, Info |
 | `ux-usability-specialist` | Blocker, Major | Minor, Note |
-| `documentation-reviewer` | status `ungrounded`, `stale`, `conflict` or `gate-failure` (reported at confidence >= 0.8) | other statuses, style findings |
+| `documentation-reviewer` | status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` (reported at confidence >= 0.8) | other statuses, style findings |
 | AI review (`pr-review` skill; local, and GitHub when `ANTHROPIC_API_KEY` is set) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
 
 - Never skip a stage because an earlier iteration passed it.
-- Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched (the requirements or design may need revisiting). A single shared budget of 3 applies across both gates of a framework-doc change.
+- Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched. A single shared budget of 3 applies across both gates of a framework-doc change.
 - Every non-blocking finding gets a disposition (fix, defer with a recorded item, or reject with a reason) listed in the hand-off; none is dropped silently.
 Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no state: skill `running-local-ai-review`, Counters.
 
@@ -110,8 +110,8 @@ Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no sta
 
 | Rule | Detail |
 |------|--------|
-| Different role | The reviewer is never the writer's role (`code-engineer` code is reviewed by `quality-guardian`, `regression-detective`, `test-automator`) |
-| Fresh context | Reviewers get the diff, the spec/design and the alignment result, not the writer's reasoning or conclusion. Independence comes from fresh context, not from memory |
+| Different role | The reviewer is never the writer's role |
+| Fresh context | Reviewers get the diff, the spec/design and the alignment result, not the writer's reasoning or conclusion. |
 | Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus`. `documentation-reviewer` runs `sonnet` because its check is mechanical (`docs/reference/model-selection-and-costs.md`) |
 | Read-only | Reviewers have no Write/Edit tools; Bash per Common Tool Permissions. They return findings in the structured form below |
 | No anchoring | A prompt that hands over a hypothesis ("confirm X is fine") is rewritten as a neutral task |
@@ -127,11 +127,11 @@ Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`; no API key; `--model opus` for auth, data model, migrations, money or core logic; cap 3 via `--max-rounds`, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; fix its findings (`MAX_ROUNDS`, label `needs-human-review`). Without the key it is skipped; green is not a review.
+Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; fix its findings (`MAX_ROUNDS`, label `needs-human-review`). Without the key it is skipped; green is not a review.
 
 ## Citation Format (Mandatory)
 
-Stored artifacts (docs, specifications, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once), for example `src/Api/Program.cs` `UseAuthentication` call. Review output (a transient finding) keeps a `line` field as a pointer.
+Stored artifacts (docs, specifications, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once). Review output (a transient finding) keeps a `line` field as a pointer.
 
 ## Anti-Hallucination Rules (All Agents)
 

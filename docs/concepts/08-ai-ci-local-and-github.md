@@ -106,7 +106,7 @@ Three counters exist and they share no state:
 |---------|----------------|-------|
 | Loop-back cap (3 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
 | Local `--max-rounds` | `.ai-review/state.json` (under `--out-dir`) | `--reset` |
-| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | a human deletes the marker comments, or raises `MAX_ROUNDS` and removes the label `needs-human-review` |
+| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (edit the workflow on the PR branch); removing the label `needs-human-review` is optional housekeeping |
 
 Running the local script does not consume GitHub rounds, and a GitHub round does not count against the session cap.
 

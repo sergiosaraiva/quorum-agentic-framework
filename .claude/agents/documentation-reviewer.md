@@ -27,7 +27,7 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 
 1. Run deterministic gates first when present (`scripts/kb/` validators for `kb/chunks/**`, link or path checkers, a build for doc code samples). Report output verbatim; skip a script that does not exist and note the skip.
 2. Extract claims: every sentence asserting a fact about the system.
-3. Verify each: Grep the cited anchor and Read around it; `git show <sha>:<path>` for a pinned citation; `mcp__business-kb__chunk` for a cited chunk; `mcp__qa-kb__get` for a cited record (KB unreachable: `_SHARED-PATTERNS.md` Never Invent rule 7). An anchor not found is `fabricated-citation` or `stale`.
+3. Verify each: Grep the cited anchor and Read around it; `git show <sha>:<path>` for a pinned citation; `mcp__business-kb__chunk` for a cited chunk; `mcp__qa-kb__get` for a cited record (KB unreachable: `_SHARED-PATTERNS.md` Never Invent rule 7; list the skipped check in `coverage_gaps` as `unverified`). An anchor not found is `fabricated-citation` if the symbol or heading never existed (check `git log -S`), `stale` if it existed and moved or changed; both block.
 4. Score each claim: grounded / partially grounded / ungrounded / stale.
 5. Report findings with confidence >= 0.80 that the claim is wrong or unverifiable. 0.50-0.79: list in `coverage_gaps` as `unverified (would-be <status>): ...`; below 0.50 is not reported. Unverified items never block.
 6. Completeness pass: public endpoints, config keys, scripts and deploy values with zero doc coverage.
@@ -52,7 +52,7 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 }
 ```
 
-Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `coverage_gaps` as unverified; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
+Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `coverage_gaps` as unverified; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
 
 ## Tools
 

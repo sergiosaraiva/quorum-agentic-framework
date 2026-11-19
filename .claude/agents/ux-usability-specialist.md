@@ -67,7 +67,7 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
   "tasks": [{"user": "string", "task": "string", "steps": ["string"], "kb_refs": ["chunk_id"]}],
   "states": [{"screen": "string", "state": "loading|empty|error|data|readonly", "spec": "string"}],
   "acceptance_criteria": ["string"],
-  "unverified": ["unverified (would-be <severity>): what and why"],
+  "unverified": ["optional: unverified (would-be <severity>): what and why"],
   "findings": [{"severity": "blocker|major|minor|note", "principle": "string", "location": "path:line|screenshot", "scenario": "string", "evidence": "string", "fix_direction": "string"}],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }

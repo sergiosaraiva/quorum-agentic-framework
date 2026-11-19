@@ -12,12 +12,12 @@ Read-only. Report findings with evidence; never edit. Fixes go back to `document
 | Pass | Check | Status when it fails |
 |------|-------|----------------------|
 | 1 Grounding | Extract every factual claim; open each file in `sources` and verify it. Score grounded / partial / ungrounded / stale. "Not shown" must not be restated as "not implemented" | `ungrounded` or `stale` |
-| 2 Citation existence | Every `sources` path and every `links` chunk_id exists; ids unique | `dangling-link` (also a `gate-failure` when `check_chunks.py` reports it) |
-| 3 Style and slop | Hedging, meta-commentary, restated title, summary sentence, marketing, a fact stated twice, terminology drift from sibling chunks, conversion noise | `noise` or `slop` |
-| 4 Shape | Self-contained (no outward-pointing pronouns), one topic, 40-350 words (the lint limit; aim for 80 to 300; outside that is a target miss only), flat formatting, frontmatter complete (`chunk_id`, `title`, `topics`, `links`, `sources`; optional `example`) | `not-self-contained`, `two-topics`; missing frontmatter is a `gate-failure` when `check_chunks.py` reports it |
-| 5 Cross-chunk | A fact belonging to another topic is linked, not re-explained; run a `business-kb` search for near-duplicates | `redundant` |
+| 2 Citation existence | Every `sources` path and every `links` chunk_id exists; ids unique. `check_chunks.py` only checks that `sources` is non-empty, so verify the paths yourself | `gate-failure` (a chunk-rule violation, reported even if `check_chunks.py` missed it) |
+| 3 Style and slop | Hedging, meta-commentary, restated title, summary sentence, marketing, a fact stated twice, terminology drift from sibling chunks, conversion noise | invented content or noise: `ungrounded`; slop alone: `slop` (does not block) |
+| 4 Shape | Self-contained (no outward-pointing pronouns), one topic, 40-350 words (the lint limit; aim for 80 to 300; outside that is a target miss only), flat formatting, frontmatter complete (`chunk_id`, `title`, `topics`, `links`, `sources`; optional `example`) | missing frontmatter or two topics: `gate-failure`; other shape issues: `not-self-contained`, `too-long`, `too-short` (do not block) |
+| 5 Cross-chunk | A fact belonging to another topic is linked, not re-explained; run a `business-kb` search for near-duplicates | duplicated mechanism: `conflict`; other redundancy: `redundant` (does not block) |
 
-Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, `stale`, `conflict` and `gate-failure` (reported at confidence >= 0.8) block; every other status is `minor` and is dispositioned.
+Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, `fabricated-citation`, `stale`, `conflict` and `gate-failure`, reported at confidence >= 0.8. Everything the earlier "Blocking when" column blocked on (ungrounded or stale claims, dangling references, noise or invented content, missing frontmatter, two topics, duplicated mechanism) maps onto those statuses and still blocks. `slop`, `not-self-contained`, `too-long`, `too-short` and `redundant` did not block before and do not now. A claim at confidence 0.50-0.79 goes in `coverage_gaps` as `unverified (would-be <status>): ...` and never blocks.
 
 ## Output
 
@@ -27,10 +27,11 @@ Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, 
   "claims_reviewed": 8,
   "findings": [
     {"claim": "string", "pass": "grounding|citation|style|shape|cross-chunk",
-     "status": "ungrounded|stale|dangling-link|slop|redundant|not-self-contained|too-long|too-short|two-topics|noise",
+     "status": "ungrounded|fabricated-citation|stale|conflict|gate-failure|slop|redundant|not-self-contained|too-long|too-short",
      "evidence": "file:line, tool result, or 'not found'",
-     "severity": "blocking|minor"}
-  ]
+     "confidence": 0.85}
+  ],
+  "coverage_gaps": ["unverified (would-be <status>): what and why"]
 }
 ```
 

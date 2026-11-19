@@ -65,7 +65,7 @@ Round cap 3 (round = review, fix, review). After round 3 with findings still ope
 
 ## Counters
 
-Three counters exist and none shares state: the in-session Loop-Back cap (3 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` clears the current branch's entry. A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; a human resets it by deleting the markers, or lets it run on by raising `MAX_ROUNDS` and removing the label). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
+Three counters exist and none shares state: the in-session Loop-Back cap (3 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` clears the current branch's entry. A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch; removing the label `needs-human-review` is optional housekeeping). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
 
 ## Order
 

@@ -14,10 +14,10 @@ A Quorum review finding without evidence cannot be acted on or disputed, so ever
 | Medium | Wrong on an edge path, a design violation |
 | Low | Maintainability with a concrete cost; nothing else is reported |
 
-Critical and High block; Medium and Low do not. Severity alone decides; unverified items (confidence 0.50 to 0.79) are listed with their would-be severity and never block. A Medium security finding does not block; before merge it is recorded as an open question and, once the owner accepts the risk, as a decision. Other reviewers map onto `_SHARED-PATTERNS.md`: the local AI review blocks on `blocking`, ux-usability-specialist on Blocker and Major, documentation-reviewer on status `ungrounded`, `stale`, `conflict` or `gate-failure`, and the GitHub AI review (when `ANTHROPIC_API_KEY` is set) on Blocker.
+Critical and High block; Medium and Low do not. Severity alone decides; unverified items (confidence 0.50 to 0.79) are listed with their would-be severity and never block. A Medium security finding does not block; if not fixed before merge it is recorded as an open question and, once the owner accepts the risk, as a decision. Other reviewers map onto `_SHARED-PATTERNS.md`: the local AI review blocks on `blocking`, ux-usability-specialist on Blocker and Major, documentation-reviewer on status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, and the GitHub AI review (when `ANTHROPIC_API_KEY` is set) on Blocker.
 
 Every non-blocking finding gets a disposition in the hand-off: fixed, deferred with a recorded item, or rejected with a reason. None is dropped silently.
 
-Stored artifacts never cite line numbers, because they go stale. They name the file path plus a stable anchor such as a symbol, a heading or a short quoted literal. A transient review finding may keep a `line` field as a pointer.
+Stored artifacts never cite line numbers. They name the file path plus a stable anchor such as a symbol, a heading or a short quoted literal. A transient review finding may keep a `line` field as a pointer.
 
 The local review script `scripts/ai_review_local.py` asks the model for JSON with severities `blocking`, `warning` and `info` and the fields file, line, title, evidence, failing scenario and suggestion. Reviewers must not raise anything listed in the Known Non-Issues table of the shared patterns file.

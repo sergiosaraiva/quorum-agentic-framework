@@ -23,7 +23,7 @@ Every sentence asserting a fact about behaviour is a claim: "the endpoint requir
 
 | Situation | Action |
 |-----------|--------|
-| Citation with path and anchor (symbol, heading, quoted literal) | Grep the anchor, read around it, confirm the claim. Anchor not found: `fabricated-citation` or `stale` |
+| Citation with path and anchor (symbol, heading, quoted literal) | Grep the anchor, read around it, confirm the claim. Anchor not found: `fabricated-citation` if the symbol or heading never existed (`git log -S`), `stale` if it existed and moved; both block |
 | Commit-pinned citation | `git show <sha>:<path>` and check |
 | No citation | Grep/Glob for the likely referent and verify there |
 | Referent nowhere | Claim is ungrounded |
@@ -46,6 +46,9 @@ Public surface with no documentation (exported Angular services, public endpoint
 | Partially grounded | Found, details differ | Yes, if material |
 | Ungrounded | Not found anywhere | Yes |
 | Stale | Was true, code changed | Yes |
+| Fabricated citation | Cited anchor never existed | Yes |
+
+Blocking statuses: `ungrounded`, `fabricated-citation`, `stale`, `conflict`, `gate-failure` (`_SHARED-PATTERNS.md`, "What blocks").
 | Added line citation | `+` line with a line-number citation | Always, no cutoff |
 
 ### 6. Style spot-check (external docs only)

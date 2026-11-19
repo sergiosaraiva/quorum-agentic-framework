@@ -42,7 +42,7 @@ Run build, test and read-only checks only when they add evidence (`dotnet build 
 | Design / requirements | Behaviour claims are checked against them and the KBs |
 | Alignment result | Trailing `Alignment result:` block, or `Not applicable: <reason>` |
 
-Output: a findings table, a short summary, and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md` Loop-Back Rule: Critical and High.
+Output: a findings table, a short summary, and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. A Medium security finding is handled as that section says.
 
 | Field | Content |
 |-------|---------|

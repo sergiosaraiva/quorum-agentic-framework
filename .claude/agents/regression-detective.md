@@ -73,7 +73,7 @@ Output: findings table plus summary.
 | fix | Smallest change restoring parity |
 | test_would_catch | One sentence: the test (layer, setup, assertion) that fails before the fix and passes after |
 
-Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md` Loop-Back Rule: Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
+Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
 
 ## Tools
 

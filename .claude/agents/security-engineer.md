@@ -57,7 +57,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 |-------|---------|------|
 | Critical | Auth bypass, cross-tenant access, secret exposure, remote code execution, integrity safeguard removed | Blocks (loop-back) |
 | High | Exploitable with realistic preconditions, significant data exposure | Blocks (loop-back) |
-| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; before merge the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD (no accepted-risk record type exists) |
+| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD (no accepted-risk record type exists) |
 | Low / Info | Hardening, hygiene | Report only |
 
 ## Context Contract

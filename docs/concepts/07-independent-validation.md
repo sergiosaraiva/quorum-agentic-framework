@@ -32,14 +32,14 @@ After code-engineer finishes, `quality-guardian` and `regression-detective` are 
 
 ## Evidence format
 
-A finding without evidence cannot be acted on or disputed. Every reviewer agent uses one finding form, defined in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). Agent contracts add only agent-specific fields. The machine contract of the local AI review (`scripts/ai_review_local.py`: `file`, `line`, `title`, `evidence`, `failing_scenario`, `suggestion`; severities `blocking`, `warning`, `info`) and the `pr-review` PR-comment form are separate and exempt. The local review's markdown renderer accepts both names. Mapping: `evidence` and `failing_scenario` become `scenario`, `suggestion` becomes `fix`, `title` has no equivalent, and `blocking` means Critical or High (the `pr-review` skill maps Critical and High to Blocker, Medium to Warning, Low to Info). The script maps the reviewer agents' severities itself, case-insensitively: Critical, High and Blocker to `blocking`, Medium to `warning`, Low and Info to `info`; any other value is treated as `warning` with a notice on stderr.
+A finding without evidence cannot be acted on or disputed. Every reviewer agent uses one finding form, defined in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). Agent contracts add only agent-specific fields. The machine contract of the local AI review (`scripts/ai_review_local.py`: `file`, `line`, `title`, `evidence`, `failing_scenario`, `suggestion`; severities `blocking`, `warning`, `info`) and the `pr-review` PR-comment form are separate and exempt. The local review's markdown renderer accepts both names. Mapping: `evidence` and `failing_scenario` become `scenario`, `suggestion` becomes `fix`, `title` has no equivalent, and `blocking` means Critical or High (the `pr-review` skill maps Critical and High to Blocker, Medium to Warning, Low to Info). The script also maps these severities, case-insensitively: Critical, High and Blocker to `blocking`, Medium to `warning`, Low and Info to `info`, consistent with "What blocks" for Critical and High. Any other value, including the ux scale's Major, Minor and Note, is treated as `warning` with a notice on stderr; the local review never runs the ux agent.
 
 | Field | Content |
 |-------|---------|
 | `id` | A short id such as `QG-1` or `SEC-001` |
 | `category` | What kind of finding: pattern, security, drift code B1 to B6, a usability heuristic, an area |
-| `severity` | Critical, High, Medium or Low. Critical and High block; Medium and Low do not. The ux scale and the documentation-reviewer `status` map through "What blocks" |
-| `file` and `anchor` | The path and a symbol or heading; `line` is optional and only for code findings, never in stored docs |
+| `severity` | Critical, High, Medium or Low, plus the optional Info (non-blocking, used by security-engineer). Critical and High block; Medium, Low and Info do not. The ux scale and the documentation-reviewer `status` map through "What blocks" |
+| `file` and `anchor` | The path and a symbol or heading; `line` is optional for any finding in review output (a ux finding may attach a screenshot file instead), never in stored docs |
 | `scenario` | The evidence and the concrete failing input or sequence, for example "a refund of 0 on an invoiced order returns 500" |
 | `fix` | The smallest change that would address it |
 | `confidence` | Optional, default 1.0; 0.50 to 0.79 means unverified (see below) |

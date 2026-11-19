@@ -146,6 +146,10 @@ class AcceptedRiskTests(unittest.TestCase):
         errors, _ = self.lint(related="[]")
         self.assertIn("OD-002.md: accepted_risk needs a related BQ/TQ record (the question that raised it)", errors)
 
+    def test_related_must_include_a_bq_or_tq_not_just_any_record(self):
+        errors, _ = self.lint(related="[OD-003]")  # OD-003 does not resolve either, but the prefix rule must fire
+        self.assertIn("OD-002.md: accepted_risk needs a related BQ/TQ record (the question that raised it)", errors)
+
     def test_needs_non_empty_decision(self):
         for body in ("No section here\n", "## Decision\n\n## History\n\nx\n"):
             errors, _ = self.lint(od_body=body)

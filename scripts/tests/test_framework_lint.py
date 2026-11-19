@@ -250,7 +250,7 @@ class SharedRuleTests(unittest.TestCase):
 
     def test_three_branch_restated(self):
         a = self.good()
-        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "KB unreachable (rule 7): Neither works, stop.\n")
+        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "KB unreachable (rule 7):\n- Neither works, stop.\n")
         self.assertTrue(any("Neither works" in e for e in self.errors(a)))
 
     def test_kb_unreachable_without_rule_7_pointer(self):
@@ -313,6 +313,32 @@ class SharedRuleTests(unittest.TestCase):
         shared = SHARED.replace("## Common Tool Permissions", "## Something else")
         self.assertTrue(any("'## Common Tool Permissions' not found" in e for e in self.errors(self.good(), shared=shared)))
 
+    def test_blocking_when_matches_only_a_table_header_cell(self):
+        s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
+        for ok in ("A question is non-blocking when the work can continue.\n",
+                   "| Status | Not blocking when x |\n", "Blocking when the build fails.\n"):
+            self.assertEqual(self.errors(self.good(), s(ok)), [], ok)
+        for bad in ("| Status | Blocking when |\n", "  | A | blocking WHEN | C |\n"):
+            self.assertTrue(any("'Blocking when'" in e for e in self.errors(self.good(), s(bad))), bad)
+
+    def test_neither_works_matches_only_the_bullet_form(self):
+        s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
+        self.assertEqual(self.errors(self.good(), s("If neither works, ask a human.\nNeither works well.\n")), [])
+        for bad in ("- Neither works, stop.\n", "   * neither works: stop\n"):
+            self.assertTrue(any("Neither works" in e for e in self.errors(self.good(), s(bad))), bad)
+
+    def test_any_bash_row_in_permissions_section_fails(self):  # kills any() -> all() on the row check
+        shared = SHARED.replace("| Analysts (`doc-analyst`) | Read, Grep, Glob |",
+                                "| Analysts (`doc-analyst`) | Read, Grep, Glob |\n| Also (`doc-analyst`) | Read, Bash |")
+        self.assertTrue(any("NO_BASH_AGENTS lists 'doc-analyst'" in e for e in self.errors(self.good(), shared=shared)))
+
+    def test_status_list_threshold_is_exactly_three(self):  # kills >= 3 -> >= 4
+        s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
+        three = "Blocking: `ungrounded`, `stale`, `conflict` here.\n"
+        two = "Blocking: `ungrounded`, `stale` here.\n"
+        self.assertTrue(any("lists the blocking statuses" in e for e in self.errors(self.good(), s(three))))
+        self.assertEqual(self.errors(self.good(), s(two)), [])
+
     def test_unblocked_is_not_a_blocking_word(self):
         line = "Continue with unblocked work: `ungrounded`, `fabricated-citation`, `stale`, `conflict`.\n"
         self.assertEqual(self.errors(self.good(), {"s": "---\nname: s\ndescription: d\n---\n" + line}), [])
@@ -321,7 +347,7 @@ class SharedRuleTests(unittest.TestCase):
         s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
         for text, frag in (("run python scripts/kb/search.py x\n", "CLI fallback"),
                            ("run python3.12 scripts/kb/search.py x\n", None),
-                           ("NEITHER  WORKS: stop\n", "Neither works"),
+                           ("  - NEITHER  WORKS: stop\n", "Neither works"),
                            ("If the KB MCP is unreachable, stop\n", "'rule 7'")):
             e = self.errors(self.good(), s(text))
             if frag is None:

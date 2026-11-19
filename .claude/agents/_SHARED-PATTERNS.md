@@ -8,7 +8,7 @@ Single owner of the cross-agent rules. Agent files and the root `CLAUDE.md` rest
 |---|-----------|-------------|
 | 1 | Never invent | Every behaviour claim is grounded in a KB chunk or a recorded decision; silence or conflict becomes a recorded question |
 | 2 | No single point of failure | The agent that produced work never approves it. A different role with fresh context and an equal or stronger model reviews it |
-| 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity; "passed" without command output is not a result |
+| 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity |
 | 4 | Vertical slices | One feature end to end, planned with ids in `docs/slices/` |
 | 5 | Delegate | Product code goes through the pipeline; a direct edit skips the review pair |
 
@@ -80,7 +80,7 @@ Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers fla
 
 ## Mandatory Parallel Review Block
 
-After `code-engineer` finishes, the orchestrating session spawns `quality-guardian` and `regression-detective` in one message (UI paths touched: also `ux-usability-specialist`). No overlap: `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6; `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned, for code artifacts, and consumes `test_would_catch` from `regression-detective`.
+After `code-engineer` finishes, the orchestrating session spawns `quality-guardian` and `regression-detective` in one message (UI paths touched: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6; `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned, for code artifacts, and consumes `test_would_catch` from `regression-detective`.
 
 ## Loop-Back Rule (Mandatory)
 
@@ -124,6 +124,7 @@ Finding form (every reviewer agent; contracts add only agent-specific fields): `
 | High | Wrong behaviour on a normal path, contract break, unbounded resource growth, a missing required control (no alignment result, no endpoint auth decision) |
 | Medium | Wrong on an edge path, design violation |
 | Low | Maintainability with a concrete cost; nothing else is reported |
+| Info | Optional, non-blocking; security-engineer only |
 
 ## Pre-Push Branch Gate (Mandatory)
 

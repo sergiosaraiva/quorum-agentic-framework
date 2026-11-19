@@ -17,7 +17,7 @@ Framework = `.claude/agents/**`, `.claude/skills/**`, every `CLAUDE.md`. It deca
 | References | Every skill named in an agent's `skills:` has a folder; every path in a body exists |
 | Catalogue | Every skill folder appears in `.claude/skills/SKILL-INDEX.md` and vice versa |
 | Forbidden terms | Project-specific or private strings not allowed in the template |
-| Shared rules | Never Invent rule 7 and "What blocks" live only in `agents/_SHARED-PATTERNS.md`. Any line elsewhere that says "KB unreachable" must say "rule 7" on the same line; two outdated literal blocking phrasings (a confidence-based one and a per-file column header; the lint prints them) are banned, and a line that says "block" (whole word) and names three or more blocking statuses must name "What blocks" (scan scope: `.claude/**/*.md`); a line that says "block" and names three or more blocking statuses must name "What blocks"; agents with KB MCP tools list `Bash` unless they are in `NO_BASH_AGENTS` (`requirements-analyst`, `solution-architect`, `prompt-engineer`) |
+| Shared rules | Never Invent rule 7 and "What blocks" live only in `agents/_SHARED-PATTERNS.md` (scan scope: `.claude/**/*.md`). Outside it: no copy of the rule 7 CLI command or of its branch bullets; every line saying "KB unreachable" says "rule 7", and every agent with KB MCP tools has such a line; two outdated blocking phrasings (a confidence-based one and a table header; the lint prints them) are banned; a line that says "block" (whole word) and names three or more of the five blocking statuses must name "What blocks". Agents in `NO_BASH_AGENTS` (`requirements-analyst`, `solution-architect`, `prompt-engineer`) list no `Bash` and have a Bash-free row in Common Tool Permissions; other agents with KB MCP tools list `Bash`; rule 7 names only agents that have a file. Limits: a blocking source naming fewer than three statuses, an unhyphenated agent name in rule 7, and anything outside `.claude/` are not caught (`docs/reference/pipeline-trial-findings.md`, F6) |
 
 Run `python3 scripts/framework_lint.py` (stdlib only; `--root` selects the framework folder, default `.claude`, falling back to `claude-staging` with a notice while the template is not yet installed). The pre-commit hook `.claude/hooks/pre-commit-framework-check.sh` runs the same checks on staged files. KB lint is separate: `python3 scripts/kb/check_chunks.py`; KB tooling tests: `python3 -m unittest discover -s scripts/kb/tests`.
 
@@ -50,7 +50,7 @@ A skill or agent change is good only if behaviour improves.
 | 1 | Write 3-5 realistic prompts, including one the skill should not trigger on |
 | 2 | Run before and after in fresh sessions |
 | 3 | Check: triggered when it should (description quality), output followed the rules, no new false triggers |
-| 4 | For reviewer agents, replay a known-defect diff and confirm it is flagged with file:line evidence |
+| 4 | For reviewer agents, replay a known-defect diff and confirm it is flagged with file + anchor evidence |
 | 5 | Keep the change only if after is better; otherwise revert |
 
 ## 5. Reporting and changing

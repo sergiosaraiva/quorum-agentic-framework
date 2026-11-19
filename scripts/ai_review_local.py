@@ -244,7 +244,7 @@ def call_model(prompt: str, model: str, claude_bin: str, timeout: int) -> str:
 def merge(findings: list[dict]) -> list[dict]:
     seen: dict[tuple, dict] = {}
     for f in findings:
-        key = (f.get("file"), f.get("line"), f.get("title"))
+        key = (f.get("file"), _first(f, "line", "anchor", default=None), _first(f, "title", "scenario", default=None))
         if key not in seen or SEVERITIES.index(f["severity"]) < SEVERITIES.index(seen[key]["severity"]):
             seen[key] = f
     return sorted(seen.values(), key=lambda f: (SEVERITIES.index(f["severity"]), str(f.get("file"))))

@@ -60,9 +60,9 @@ Round cap 3 (round = review, fix, review). After round 3 with findings still ope
 | info | Optional |
 | False positive | Note the reason in the PR description; if it repeats, add a Known Non-Issue to `.claude/agents/_SHARED-PATTERNS.md` |
 
-The script accepts the reviewer agents' scale as well, case-insensitively: Critical, High and Blocker count as blocking, Medium as warning, Low and Info as info; any other value is treated as warning with a stderr notice (`_SHARED-PATTERNS.md`, "What blocks").
+The script also accepts severities from the reviewer agents, case-insensitively: Critical, High and Blocker count as blocking, Medium as warning, Low and Info as info (consistent with "What blocks" for Critical and High). Any other value, including the ux scale's Major, Minor and Note, is treated as warning with a stderr notice; the local review never runs the ux agent.
 
-- A finding without file and line evidence is not actionable; discard it or re-run with a narrower scope.
+- A finding without file and anchor (or line) evidence is not actionable; discard it or re-run with a narrower scope.
 - The agent that wrote the code applies fixes; the script judges them. Never mark a finding resolved without a re-run.
 
 ## Counters

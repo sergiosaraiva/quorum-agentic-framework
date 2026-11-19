@@ -41,7 +41,7 @@ MAX_AGENT_BYTES = 16 * 1024
 MAX_SKILL_BYTES = 7 * 1024
 SHARED_FILE = "_SHARED-PATTERNS.md"
 KB_TOOL_PREFIXES = ("mcp__business-kb", "mcp__qa-kb")
-# Agents without Bash by design. Rule 7 does not name them; the shared file's "Common Tool Permissions" table does
+# Agents without Bash by design. rule 7 names them as authoring agents but does not state that they have no Bash; the shared file's "Common Tool Permissions" table does
 # (Analysts and prompt-engineer rows), and check_shared_rules cross-checks the constant against that table.
 NO_BASH_AGENTS = ("requirements-analyst", "solution-architect", "prompt-engineer")
 KB_UNREACHABLE = r"\bKB\b.{0,20}?unreachable"
@@ -317,9 +317,9 @@ def check_shared_rules(root: Path, report: Report) -> None:
     Skipped when the shared file is absent. All checks read the working tree under `root`.
 
     rule 7   outside the shared file no .md file under root has `python3 scripts/kb/search.py`, the phrase
-             "Neither works", or `scripts/kb/search.py` in an agent file; any line saying "KB unreachable" /
+             a list bullet starting "Neither works", or `scripts/kb/search.py` in an agent file; any line saying "KB unreachable" /
              "KB MCP unreachable" must say "rule 7"; every agent with KB MCP tools has such a line.
-    blocks   outside the shared file no .md file has "still blocking" or a "Blocking when" header; a line with
+    blocks   outside the shared file no .md file has "still blocking" or a table header cell "Blocking when"; a line with
              at least 3 of the five blocking statuses and the word "block" must name "What blocks"
              (a line merely enumerating statuses, e.g. an output enum, has no "block" and passes).
     tools    agents in NO_BASH_AGENTS (checked against Common Tool Permissions) must not list Bash; every other
@@ -345,11 +345,12 @@ def check_shared_rules(root: Path, report: Report) -> None:
                                f"point to {SHARED_FILE} Never Invent rule 7 instead")
         elif is_agent and "scripts/kb/search.py" in text:
             report.error(path, f"mentions scripts/kb/search.py; the KB fallback lives only in {SHARED_FILE} rule 7")
-        if re.search(r"neither\s+works", text, re.I):
+        if re.search(r"^[ \t]*[-*][ \t]+neither\s+works", text, re.I | re.M):
             report.error(path, f"restates the rule 7 branches ('Neither works'); point to {SHARED_FILE} rule 7")
         if re.search(r"still blocking", text, re.I):
             report.error(path, f"contains 'still blocking'; blocking is decided only by {SHARED_FILE} 'What blocks'")
-        if re.search(r"Blocking when", text, re.I):
+        if any(ln.lstrip().startswith("|") and any(c.strip().lower() == "blocking when" for c in ln.split("|"))
+               for ln in text.splitlines()):
             report.error(path, f"has a 'Blocking when' column; blocking is decided only by {SHARED_FILE} 'What blocks'")
         for n, line in enumerate(text.splitlines(), 1):
             if re.search(KB_UNREACHABLE, line, re.I) and not re.search(r"rule 7", line, re.I):

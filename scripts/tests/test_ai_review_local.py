@@ -232,6 +232,10 @@ class SeverityMappingTests(unittest.TestCase):
                 self.assertEqual(air.normalize_severity(raw), "warning")
             self.assertIn("unknown severity", err.getvalue())
 
+    def test_severity_is_stripped(self):
+        self.assertEqual(air.normalize_severity(" High "), "blocking")
+        self.assertEqual(air.normalize_severity("\tlow\n"), "info")
+
     def exit_code(self, severity: str) -> int:
         import contextlib
         import io
@@ -257,6 +261,15 @@ class SeverityMappingTests(unittest.TestCase):
 
 
 class MergeTests(unittest.TestCase):
+    def test_canonical_findings_with_different_anchors_are_not_collapsed(self):
+        a = {"severity": "warning", "file": "a.py", "anchor": "func f", "scenario": "s1", "fix": "x"}
+        b = {"severity": "warning", "file": "a.py", "anchor": "func g", "scenario": "s2", "fix": "y"}
+        self.assertEqual(len(air.merge([a, b])), 2)
+        c = {"severity": "warning", "file": "a.py", "anchor": "func f", "scenario": "s1"}
+        d = {**c, "severity": "blocking"}
+        merged = air.merge([c, dict(c), d])
+        self.assertEqual([f["severity"] for f in merged], ["blocking"])
+
     def test_merge_keeps_most_severe_duplicate(self):
         merged = air.merge([
             {"file": "a", "line": 1, "title": "t", "severity": "warning"},

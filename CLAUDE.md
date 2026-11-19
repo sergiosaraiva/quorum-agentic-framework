@@ -123,7 +123,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 
 Before any coding or documentation task, state the pipeline in one line, with a few words of reason per skipped stage, for example: `Pipeline: full lane - requirements-analyst skip (small scope) - code-engineer -> QG||RD -> test-automator - docs: none - KB check: done (BC-001) - Alignment Gate: applies (src/)`.
 
-Loop-back rule: findings return to the producing agent; at most 3 rounds per gate, then escalate to a human. Reviewers report evidence (file:line plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
+Loop-back rule: findings return to the producing agent; at most 3 rounds per gate, then escalate to a human. Reviewers report evidence (file plus anchor, line optional and never in stored docs, plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
 
 ## Delegation Is Required
 

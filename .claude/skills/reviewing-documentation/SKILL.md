@@ -47,9 +47,9 @@ Public surface with no documentation (exported Angular services, public endpoint
 | Ungrounded | Not found anywhere | Yes |
 | Stale | Was true, code changed | Yes |
 | Fabricated citation | Cited anchor never existed | Yes |
+| Added line citation | `+` line with a line-number citation | Always, no cutoff |
 
 Blocking statuses: `ungrounded`, `fabricated-citation`, `stale`, `conflict`, `gate-failure` (`_SHARED-PATTERNS.md`, "What blocks").
-| Added line citation | `+` line with a line-number citation | Always, no cutoff |
 
 ### 6. Style spot-check (external docs only)
 

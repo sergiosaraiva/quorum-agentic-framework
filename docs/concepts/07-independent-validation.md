@@ -51,10 +51,11 @@ An unverified item is a finding the reviewer could not confirm (confidence 0.50 
 
 | Reviewer | Where | Label |
 |----------|-------|-------|
-| quality-guardian, regression-detective | the "unverified" list in the report | plain list, with the severity it would have |
+| quality-guardian, regression-detective | the "unverified" list in the report | `unverified (would-be <severity>): ...`, one entry per item |
 | security-engineer | `areas_not_reviewed` | `unverified (would-be <severity>): ...` |
 | ux-usability-specialist | the optional `unverified` list | `unverified (would-be <severity>): ...` |
 | documentation-reviewer, and the `reviewing-kb-chunks` pass | `coverage_gaps` | `unverified (would-be <status>): ...` |
+| infrastructure-engineer (review mode) | `coverage_gaps` (optional) | `unverified: ...`; it has no severity scale |
 
 ## Blocking, non-blocking, dispositions
 

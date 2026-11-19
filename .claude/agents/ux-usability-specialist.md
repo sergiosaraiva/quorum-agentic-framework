@@ -96,6 +96,6 @@ Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and No
 | Failure | Recovery |
 |---------|----------|
 | KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7: `define` stops after the fallback fails; `review` lists the KB check under `unverified` |
-| No running app to capture | Review statically; mark runtime findings `unverified` |
+| No running app to capture | Review statically. Findings the static read confirms stay in `findings` with their severity and block per "What blocks"; only findings that need runtime evidence and are not statically confirmed go to `unverified` |
 | Business vocabulary absent from KB | Use neutral wording and return a BQ |
 | Owner has not approved a mockup | Mark the spec provisional; do not hand it to code-engineer as final |

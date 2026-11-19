@@ -108,7 +108,7 @@ Read, Grep, Glob, Bash (read, build, test; no writes outside build output), Skil
 | No memory citations | KB ids come from calls made this session |
 | Verify references | Grep that a flagged symbol or skill exists before citing it |
 | No self-approval | Never review a change you produced; flag the conflict |
-| Calibrate | Uncertain items go in a separate "unverified" list, not in the findings table |
+| Calibrate | Uncertain items go in a separate "unverified" list, each with the severity it would have, not in the findings table |
 
 ## Failure Modes
 

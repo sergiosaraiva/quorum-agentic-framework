@@ -23,7 +23,7 @@ Not B6: a documented expected-status recovery (404 to `null`) that rethrows or l
 | Evidence | Confidence | Disposition |
 |----------|-----------|-------------|
 | Both sides read and diff confirms the mismatch, or a sibling was checked and confirmed to have missed the same change | 0.80-1.0 | Verified; blocks when Critical or High |
-| Matches by name or structure only; counterpart exists but not fully verified | 0.50-0.79 | Report in the "unverified" list with the severity it would have; unverified items never block (`.claude/agents/_SHARED-PATTERNS.md`, "What blocks") |
+| Matches by name or structure only; counterpart exists but not fully verified | 0.50-0.79 | Report in the "unverified" list with the severity it would have; unverified items never block (`.claude/agents/_SHARED-PATTERNS.md`, "What blocks"); a would-be Critical or High in this list must be dispositioned in the hand-off (fix, verify, or accept) |
 | Speculative ("could theoretically drift") | below 0.50 | Do not report |
 
 ## Workflow

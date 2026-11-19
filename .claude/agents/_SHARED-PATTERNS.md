@@ -50,10 +50,10 @@ Rules:
 4. KB and code or spec disagree, or both are silent: do not guess. Record a question and continue with unblocked work.
 5. Record type: business or expected-behaviour question = BQ, `decider` a business role; technical question = TQ, `decider` the technical role. Who writes the record: an agent whose role includes question records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself; every other agent returns it in `questions_to_record` and the session (or `documentation-curator`) writes it. Format: `questions/README.md`, skill `recording-decisions`.
 6. "Flag" means record and continue. "Ask" means stop and ask, only when blocked on an owner decision no record settles, a scope change, or a destructive or outward-facing action the request did not cover. Batch every open item into one round, recommended option first.
-7. KB MCP unreachable (the only statement of this rule; agent failure rows point here), in order:
-   - Agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Agents without `Bash` (`requirements-analyst`, `solution-architect`) read `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep; only BM25 ranking (local backend) is lost. Say in the output which was used.
-   - Neither possible, authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer` and `ux-usability-specialist` when authoring or defining): stop and return to the session (`/mcp`); never proceed from memory.
-   - Read-only reviewers (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `infrastructure-engineer` and `ux-usability-specialist` when reviewing): list `chunk verification skipped: KB unreachable` as an unverified item (field per reviewer: `docs/concepts/07-independent-validation.md`), never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
+7. KB MCP unreachable (sole statement; agent failure rows point here), in order:
+   - First, agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Then, any agent reads `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep, losing BM25 ranking (local backend), `--graph`/`--related` and the filters. Say in the output which was used.
+   - Neither works (files unreadable), authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer` and `ux-usability-specialist` when authoring or defining): stop and return to the session (`/mcp`); never proceed from memory.
+   - Reviewing agents (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `infrastructure-engineer` and `ux-usability-specialist` when reviewing): list `chunk verification skipped: KB unreachable` as an unverified item (fields: `docs/concepts/07-independent-validation.md`), never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
 
 ## Pre-Development Alignment Gate (Mandatory)
 
@@ -113,7 +113,7 @@ Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no sta
 | Different role | The reviewer is never the writer's role |
 | Fresh context | Reviewers get the diff, the spec/design and the alignment result, not the writer's reasoning or conclusion. |
 | Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus`. `documentation-reviewer` runs `sonnet` because its check is mechanical (`docs/reference/model-selection-and-costs.md`) |
-| Read-only | Reviewers have no Write/Edit tools; Bash per Common Tool Permissions. They return findings in the structured form below |
+| Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. They return findings in the structured form below |
 | No anchoring | A prompt that hands over a hypothesis ("confirm X is fine") is rewritten as a neutral task |
 
 Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`, `file` + anchor (and `line` as a pointer in the review output only), `scenario` (concrete input that fails), `fix`. A finding without a failing scenario is dropped.
@@ -127,7 +127,7 @@ Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; fix its findings (`MAX_ROUNDS`, label `needs-human-review`). Without the key it is skipped; green is not a review.
+Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (otherwise skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
 
 ## Citation Format (Mandatory)
 

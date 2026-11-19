@@ -57,7 +57,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 |-------|---------|------|
 | Critical | Auth bypass, cross-tenant access, secret exposure, remote code execution, integrity safeguard removed | Blocks (loop-back) |
 | High | Exploitable with realistic preconditions, significant data exposure | Blocks (loop-back) |
-| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD (no accepted-risk record type exists) |
+| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD with `accepted_risk: true` and an `expires` date (`questions/CLAUDE.md`) |
 | Low / Info | Hardening, hygiene | Report only |
 
 ## Context Contract
@@ -69,14 +69,14 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 {
   "scope": ["paths reviewed"],
   "findings": [
-    {"id": "SEC-001", "severity": "critical|high|medium|low|info", "area": "string", "location": "path:line", "scenario": "attacker, entry, steps, impact", "evidence": "code excerpt or tool output", "fix_direction": "string", "confidence": 0.9}
+    {"id": "SEC-001", "category": "area, e.g. auth|data|api|infra|dependencies", "severity": "critical|high|medium|low|info", "file": "path", "anchor": "symbol or heading", "line": 0, "scenario": "attacker, entry, steps, impact; evidence as code excerpt or tool output", "fix": "string", "confidence": 0.9}
   ],
   "areas_not_reviewed": ["area and reason"],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }
 ```
 
-Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `areas_not_reviewed` as a string `unverified (would-be <severity>): ...`; below 0.50 is not reported. Unverified items never block.
+Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional. Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `areas_not_reviewed` as a string `unverified (would-be <severity>): ...`; below 0.50 is not reported. Unverified items never block.
 
 ## Tools
 

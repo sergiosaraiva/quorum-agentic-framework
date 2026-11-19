@@ -68,12 +68,12 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
   "states": [{"screen": "string", "state": "loading|empty|error|data|readonly", "spec": "string"}],
   "acceptance_criteria": ["string"],
   "unverified": ["optional: unverified (would-be <severity>): what and why"],
-  "findings": [{"severity": "blocker|major|minor|note", "principle": "string", "location": "path:line|screenshot", "scenario": "string", "evidence": "string", "fix_direction": "string"}],
+  "findings": [{"id": "UX-1", "category": "heuristic or principle", "severity": "blocker|major|minor|note", "file": "path or screenshot", "anchor": "component or element", "line": 0, "scenario": "task, steps, evidence", "fix": "string"}],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }
 ```
 
-Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
+Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
 
 ## Tools
 

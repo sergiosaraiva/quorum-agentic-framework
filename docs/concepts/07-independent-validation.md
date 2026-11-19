@@ -32,16 +32,19 @@ After code-engineer finishes, `quality-guardian` and `regression-detective` are 
 
 ## Evidence format
 
-A finding without evidence cannot be acted on or disputed. Every finding carries:
+A finding without evidence cannot be acted on or disputed. Every reviewer uses one finding form, defined in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). Agent contracts add only agent-specific fields:
 
 | Field | Content |
 |-------|---------|
-| Severity | Critical, High, Medium or Low. Critical and High block; Medium and Low do not |
-| Location | `path` and symbol, with the line when needed to find it |
-| Claim | One sentence: what is wrong |
-| Failing scenario | The input or sequence that exposes it, for example "a refund of 0 on an invoiced order returns 500" |
-| Fix direction | The smallest change that would address it |
-| Test hint | The test that would have caught it, if one exists |
+| `id` | A short id such as `QG-1` or `SEC-001` |
+| `category` | What kind of finding: pattern, security, drift code B1 to B6, a usability heuristic, an area |
+| `severity` | Critical, High, Medium or Low. Critical and High block; Medium and Low do not. The ux scale and the documentation-reviewer `status` map through "What blocks" |
+| `file` and `anchor` | The path and a symbol or heading; `line` is optional and only for code findings, never in stored docs |
+| `scenario` | The evidence and the concrete failing input or sequence, for example "a refund of 0 on an invoiced order returns 500" |
+| `fix` | The smallest change that would address it |
+| `confidence` | Optional, default 1.0; 0.50 to 0.79 means unverified (see below) |
+
+Agent-specific fields stay where they are useful, for example `test_would_catch` (the test that would have caught it) and `counterpart` (the stale side of a drift) in regression-detective, and `claim` in documentation-reviewer.
 
 A bare "looks fine" is not a result. A clean review states what was checked, so silence cannot be mistaken for coverage. The tools use different scales, so `.claude/agents/_SHARED-PATTERNS.md` maps them: Critical and High block (the ux scale's Blocker and Major block too); Medium and Low do not; a documentation-reviewer finding of status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` blocks (confidence only decides what is reported: 0.50 to 0.79 is listed as unverified, and unverified items never block); in the PR review a Blocker blocks and Warning or Info do not.
 
@@ -59,7 +62,7 @@ An unverified item is a finding the reviewer could not confirm (confidence 0.50 
 
 ## Blocking, non-blocking, dispositions
 
-Blocking findings (Critical or High severity, for example data loss, an exploitable security hole, a broken contract, a violated Immutable Rule or an unauthorised endpoint) stop the pipeline. A Medium security finding does not block; if it is not fixed before merge, the session records it as an open question and, once the owner accepts the risk, as a decision. Non-blocking findings do not stop it but are never dropped silently: each is given a disposition in the hand-off (fixed now, deferred with a recorded question or work item, or declined with a reason). Reviewers also must not raise a finding that a rule explicitly lists as a known non-issue, so the same false alarm is not re-argued each round.
+Blocking findings (Critical or High severity, for example data loss, an exploitable security hole, a broken contract, a violated Immutable Rule or an unauthorised endpoint) stop the pipeline. A Medium security finding does not block; if it is not fixed before merge, the session records it as an open question and, once the owner accepts the risk, as a decision (`accepted_risk: true` with an `expires` date; see `questions/CLAUDE.md`). Non-blocking findings do not stop it but are never dropped silently: each is given a disposition in the hand-off (fixed now, deferred with a recorded question or work item, or declined with a reason). Reviewers also must not raise a finding that a rule explicitly lists as a known non-issue, so the same false alarm is not re-argued each round.
 
 ## The loop and its cap
 

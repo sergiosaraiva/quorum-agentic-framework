@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -98,7 +99,8 @@ class LintTests(unittest.TestCase):
         self.assertEqual(len(self.run_lint({}, {"s": big_skill}, strict=True).errors), 1)
 
     def test_shared_patterns_file_is_not_treated_as_an_agent(self):
-        r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\n"}, {})
+        with mock.patch.object(fl, "NO_BASH_AGENTS", ()):
+            r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\n7. KB MCP unreachable: stop\n"}, {})
         self.assertEqual(r.errors, [])
 
     def test_skill_folder_without_skill_md_is_an_error(self):
@@ -180,6 +182,119 @@ class StagedTests(unittest.TestCase):
         self.agent.write_text(GOOD_AGENT.format(n="a").replace("Read, Grep", "Read, Agent(w)"), encoding="utf-8")
         self.git("add", ".")
         self.assertTrue(any("Agent" in e for e in self.run_staged().errors))
+
+
+SHARED = """# Shared
+7. KB MCP unreachable (sole statement), in order:
+   - First, agents with `Bash` use `python3 scripts/kb/search.py "<q>"`.
+   - Neither works, authoring agents (`doc-writer`): stop.
+   - Reviewing agents (`doc-reviewer`): list unverified.
+
+| Agent class | Tools |
+|---|---|
+| Analysts (`doc-analyst`) | Read, Grep, Glob |
+
+What blocks.
+"""
+KB = "mcp__business-kb__search, mcp__qa-kb__get"
+
+
+def agent(n, tools, body="| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 |\n"):
+    return f"---\nname: {n}\ndescription: d\nmodel: sonnet\ntools: {tools}\n---\n\n{body}"
+
+
+class SharedRuleTests(unittest.TestCase):
+    """check_shared_rules: rule 7 and 'What blocks' have one owner; tools match rule 7."""
+
+    def setUp(self):
+        self.patch = mock.patch.object(fl, "NO_BASH_AGENTS", ("doc-analyst",))
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def errors(self, agents, skills=None, shared=SHARED):
+        agents = {"_SHARED-PATTERNS": shared, **agents}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build(Path(tmp) / ".claude", {}, skills or {})
+            for name, text in agents.items():
+                (root / "agents" / f"{name}.md").write_text(text, encoding="utf-8")
+            report = fl.Report(False)
+            fl.check_shared_rules(root, report)
+            return report.errors
+
+    def good(self):
+        return {"doc-writer": agent("doc-writer", f"Read, Bash, {KB}"), "doc-reviewer": agent("doc-reviewer", f"Read, Bash, {KB}"),
+                "doc-analyst": agent("doc-analyst", f"Read, {KB}")}
+
+    def test_passing_case(self):
+        self.assertEqual(self.errors(self.good()), [])
+
+    def test_absent_shared_file_skips_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build(Path(tmp) / ".claude", {"a": GOOD_AGENT.format(n="a")}, {})
+            report = fl.Report(False)
+            fl.check_shared_rules(root, report)
+            self.assertEqual(report.errors, [])
+
+    def test_cli_fallback_restated_in_agent(self):
+        a = self.good()
+        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "| KB unreachable | rule 7; run `python3 scripts/kb/search.py x` |\n")
+        self.assertTrue(any("restates the rule 7 CLI fallback" in e for e in self.errors(a)))
+
+    def test_cli_fallback_restated_in_skill(self):
+        e = self.errors(self.good(), {"s": "---\nname: s\ndescription: d\n---\nrun python3 scripts/kb/search.py x\n"})
+        self.assertTrue(any("skills" in x and "CLI fallback" in x for x in e))
+
+    def test_three_branch_restated(self):
+        a = self.good()
+        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "KB unreachable (rule 7): Neither works, stop.\n")
+        self.assertTrue(any("Neither works" in e for e in self.errors(a)))
+
+    def test_kb_unreachable_without_rule_7_pointer(self):
+        a = self.good()
+        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "| KB unreachable | stop and ask |\n")
+        e = self.errors(a)
+        self.assertTrue(any("must point to Never Invent 'rule 7'" in x for x in e))
+        self.assertTrue(any("no 'KB unreachable' line pointing to rule 7" in x for x in e))
+
+    def test_kb_agent_without_unreachable_row(self):
+        a = self.good()
+        a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", "nothing\n")
+        self.assertTrue(any("no 'KB unreachable' line" in e for e in self.errors(a)))
+
+    def test_still_blocking_and_blocking_when_header(self):
+        s = {"s": "---\nname: s\ndescription: d\n---\n0.5 is Still Blocking\n| Status | Blocking when |\n"}
+        e = self.errors(self.good(), s)
+        self.assertTrue(any("'still blocking'" in x for x in e))
+        self.assertTrue(any("'Blocking when'" in x for x in e))
+
+    def test_blocking_status_list_needs_what_blocks(self):
+        line = "Blocking: `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`.\n"
+        s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
+        self.assertTrue(any("lists the blocking statuses" in x for x in self.errors(self.good(), s(line))))
+        self.assertEqual(self.errors(self.good(), s(line.rstrip() + " (\"What blocks\")\n")), [])
+        self.assertEqual(self.errors(self.good(), s('"status": "ungrounded|stale|fabricated-citation|conflict|gate-failure"\n')), [])
+
+    def test_no_bash_agent_listing_bash(self):
+        a = self.good()
+        a["doc-analyst"] = agent("doc-analyst", f"Read, Bash, {KB}")
+        self.assertTrue(any("tools lists Bash" in e for e in self.errors(a)))
+
+    def test_kb_agent_without_bash(self):
+        a = self.good()
+        a["doc-writer"] = agent("doc-writer", f"Read, {KB}")
+        self.assertTrue(any("KB MCP tools but no Bash" in e for e in self.errors(a)))
+
+    def test_rule_7_names_agent_without_file(self):
+        a = self.good()
+        del a["doc-reviewer"]
+        self.assertTrue(any("'doc-reviewer' but agents/doc-reviewer.md does not exist" in e for e in self.errors(a)))
+
+    def test_no_bash_constant_must_match_permissions_table(self):
+        e = self.errors(self.good(), shared=SHARED.replace("Read, Grep, Glob |", "Read, Bash |"))
+        self.assertTrue(any("NO_BASH_AGENTS lists 'doc-analyst'" in x for x in e))
+
+    def test_missing_rule_7(self):
+        self.assertTrue(any("rule 7" in e for e in self.errors(self.good(), shared="# Shared\n")))
 
 
 if __name__ == "__main__":

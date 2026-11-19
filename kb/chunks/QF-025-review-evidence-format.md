@@ -5,7 +5,7 @@ topics: [validation, review]
 links: [QF-024, QF-026, QF-006]
 sources: [".claude/agents/_SHARED-PATTERNS.md", "docs/concepts/07-independent-validation.md", ".claude/skills/pr-review/SKILL.md", "scripts/ai_review_local.py"]
 ---
-A Quorum review finding without evidence cannot be acted on or disputed, so every reviewer reports in a fixed form: `severity`, `category`, `file` plus an anchor, `scenario` and `fix`. The scenario is a concrete input or sequence that fails. A finding without a failing scenario is dropped. A bare "looks fine" is not a result, and a clean review states what was checked so that silence cannot be mistaken for coverage.
+A Quorum review finding without evidence cannot be acted on or disputed, so every reviewer reports in one form: `id`, `category`, `severity`, `file` plus an `anchor`, `scenario`, `fix` and an optional `confidence`. The scenario is a concrete input or sequence that fails. A finding without a failing scenario is dropped. A bare "looks fine" is not a result, and a clean review states what was checked so that silence cannot be mistaken for coverage.
 
 | Severity | Meaning |
 |----------|---------|
@@ -14,7 +14,7 @@ A Quorum review finding without evidence cannot be acted on or disputed, so ever
 | Medium | Wrong on an edge path, a design violation |
 | Low | Maintainability with a concrete cost; nothing else is reported |
 
-Critical and High block; Medium and Low do not. Severity alone decides; unverified items (confidence 0.50 to 0.79) are listed with their would-be severity and never block. A Medium security finding does not block; if not fixed before merge it is recorded as an open question and, once the owner accepts the risk, as a decision. Other reviewers map onto `_SHARED-PATTERNS.md`: the local AI review blocks on `blocking`, ux-usability-specialist on Blocker and Major, documentation-reviewer on status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, and the GitHub AI review (when `ANTHROPIC_API_KEY` is set) on Blocker.
+Critical and High block; Medium and Low do not. Severity alone decides; unverified items (confidence 0.50 to 0.79) are listed with their would-be severity and never block. A Medium security finding does not block; if not fixed before merge it is recorded as an open question and, once the owner accepts the risk, as a decision with `accepted_risk: true` and an expiry date. Other reviewers map their scales onto `_SHARED-PATTERNS.md`, "What blocks"; `docs/concepts/07-independent-validation.md` lists them.
 
 Every non-blocking finding gets a disposition in the hand-off: fixed, deferred with a recorded item, or rejected with a reason. None is dropped silently.
 

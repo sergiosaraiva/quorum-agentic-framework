@@ -31,6 +31,7 @@ Frontmatter:
 | `answered` | Optional date the answer or decision was recorded |
 | `related` | Other record ids; lint fails on an unknown id |
 | `chunks` | Business KB chunk ids the record concerns; lint fails on an unknown id |
+| `accepted_risk`, `expires` | Optional, `OD` only: `accepted_risk: true` needs `expires: YYYY-MM-DD` and a `related` BQ/TQ; the owner has accepted a known risk (`## Decision`: risk, owner, mitigation, expiry action). `expires` must follow `answered` or `asked`; past it, lint warns |
 | `example` | Optional `true` for demo content to delete on adoption |
 
 Body sections: `## Question`, `## Options` (recommended first, one-line trade-offs), `## Answer` (or `## Decision` for an OD; required once `answered` or `decided`), `## History` (append-only dated lines: opened, answered, who).

@@ -49,11 +49,12 @@ Output: a findings table, a short summary, and `questions_to_record` for any beh
 | id | `QG-n` |
 | severity | Critical / High / Medium / Low |
 | category | pattern, security, ef-core, resource, design, alignment |
-| location | `path` + symbol anchor, `line` as pointer |
+| file, anchor | `path` + symbol anchor; `line` optional pointer |
 | scenario | Concrete input or sequence that fails |
 | fix | Smallest change that removes the cause |
+| confidence | Optional, default 1.0 |
 
-State "no blocking findings" explicitly when true, with the list of checks run.
+Finding form: `_SHARED-PATTERNS.md` (canonical field names). State "no blocking findings" explicitly when true, with the list of checks run.
 
 ## Pattern Checklists
 

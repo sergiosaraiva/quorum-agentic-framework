@@ -17,6 +17,7 @@ Framework = `.claude/agents/**`, `.claude/skills/**`, every `CLAUDE.md`. It deca
 | References | Every skill named in an agent's `skills:` has a folder; every path in a body exists |
 | Catalogue | Every skill folder appears in `.claude/skills/SKILL-INDEX.md` and vice versa |
 | Forbidden terms | Project-specific or private strings not allowed in the template |
+| Shared rules | Never Invent rule 7 and "What blocks" live only in `agents/_SHARED-PATTERNS.md`. Any line elsewhere that says "KB unreachable" must say "rule 7" on the same line; a second blocking table and the old confidence-based blocking phrases are banned (the lint names them); a line that says "block" and names three or more blocking statuses must name "What blocks"; agents with KB MCP tools list `Bash` unless they are in `NO_BASH_AGENTS` (`requirements-analyst`, `solution-architect`, `prompt-engineer`) |
 
 Run `python3 scripts/framework_lint.py` (stdlib only; `--root` selects the framework folder, default `.claude`, falling back to `claude-staging` with a notice while the template is not yet installed). The pre-commit hook `.claude/hooks/pre-commit-framework-check.sh` runs the same checks on staged files. KB lint is separate: `python3 scripts/kb/check_chunks.py`; KB tooling tests: `python3 -m unittest discover -s scripts/kb/tests`.
 

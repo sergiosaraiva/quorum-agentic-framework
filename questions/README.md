@@ -10,9 +10,9 @@ The five records shipped here (`BQ-001`, `BQ-002`, `TQ-001`, `TQ-002`, `OD-001`)
 |------|---------|-----------------|----------|
 | `BQ` | Business question: behaviour, scope, rules | product owner | `open`, `answered`, `closed` |
 | `TQ` | Technical question: design, tooling, data model | tech lead | `open`, `answered`, `closed` |
-| `OD` | Owner decision: a recorded choice that binds later work | whoever owns it | `decided`, `closed` |
+| `OD` | Owner decision: a recorded choice that binds later work, or an accepted risk (`accepted_risk: true`) | whoever owns it, or the role that owns the risk | `decided`, `closed` |
 
-An answered question that settles a design choice usually also produces an `OD` that cites it.
+An answered question that settles a design choice usually also produces an `OD` that cites it. An accepted risk is an `OD` too: the owner accepts a known, unfixed finding for a limited time (see `accepted_risk` and `expires` below).
 
 ## Layout and format
 
@@ -45,9 +45,11 @@ example: true
 | `decider` | role that must answer (required) |
 | `priority` | `P1` (blocks work) to `P3` |
 | `asked` | date the record was raised (`YYYY-MM-DD`) |
-| `answered` | optional date the answer or decision was recorded. It is kept with the record but is not a database column and not a search filter |
+| `answered` | optional date (`YYYY-MM-DD`) the answer or decision was recorded; lint uses it as the reference for `expires`. It is kept with the record but is not a database column and not a search filter |
 | `related` | other record ids; lint fails on an unknown id |
 | `chunks` | business KB chunk ids the record concerns; lint fails on an unknown id |
+| `accepted_risk` | optional, `true` or `false`; only on kind `OD`. `true` marks a recorded risk acceptance and requires `expires`, a `related` BQ/TQ record (the question that raised the risk) and a non-empty `## Decision` stating the risk, the owner who accepted it, the mitigation and what happens at expiry |
+| `expires` | `YYYY-MM-DD`; required when `accepted_risk` is `true`, an error otherwise; must be after `answered` (or `asked` when `answered` is absent). From the day after this date, lint prints a WARNING (the exit code is unchanged). Like `answered`, it is kept with the record, not stored in the database and not returned by the MCP tools |
 | `example` | optional `true` marks demo content to delete when you adopt the template |
 
 Statuses `answered` and `decided` require an `## Answer` or `## Decision` section (lint enforces it). To retire a record that a later one replaces, set its status to `closed` and add a line "Superseded by <id>" under `## History`; no other status exists. The MCP `search` tool filters only by `query`, `k`, `kind` and `status`. Rules for writing records: `questions/CLAUDE.md`. Tables: `questions/schema.sql` (the ingest script applies it).

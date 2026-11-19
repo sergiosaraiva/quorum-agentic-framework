@@ -9,8 +9,17 @@ public static class OrdersEndpoints
         // Explicit auth decision (Immutable Rule 7): the whole group requires an authenticated caller.
         var group = app.MapGroup("/api/orders").WithTags("Orders").RequireAuthorization();
 
-        group.MapGet("/", async (int? page, int? pageSize, OrdersService service, CancellationToken ct) =>
-            Results.Ok(await service.ListAsync(page, pageSize, ct)));
+        // The filter values bind as strings and are parsed explicitly, so a malformed value gives
+        // validation problem details (TQ-005) and a calendar date is exactly yyyy-MM-dd (OD-005).
+        group.MapGet("/", async (
+            int? page, int? pageSize, string? createdFrom, string? createdTo, string? customerName,
+            OrdersService service, CancellationToken ct) =>
+        {
+            var (filter, errors) = OrderListFilter.Parse(createdFrom, createdTo, customerName);
+            return errors.Count > 0
+                ? Results.ValidationProblem(errors)
+                : Results.Ok(await service.ListAsync(page, pageSize, filter, ct));
+        });
 
         group.MapGet("/{id:guid}", async (Guid id, OrdersService service, CancellationToken ct) =>
             await service.GetAsync(id, ct) is { } order ? Results.Ok(order) : Results.NotFound());

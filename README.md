@@ -153,6 +153,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 | [09 Agents and skills](docs/concepts/09-agents-and-skills.md) | what each is and how to write them |
 | [10 Adopting the template](docs/concepts/10-adopting-the-template.md) | step-by-step setup |
 | [Model selection and costs](docs/reference/model-selection-and-costs.md) | which model, what it costs |
+| [Pipeline trial findings](docs/reference/pipeline-trial-findings.md) | what a trial of the pipeline on one example slice caught and exposed |
 
 ## What is tested vs not
 

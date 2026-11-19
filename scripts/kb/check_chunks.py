@@ -53,7 +53,8 @@ def check_accepted_risk(r: lib.Record, name: str, errors: list[str], warnings: l
         if r.kind != "OD":
             errors.append(f"{name}: accepted_risk is allowed only on kind OD")
         if not isinstance(flag, bool):
-            errors.append(f"{name}: accepted_risk must be true or false, got {flag!r}")
+            hint = " (unquote the value: accepted_risk: true)" if isinstance(flag, str) and flag.lower() in ("true", "false") else ""
+            errors.append(f"{name}: accepted_risk must be true or false, got {flag!r}{hint}")
     if has_expires and flag is not True:
         errors.append(f"{name}: expires requires accepted_risk: true")
     if flag is not True or r.kind != "OD":
@@ -62,15 +63,17 @@ def check_accepted_risk(r: lib.Record, name: str, errors: list[str], warnings: l
     if not has_expires or expires in ("", []):
         errors.append(f"{name}: accepted_risk true requires expires: YYYY-MM-DD")
     elif exp is None:
-        errors.append(f"{name}: expires {expires!r} is not a valid YYYY-MM-DD date")
+        hint = " (no trailing comment: expires: 2026-12-31)" if isinstance(expires, str) and re.match(
+            r"^\d{4}-\d{2}-\d{2}\s+#", expires) else ""
+        errors.append(f"{name}: expires {expires!r} is not a valid YYYY-MM-DD date{hint}")
     else:
-        ref_field = "answered" if "answered" in r.extra else "asked"
+        ref_field = "answered" if r.extra.get("answered") not in (None, "", []) else "asked"
         ref = _date(r.extra.get("answered")) if ref_field == "answered" else _date(r.asked)
         if ref is None:
             errors.append(f"{name}: accepted_risk needs a valid {ref_field} date (YYYY-MM-DD) to check expires against")
         elif exp <= ref:
             errors.append(f"{name}: expires {expires} must be after {ref_field} {ref.isoformat()}")
-        if exp < today:
+        if exp < today and r.status != "closed":
             warnings.append(f"{name}: accepted risk expired on {expires}; re-decide or close it")
     if not any(o.startswith(("BQ-", "TQ-")) for o in r.related):
         errors.append(f"{name}: accepted_risk needs a related BQ/TQ record (the question that raised it)")

@@ -116,7 +116,7 @@ Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no sta
 | Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. They return findings in the structured form below |
 | No anchoring | A prompt that hands over a hypothesis ("confirm X is fine") is rewritten as a neutral task |
 
-Finding form (one schema; contracts add only agent-specific fields): `id`, `category`, `severity` (Critical/High/Medium/Low; the ux scale and documentation-reviewer `status` map via "What blocks"), `file` + `anchor` (symbol or heading; `line` optional, code findings only), `scenario` (evidence and failing input), `fix` (minimal), `confidence` (optional, default 1.0). A finding without a failing scenario is dropped.
+Finding form (every reviewer agent; contracts add only agent-specific fields): `id`, `category`, `severity` (Critical/High/Medium/Low/Info; ux scale and documentation-reviewer `status` map via "What blocks"), `file` + `anchor` (symbol or heading; `line` optional in review output, never in stored docs), `scenario` (evidence and failing input), `fix` (minimal), `confidence` (optional, default 1.0). A finding without a failing scenario is dropped.
 
 | Severity | Meaning |
 |----------|---------|

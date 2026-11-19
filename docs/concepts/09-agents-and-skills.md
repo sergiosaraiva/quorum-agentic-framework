@@ -50,9 +50,9 @@ The separate context window is the other point. A subagent works through many fi
 | Inputs and outputs explicit | What it receives (diff, ids) and the exact format it returns |
 | Decision rules as tables | Which findings are blocking, which categories it owns and does not own |
 | Ground rules by pointer | "Follow the grounding rule in `CLAUDE.md`" instead of copying it |
-| Evidence required | Findings need location, claim, failing scenario |
+| Evidence required | Findings need file + anchor, claim, failing scenario |
 | Stop conditions | What it does when the KB is down or the diff is too large |
-| Size | `python3 scripts/framework_lint.py` warns above 16 KB; aim well under, and move shared material to `_SHARED-PATTERNS.md` |
+| Size | `python3 scripts/framework_lint.py` warns above 16 KB; aim well under, and move shared material to `_SHARED-PATTERNS.md`. The same lint also checks the shared rules: Never Invent rule 7 has a single owner (any line saying "KB unreachable" must say "rule 7"), blocking decisions are not restated outside "What blocks", and an agent's `tools:` match what rule 7 asks of it |
 
 `.claude/agents/_SHARED-PATTERNS.md` holds what several agents share: the alignment gate, loop-back rule, severity scale, citation format and common tool permissions. An agent file points to it instead of repeating it, so a rule has one owner.
 

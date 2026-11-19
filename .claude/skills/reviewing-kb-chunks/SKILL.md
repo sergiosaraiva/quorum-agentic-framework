@@ -39,7 +39,7 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names; `status` replaces `s
 
 ## Rules
 
-- Evidence is a file:line or tool result, never a bare verdict.
+- Evidence is a file + anchor or tool result, never a bare verdict.
 - Re-check load-bearing claims against the live source, not a cached summary.
 - Zero findings is valid; state what you checked.
 - If a source is silent on something the chunk asserts, return a BQ in `questions_to_record` (`recording-decisions`) rather than a rewrite.

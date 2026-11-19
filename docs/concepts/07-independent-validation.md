@@ -32,7 +32,7 @@ After code-engineer finishes, `quality-guardian` and `regression-detective` are 
 
 ## Evidence format
 
-A finding without evidence cannot be acted on or disputed. Every reviewer uses one finding form, defined in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). Agent contracts add only agent-specific fields:
+A finding without evidence cannot be acted on or disputed. Every reviewer agent uses one finding form, defined in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). Agent contracts add only agent-specific fields. The machine contract of the local AI review (`scripts/ai_review_local.py`: `file`, `line`, `title`, `evidence`, `failing_scenario`, `suggestion`; severities `blocking`, `warning`, `info`) and the `pr-review` PR-comment form are separate and exempt. The local review's markdown renderer accepts both names. Mapping: `evidence` and `failing_scenario` become `scenario`, `suggestion` becomes `fix`, `title` has no equivalent, and `blocking` means Critical or High (the `pr-review` skill maps Critical and High to Blocker, Medium to Warning, Low to Info).
 
 | Field | Content |
 |-------|---------|
@@ -44,7 +44,7 @@ A finding without evidence cannot be acted on or disputed. Every reviewer uses o
 | `fix` | The smallest change that would address it |
 | `confidence` | Optional, default 1.0; 0.50 to 0.79 means unverified (see below) |
 
-Agent-specific fields stay where they are useful, for example `test_would_catch` (the test that would have caught it) and `counterpart` (the stale side of a drift) in regression-detective, and `claim` in documentation-reviewer.
+`infrastructure-engineer`, `test-automator` and `code-engineer` return no findings list (their contracts hold readiness items, test verdicts and change summaries), so the form does not apply to them. Agent-specific fields stay where they are useful, for example `test_would_catch` (the test that would have caught it) and `counterpart` (the stale side of a drift) in regression-detective, and `claim` in documentation-reviewer.
 
 A bare "looks fine" is not a result. A clean review states what was checked, so silence cannot be mistaken for coverage. The tools use different scales, so `.claude/agents/_SHARED-PATTERNS.md` maps them: Critical and High block (the ux scale's Blocker and Major block too); Medium and Low do not; a documentation-reviewer finding of status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` blocks (confidence only decides what is reported: 0.50 to 0.79 is listed as unverified, and unverified items never block); in the PR review a Blocker blocks and Warning or Info do not.
 

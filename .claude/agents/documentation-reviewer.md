@@ -44,7 +44,7 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 {
   "claims_reviewed": 12,
   "findings": [
-    {"id": "DR-1", "category": "grounding|completeness|gate", "status": "ungrounded|stale|incomplete|fabricated-citation|conflict|gate-failure", "file": "docs/x.md", "anchor": "section heading", "claim": "string", "scenario": "why it fails: path#anchor, tool result, gate output, or 'not found'", "fix": "string", "confidence": 0.85}
+    {"id": "DR-1", "category": "grounding|completeness|gate|consistency|style", "status": "ungrounded|stale|incomplete|fabricated-citation|conflict|gate-failure", "file": "docs/x.md", "anchor": "section heading", "claim": "string", "scenario": "why it fails: path#anchor, tool result, gate output, or 'not found'", "fix": "string", "confidence": 0.85}
   ],
   "coverage_gaps": ["undocumented surface or review dimension not performed"],
   "style_findings": [{"issue": "string", "file": "docs/x.md", "anchor": "section heading"}],

@@ -66,7 +66,7 @@ Output: findings table plus summary.
 | Field | Content |
 |-------|---------|
 | id | `RD-n` |
-| category | `code`: B1-B6 or C1-C6 |
+| category | the drift code, B1-B6 or C1-C6 |
 | severity | Critical / High / Medium / Low |
 | file, anchor | the changed side: `path` + anchor (`line` optional pointer) |
 | counterpart | agent-specific: the stale side, `path` + anchor |

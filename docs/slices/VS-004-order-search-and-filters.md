@@ -288,17 +288,17 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-005 | TQ | tech-lead | none (R1 binds its new parameters as strings) | no, non-blocking (added by solution-architect) |
 | TQ-006 | TQ | tech-lead | none (ASCII folding is locale-independent; R1 tests the container locale) | no, non-blocking (added by solution-architect) |
 | BQ-007 | BQ | product-owner | R1 (date semantics, was a working assumption) | yes, `OD-005` |
-| TQ-007 | TQ | tech-lead | none (accepted until answered: SEC-001, no rate limit or query timeout) | no, non-blocking (security-engineer review) |
-| BQ-008 | BQ | product-owner | none (accepted until answered: SEC-002, customer name in URL query strings) | no, non-blocking (security-engineer review) |
+| TQ-007 | TQ | tech-lead | none (open, non-blocking, not accepted: SEC-001, no rate limit or query timeout) | no, non-blocking (security-engineer review) |
+| BQ-008 | BQ | product-owner | none (open, non-blocking, not accepted: SEC-002, customer name in URL query strings) | no, non-blocking (security-engineer review) |
 | TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | no, non-blocking (regression-detective review) |
 | TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | no, non-blocking (security-engineer review) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
 
 BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'; it must be answered before R1 reaches an environment where non-staff identities can obtain a token for the audience, and a named authorization policy is advised meanwhile.
 
-Accepted until answered: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
+Open, non-blocking and not accepted by the owner: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
 
-Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking by owner decision; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
+Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking, open and not accepted by the owner; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
 
 ## Priority inputs
 

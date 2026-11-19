@@ -144,7 +144,7 @@ Run the local AI review before the first push: `python3 scripts/ai_review_local.
 ```bash
 dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format Quorum.slnx --verify-no-changes   # backend (tests run on Microsoft.Testing.Platform)
 (cd frontend && npm ci && npm run build && npm test)              # frontend
-python3 scripts/framework_lint.py                                 # agents and skills: frontmatter, names, sizes
+python3 scripts/framework_lint.py                                 # agents and skills: frontmatter, names, sizes, shared rules
 python3 scripts/kb/check_chunks.py                                # KB chunks and Q&A records
 python3 -m unittest discover -s scripts/kb/tests                  # KB tooling tests
 python3 -m unittest discover -s scripts/tests                     # framework lint and local review tests

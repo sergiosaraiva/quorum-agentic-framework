@@ -100,7 +100,7 @@ class LintTests(unittest.TestCase):
 
     def test_shared_patterns_file_is_not_treated_as_an_agent(self):
         with mock.patch.object(fl, "NO_BASH_AGENTS", ()):
-            r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\n7. KB MCP unreachable: stop\n"}, {})
+            r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\n7. KB MCP unreachable: stop\n## Common Tool Permissions\n"}, {})
         self.assertEqual(r.errors, [])
 
     def test_skill_folder_without_skill_md_is_an_error(self):
@@ -190,9 +190,13 @@ SHARED = """# Shared
    - Neither works, authoring agents (`doc-writer`): stop.
    - Reviewing agents (`doc-reviewer`): list unverified.
 
+## Common Tool Permissions
+
 | Agent class | Tools |
 |---|---|
 | Analysts (`doc-analyst`) | Read, Grep, Glob |
+
+## Next
 
 What blocks.
 """
@@ -292,6 +296,38 @@ class SharedRuleTests(unittest.TestCase):
     def test_no_bash_constant_must_match_permissions_table(self):
         e = self.errors(self.good(), shared=SHARED.replace("Read, Grep, Glob |", "Read, Bash |"))
         self.assertTrue(any("NO_BASH_AGENTS lists 'doc-analyst'" in x for x in e))
+
+    def test_earlier_table_row_does_not_mask_the_permissions_row(self):
+        earlier = "| Role | Duty |\n|---|---|\n| `doc-analyst` | Steps 1-5 |\n\n"
+        shared = SHARED.replace("## Common Tool Permissions", earlier + "## Common Tool Permissions")
+        self.assertEqual(self.errors(self.good(), shared=shared), [])
+        bad = shared.replace("Read, Grep, Glob |", "Read, Bash |")
+        self.assertTrue(any("NO_BASH_AGENTS lists 'doc-analyst'" in e for e in self.errors(self.good(), shared=bad)))
+
+    def test_row_after_the_permissions_section_does_not_count(self):
+        shared = SHARED.replace("## Next", "## Next\n\n| `doc-analyst` | Read, Grep |\n").replace(
+            "| Analysts (`doc-analyst`) | Read, Grep, Glob |", "| Analysts (`other`) | Read |")
+        self.assertTrue(any("NO_BASH_AGENTS lists" in e for e in self.errors(self.good(), shared=shared)))
+
+    def test_missing_permissions_section_fails_closed(self):
+        shared = SHARED.replace("## Common Tool Permissions", "## Something else")
+        self.assertTrue(any("'## Common Tool Permissions' not found" in e for e in self.errors(self.good(), shared=shared)))
+
+    def test_unblocked_is_not_a_blocking_word(self):
+        line = "Continue with unblocked work: `ungrounded`, `fabricated-citation`, `stale`, `conflict`.\n"
+        self.assertEqual(self.errors(self.good(), {"s": "---\nname: s\ndescription: d\n---\n" + line}), [])
+
+    def test_loosened_restatement_patterns(self):
+        s = lambda t: {"s": "---\nname: s\ndescription: d\n---\n" + t}
+        for text, frag in (("run python scripts/kb/search.py x\n", "CLI fallback"),
+                           ("run python3.12 scripts/kb/search.py x\n", None),
+                           ("NEITHER  WORKS: stop\n", "Neither works"),
+                           ("If the KB MCP is unreachable, stop\n", "'rule 7'")):
+            e = self.errors(self.good(), s(text))
+            if frag is None:
+                self.assertEqual(e, [], text)  # python3.12 is not matched: only python / python3
+            else:
+                self.assertTrue(any(frag in x for x in e), text)
 
     def test_missing_rule_7(self):
         self.assertTrue(any("rule 7" in e for e in self.errors(self.good(), shared="# Shared\n")))

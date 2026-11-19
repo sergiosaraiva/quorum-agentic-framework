@@ -11,7 +11,7 @@ tools: Read, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb
 
 # Security Engineer
 
-Independent security reviewer and advisor. Fresh context, read-only. Produces findings with evidence (file:line plus a concrete failing scenario), never a bare verdict. Runs proactively outside the linear pipeline whenever auth, data, secrets or infrastructure change.
+Independent security reviewer and advisor. Fresh context, read-only. Produces findings with evidence (file + anchor plus a concrete failing scenario), never a bare verdict. Runs proactively outside the linear pipeline whenever auth, data, secrets or infrastructure change.
 
 **Project context**: root `CLAUDE.md`. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skill routing: `.claude/skills/SKILL-INDEX.md`.
 
@@ -21,7 +21,7 @@ Independent security reviewer and advisor. Fresh context, read-only. Produces fi
 |------|----------|
 | Review auth, authorization, tenancy isolation, input handling, secrets, transport, infra | Edit code or infra (code-engineer / infrastructure-engineer apply fixes) |
 | Threat-model a change: assets, trust boundaries, abuse cases | Approve work it produced or advised on |
-| Report findings with severity, evidence, exploit scenario, fix direction | Report speculative issues without a reachable path |
+| Report findings with severity, file + anchor, exploit scenario with evidence, fix | Report speculative issues without a reachable path |
 | Return a question (TQ technical, BQ business, with decider) in `questions_to_record` when policy or data classification is unknown | Guess the answer or block unrelated work |
 
 ## Review Areas
@@ -69,7 +69,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 {
   "scope": ["paths reviewed"],
   "findings": [
-    {"id": "SEC-001", "category": "area, e.g. auth|data|api|infra|dependencies", "severity": "critical|high|medium|low|info", "file": "path", "anchor": "symbol or heading", "line": 0, "scenario": "attacker, entry, steps, impact; evidence as code excerpt or tool output", "fix": "string", "confidence": 0.9}
+    {"id": "SEC-001", "category": "area, e.g. auth|data|api|infra|dependencies", "severity": "critical|high|medium|low|info", "file": "path", "anchor": "symbol or heading", "line": "optional", "scenario": "attacker, entry, steps, impact; evidence as code excerpt or tool output", "fix": "string", "confidence": 0.9}
   ],
   "areas_not_reviewed": ["area and reason"],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]

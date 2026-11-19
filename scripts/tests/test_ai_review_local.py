@@ -1,4 +1,5 @@
 """Tests for scripts/ai_review_local.py. Run: python3 -m unittest discover -s scripts/tests"""
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -121,6 +122,29 @@ class PromptTests(unittest.TestCase):
             self.assertEqual(air.read_body(f), "Body text")
 
 
+class CanonicalNamesTests(unittest.TestCase):
+    CANON = {"severity": "High", "category": "c", "file": "a.py", "anchor": "func f", "title": "t",
+             "scenario": "input X fails", "fix": "do Y"}
+
+    def test_render_accepts_canonical_finding_names(self):
+        text = air.render_markdown([self.CANON], 1, "m", "main")
+        self.assertIn("Failing scenario: input X fails", text)
+        self.assertIn("Suggestion: do Y", text)
+        self.assertIn("`a.py:func f`", text)
+
+    def test_render_still_prefers_contract_names(self):
+        f = {**self.CANON, "failing_scenario": "S", "suggestion": "G", "evidence": "E", "line": 7}
+        text = air.render_markdown([f], 1, "m", "main")
+        self.assertIn("Failing scenario: S", text)
+        self.assertIn("Suggestion: G", text)
+        self.assertIn("Evidence: E", text)
+        self.assertIn("`a.py:7`", text)
+
+    def test_prior_text_adds_contract_names_for_canonical_findings(self):
+        shown = json.loads(air._prior_text([self.CANON]))[0]
+        self.assertEqual((shown["failing_scenario"], shown["suggestion"]), ("input X fails", "do Y"))
+
+
 class StateTests(unittest.TestCase):
     def test_corrupt_state_exits_2_and_mentions_reset(self):
         import contextlib
@@ -186,6 +210,50 @@ class StateTests(unittest.TestCase):
 
             self.assertIn("round 1/3", run_on("feature/b"))  # a new branch starts fresh
             self.assertIn("round 4/3", run_on("feature/a"))  # feature/a keeps its own count
+
+
+class SeverityMappingTests(unittest.TestCase):
+    def test_each_mapping(self):
+        import contextlib
+        import io
+        cases = {"blocking": "blocking", "warning": "warning", "info": "info", "Critical": "blocking",
+                 "HIGH": "blocking", "high": "blocking", "Blocker": "blocking", "blocker": "blocking",
+                 "Medium": "warning", "Low": "info", "low": "info"}
+        for raw, want in cases.items():
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(air.normalize_severity(raw), want, raw)
+            self.assertEqual(err.getvalue(), "", raw)  # known names print no notice
+
+    def test_unknown_severity_is_warning_with_notice(self):
+        import contextlib
+        import io
+        for raw in ("Major", "", None, 3):
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(air.normalize_severity(raw), "warning")
+            self.assertIn("unknown severity", err.getvalue())
+
+    def exit_code(self, severity: str) -> int:
+        import contextlib
+        import io
+        import tempfile
+        from unittest import mock
+        reply = json.dumps({"findings": [{"severity": severity, "file": "a.py", "line": 1, "title": "t",
+                                          "scenario": "s", "fix": "f"}]})
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(air, "get_diff", return_value=make_diff("a.py", ["x"])), \
+                mock.patch.object(air, "current_branch", return_value="t"), \
+                mock.patch.object(air.shutil, "which", return_value="/bin/claude"), \
+                mock.patch.object(air, "call_model", return_value=reply), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return air.main(["--out-dir", tmp, "--base", "origin/main"])
+
+    def test_canonical_high_and_critical_fail_the_gate(self):
+        self.assertEqual(self.exit_code("High"), 1)
+        self.assertEqual(self.exit_code("Critical"), 1)
+
+    def test_medium_low_and_info_do_not_fail_the_gate(self):
+        for sev in ("Medium", "Low", "Info", "warning"):
+            self.assertEqual(self.exit_code(sev), 0, sev)
 
 
 class MergeTests(unittest.TestCase):

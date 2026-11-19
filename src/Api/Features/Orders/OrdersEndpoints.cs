@@ -1,0 +1,42 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace Api.Features.Orders;
+
+public static class OrdersEndpoints
+{
+    public static IEndpointRouteBuilder MapOrdersEndpoints(this IEndpointRouteBuilder app)
+    {
+        // Explicit auth decision (Immutable Rule 7): the whole group requires an authenticated caller.
+        var group = app.MapGroup("/api/orders").WithTags("Orders").RequireAuthorization();
+
+        group.MapGet("/", async (int? page, int? pageSize, OrdersService service, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(page, pageSize, ct)));
+
+        group.MapGet("/{id:guid}", async (Guid id, OrdersService service, CancellationToken ct) =>
+            await service.GetAsync(id, ct) is { } order ? Results.Ok(order) : Results.NotFound());
+
+        group.MapPost("/", async (CreateOrderRequest request, OrdersService service, CancellationToken ct) =>
+        {
+            var errors = Validate(request);
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
+            var created = await service.CreateAsync(request, ct);
+            return Results.Created($"/api/orders/{created.Id}", created);
+        });
+
+        return app;
+    }
+
+    private static Dictionary<string, string[]> Validate(CreateOrderRequest request)
+    {
+        var results = new List<ValidationResult>();
+        Validator.TryValidateObject(request, new ValidationContext(request), results, validateAllProperties: true);
+        return results
+            .SelectMany(r => r.MemberNames.DefaultIfEmpty(""), (r, member) => (member, message: r.ErrorMessage ?? "Invalid"))
+            .GroupBy(x => x.member)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.message).ToArray());
+    }
+}

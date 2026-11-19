@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1   # v5
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Quorum.slnx
+      - run: dotnet build Quorum.slnx --no-restore
+      - run: dotnet format Quorum.slnx --verify-no-changes --no-restore
+      # Integration tests start PostgreSQL through Testcontainers; the runner must provide Docker.
+      - run: dotnet test --solution Quorum.slnx --no-build
+
+  frontend:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
+      # The template ships no package-lock.json (a lockfile embeds the registry URL of whoever made it).
+      # Create it once with `cd frontend && npm install`, commit it, and this job starts running.
+      - name: Frontend skipped
+        if: hashFiles('frontend/package-lock.json') == ''
+        run: echo "::notice::frontend/package-lock.json is missing; frontend build and tests skipped (see frontend/CLAUDE.md, Lockfile)"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38   # v6
+        if: hashFiles('frontend/package-lock.json') != ''
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - if: hashFiles('frontend/package-lock.json') != ''
+        working-directory: frontend
+        run: npm ci && npm run build && npm test
+
+  framework-lint:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6
+        with:
+          python-version: "3.12"
+      # Lints .claude/ (falls back to claude-staging/ with a notice until you move it).
+      - name: Framework lint (agent and skill frontmatter, names, index, sizes)
+        run: python3 scripts/framework_lint.py
+      - name: KB lint (chunks and Q&A records)
+        run: python3 scripts/kb/check_chunks.py
+      - name: KB tooling tests
+        run: python3 -m unittest discover -s scripts/kb/tests
+      - name: Script tests (framework lint, local AI review)
+        run: python3 -m unittest discover -s scripts/tests

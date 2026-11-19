@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "business-kb": {
+      "command": "python3",
+      "args": ["scripts/kb/mcp_server.py", "--kb", "business"]
+    },
+    "qa-kb": {
+      "command": "python3",
+      "args": ["scripts/kb/mcp_server.py", "--kb", "qa"]
+    }
+  }
+}

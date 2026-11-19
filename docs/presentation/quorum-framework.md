@@ -381,7 +381,7 @@ Highest priority among `Ready` slices whose hard dependencies are `Done` goes fi
 | Haiku 5.5 | Prompt sharpening, triage, bulk simple work | $0.10 / $0.50 |
 | Fable 5.2 | Hardest long-horizon work, used sparingly | $8 / $40 |
 
-Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Price figures were taken from Anthropic's published API reference on 2026-11-03: verify them on the pricing page, and see `docs/reference/model-selection-and-costs.md` for which figures are unsourced.
+Levers, in order: cache repeated context, send diffs not files, right-size model and effort, batch what can wait (50% off), cap review rounds, run the local AI CI first. Price figures were re-verified on 2026-11-19 against the Anthropic pricing page and API reference; check the pricing page before budgeting (see `docs/reference/model-selection-and-costs.md`).
 
 ---
 
@@ -394,7 +394,7 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 | `high` | coding, review, requirements analysis (most agents here) |
 | `xhigh`, `max` | hard agentic work; measuring a ceiling |
 
-- Effort is the quality-versus-cost dial inside one model. Tune per agent, after measuring real tasks. The per-model defaults are unsourced: verify them.
+- Effort is the quality-versus-cost dial inside one model. Tune per agent, after measuring real tasks. The per-model defaults come from the Anthropic API reference (cached 2026-11-03).
 - **Advisor pattern**: a cheaper executor does the work and consults a stronger advisor before committing to an approach, when stuck and before declaring done. Same idea as independent review, applied inside one task.
 - The advisor does not replace the reviewer agents: it is early correction, they are the independent final check.
 

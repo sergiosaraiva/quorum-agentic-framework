@@ -16,7 +16,7 @@ A user of the orders list can narrow it down by criteria and find an order witho
 
 Decided 2026-11-19: filters are status, created-date range and customer name, no amount filter (`BQ-003`, `OD-002`); customer name is a case-insensitive substring match (`BQ-004`, `OD-003`); order statuses are aligned to BC-001 in follow-up `VS-005` (`TQ-003`, `OD-004`).
 
-Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-006`, currency for a deferred amount filter `TQ-004`.
+Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-006`, currency for a deferred amount filter `TQ-004`, typed-binding problem details for `page`/`pageSize` `TQ-005`, container locale for case folding `TQ-006`; from the R1 review: search cost `TQ-007`, customer name in URLs `BQ-008`, error-key casing `TQ-008`, NUL in create `TQ-009` (the S5 table lists all nine).
 
 ## Acceptance criteria
 
@@ -26,10 +26,10 @@ Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-00
 | 2 | Given a filter that matches nothing, when listed, then 200 with empty `items` and `totalCount` 0 | integration |
 | 3 | Given several filters, when combined, then only orders matching all of them are returned (assumption, see readiness S2) | unit + integration |
 | 4 | Given a filter, when paged, then `totalCount` counts the filtered set and `pageSize` is clamped as in VS-001 | integration |
-| 5 | Given an invalid filter value (unparseable date, from after to, unknown status), then 400 problem details | integration |
+| 5 | Given an invalid filter value (unparseable date, from after to, a customer name over the limit or containing the NUL character such as `customerName=%00`, unknown status), then 400 problem details | integration |
 | 6 | Given no credentials, then 401 (group auth inherited) | integration |
 | 7 | R1: given orders created on different dates, when a created-date range (from, to, both optional) is given, then only orders created in the range are returned, bounds inclusive | unit + integration |
-| 8 | R1: given a customer-name text, when searched, then orders whose name contains it, ignoring case, are returned (`OD-003`); special characters are matched literally | unit + integration |
+| 8 | R1: given a customer-name text, when searched, then orders whose name contains it, ignoring case, are returned (`OD-003`); special characters are matched literally; a name containing the NUL character is rejected with a 400 (see criterion 5) | unit + integration |
 | 9 | R2: given a status, when filtered, then only orders in that BC-001 state are returned; an unknown status gives 400 (needs `VS-005`) | unit + integration |
 
 ## Scope
@@ -76,7 +76,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 
 # Readiness analysis: VS-004
 
-Baseline commit: `f1b0adc` (2026-11-19, branch `feat/pipeline-trial-slice`, clean tree). Analyst: `requirements-analyst`. Result: `Ready` for R1 (date-range and customer-name filters); R2 (status filter) is `Blocked by VS-005`. Updated 2026-11-19 after the owner answers; the first analysis result was `Blocked by BQ-003, BQ-004, TQ-003`. Steps S1, S2, S3 (requirements-level), S4, S5 done; S2b not applicable. The KB MCP tools were unavailable in this session; the same sources were read from `kb/chunks` and `questions/records` and via `scripts/kb/search.py`.
+Baseline commit: `f1b0adc` (2026-11-19, branch `feat/pipeline-trial-slice`; the readiness analysis was written before the VS-004 records and spec were committed). Analyst: `requirements-analyst`. Result: `Ready` for R1 (date-range and customer-name filters); R2 (status filter) is `Blocked by VS-005`. Updated 2026-11-19 after the owner answers; the first analysis result was `Blocked by BQ-003, BQ-004, TQ-003`. Steps S1, S2, S3 (requirements-level), S4, S5 done; S2b not applicable. The KB MCP tools were unavailable in this session; the same sources were read from `kb/chunks` and `questions/records` and via `scripts/kb/search.py`.
 
 ## S1 Ground
 
@@ -171,6 +171,7 @@ Error keys and messages (messages never echo the input):
 | `createdTo` | `createdTo must be a date in the format yyyy-MM-dd.` | unparseable |
 | `createdTo` | `createdTo must not be before createdFrom.` | both valid, `to < from` |
 | `customerName` | `customerName must be at most 200 characters.` (the number comes from the constant) | too long |
+| `customerName` | `customerName must not contain the NUL character.` | contains U+0000 (PostgreSQL rejects 0x00 in text) |
 
 Ordering: unchanged, `CreatedAt` descending, then `Id` ascending (`BQ-005` working assumption). Filters combine with AND.
 
@@ -222,7 +223,7 @@ Unit (`tests/Api.UnitTests/OrderListFilterTests.cs`, no database):
 | U2 | `Parse_ValidDates_ReturnsDates`, including `from == to` | 7 |
 | U3 | `Parse_MalformedDate_ReturnsErrorKeyedByParameter`: theory over `2026-13-40`, `19/11/2026`, `11/19/2026`, `2026-11-19T10:00:00`, `2026-1-5`, `abc`, for each of `createdFrom` and `createdTo` | 5 |
 | U4 | `Parse_FromAfterTo_ReturnsCreatedToError`; `Parse_MalformedFromAndTooLongName_ReturnsBothErrors` | 5 |
-| U5 | `Parse_CustomerName_TrimsAndCapsLength`: 200 characters accepted, 201 rejected (key `customerName`), `"  acme  "` gives `"acme"` | 8 |
+| U5 | Split in the code into `Parse_CustomerNameAtLimit_IsAccepted`, `Parse_CustomerNameOverLimit_ReturnsCustomerNameError`, `Parse_CustomerNamePaddedOverLimit_IsTrimmedBeforeTheCheck`, `Parse_CustomerNameWithNul_ReturnsCustomerNameErrorWithoutEchoingInput` and `Parse_CustomerNameWithSpaces_IsTrimmed`: 200 characters accepted, 201 rejected (key `customerName`), NUL rejected, `"  acme  "` gives `"acme"` | 5, 8 |
 | U6 | `EscapeLikePattern_SpecialCharacters_AreEscaped`: `50%` -> `50\%`, `a_b` -> `a\_b`, `a\b` -> `a\\b`, `\%` -> `\\\%`, `Acme` unchanged | 8 |
 
 Integration (`tests/Api.IntegrationTests/OrdersSearchTests.cs`, real PostgreSQL).
@@ -239,7 +240,7 @@ Isolation rules:
 | I2 | `List_FilterMatchesNothing_ReturnsEmptyItemsAndZeroTotal` | 2 |
 | I3 | `List_DateRangeAndName_ReturnsOnlyOrdersMatchingBoth`: seed in-range/out-of-range by name and by date | 3 |
 | I4 | `List_FilteredSecondPage_TotalCountIsFilteredSet` (seed 3 matches plus non-matches, `pageSize=2&page=2`: 1 item, `totalCount` 3); `List_FilteredHugePageSize_IsClampedToMaxPageSize` | 4 |
-| I5 | `List_InvalidFilter_ReturnsValidationProblem`: theory over `createdFrom=2026-13-40`, `createdFrom=11/19/2026`, `createdTo=abc`, `createdFrom=2026-11-20&createdTo=2026-11-19`, `customerName=<201 x>`, asserting the key for each | 5 |
+| I5 | `List_InvalidFilter_ReturnsValidationProblem`: theory over `createdFrom=2026-13-40`, `createdFrom=11/19/2026`, `createdTo=abc`, `createdFrom=2026-11-20&createdTo=2026-11-19`, `customerName=<201 x>`, `customerName=%00`, `customerName=ac%00me`, asserting the key for each | 5 |
 | I6 | `List_FilterWithoutCredentials_ReturnsUnauthorized` (`AnonymousHeader` with `customerName=x`) | 6 |
 | I7 | `List_DateRange_BoundsAreInclusiveUtcDays`: rows at `from 00:00:00Z` and `to 23:59:59.999999Z` are in; `from-1 23:59:59.999999Z` and `to+1 00:00:00Z` are out; plus from-only and to-only cases; `createdTo=9999-12-31` returns 200 | 7 |
 | I8 | `List_CustomerName_MatchesCaseInsensitiveSubstring`: `"<token> ACME Widgets"` found by `acme`, `WIDG`, `me wi`, `<token>`; one accented case (`ÉCOLE` found by `école`) documents the container locale (`TQ-006`) | 8 |
@@ -297,7 +298,7 @@ BQ-006 note (security-engineer review): severity is Low under the working assump
 
 Accepted until answered: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
 
-Blockers (rows that block a rung) are all resolved for R1. The three open rows are non-blocking by owner decision; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
+Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking by owner decision; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
 
 ## Priority inputs
 

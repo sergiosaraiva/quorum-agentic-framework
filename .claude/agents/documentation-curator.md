@@ -89,6 +89,7 @@ Never mix styles inside one file. No emojis. No AI-slop (stock openers, hedging 
 
 | Failure | Recovery |
 |---------|----------|
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (CLI fallback, then stop) |
 | Referent not found | Do not write the claim; record a TQ |
 | Reviewer finds an ungrounded claim | Fix or remove it; loop cap 3 rounds, then escalate to a human |
 | Two docs disagree | Cite both, record a question, do not pick silently |

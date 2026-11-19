@@ -46,7 +46,7 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--out-dir` | where findings and round state are written (default `.ai-review`) |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
 | `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH; use it for the gate |
-| `--reset` | reset the round counter after a human review |
+| `--reset` | drop the current branch's saved count after a human review; the next completed round starts from 1 |
 | `--dry-run` | print the prompt without calling a model |
 
 | Aspect | Behaviour |
@@ -104,9 +104,9 @@ Three counters exist and they share no state:
 
 | Counter | Where it lives | Reset |
 |---------|----------------|-------|
-| Loop-back cap (3 rounds per gate in a session) | the session's own loop, in no file | a new session or gate |
-| Local `--max-rounds` | `.ai-review/state.json` (under `--out-dir`) | `--reset` |
-| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | none; a human decides after the cap |
+| Loop-back cap (3 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
+| Local `--max-rounds` | `.ai-review/state.json` (under `--out-dir`) | `--reset` drops the branch's count; the next completed round starts from 1 |
+| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (edit the workflow on the PR branch); removing the label `needs-human-review` is optional housekeeping |
 
 Running the local script does not consume GitHub rounds, and a GitHub round does not count against the session cap.
 

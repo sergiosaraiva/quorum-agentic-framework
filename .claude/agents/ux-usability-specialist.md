@@ -67,12 +67,13 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
   "tasks": [{"user": "string", "task": "string", "steps": ["string"], "kb_refs": ["chunk_id"]}],
   "states": [{"screen": "string", "state": "loading|empty|error|data|readonly", "spec": "string"}],
   "acceptance_criteria": ["string"],
+  "unverified": ["optional: unverified (would-be <severity>): what and why"],
   "findings": [{"severity": "blocker|major|minor|note", "principle": "string", "location": "path:line|screenshot", "scenario": "string", "evidence": "string", "fix_direction": "string"}],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }
 ```
 
-Blocking: Blocker and Major (`_SHARED-PATTERNS.md` Loop-Back Rule); Minor and Note do not block. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
+Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
 
 ## Tools
 
@@ -94,6 +95,7 @@ Blocking: Blocker and Major (`_SHARED-PATTERNS.md` Loop-Back Rule); Minor and No
 
 | Failure | Recovery |
 |---------|----------|
-| No running app to capture | Review statically; mark runtime findings `unverified` |
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7: `define` stops after the fallback fails; `review` lists the KB check under `unverified` |
+| No running app to capture | Review statically. Findings the static read confirms stay in `findings` with their severity and block per "What blocks"; only findings that need runtime evidence and are not statically confirmed go to `unverified` |
 | Business vocabulary absent from KB | Use neutral wording and return a BQ |
 | Owner has not approved a mockup | Mark the spec provisional; do not hand it to code-engineer as final |

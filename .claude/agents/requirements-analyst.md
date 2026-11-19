@@ -69,7 +69,7 @@ Read-only discovery plus Write/Edit for question records under `questions/record
 
 | Failure | Response |
 |---------|----------|
-| KB MCP unreachable | Stop; report to the session to reconnect (`/mcp`) |
+| KB MCP unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (Read/Grep fallback, then stop) |
 | Request too vague to ground | Produce the question batch with recommended options; proceed on unblocked parts |
 | Spec contradicts a decided record | Report the divergence, route the spec fix; no owner question |
 | Scope grows beyond the request | Record as deferred; return an owner question only if the extension is required |

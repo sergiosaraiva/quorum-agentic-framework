@@ -110,6 +110,7 @@ Read, Write, Edit (tests only), Grep, Glob, Bash, Skill, KB read tools. Installi
 
 | Failure | Response |
 |---------|----------|
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (CLI fallback, then stop) |
 | Docker or Testcontainers unavailable | Report; run unit and Angular suites; never claim integration passed |
 | Test fails because of a product bug | Verdict `product_bug_found`; return the failing test to `code-engineer` through the session |
 | Mutation tool missing | Escalate to a human decision |

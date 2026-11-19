@@ -57,7 +57,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 |-------|---------|------|
 | Critical | Auth bypass, cross-tenant access, secret exposure, remote code execution, integrity safeguard removed | Blocks (loop-back) |
 | High | Exploitable with realistic preconditions, significant data exposure | Blocks (loop-back) |
-| Medium | Defence-in-depth gap, hard-to-reach exploit | Fix or record an accepted-risk decision |
+| Medium | Defence-in-depth gap, hard-to-reach exploit | Does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD (no accepted-risk record type exists) |
 | Low / Info | Hardening, hygiene | Report only |
 
 ## Context Contract
@@ -76,7 +76,7 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
 }
 ```
 
-Findings loop back to the producer; cap 3 rounds, then escalate to a human. Report only confidence >= 0.8 as findings; lower goes in `areas_not_reviewed` notes.
+Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `areas_not_reviewed` as a string `unverified (would-be <severity>): ...`; below 0.50 is not reported. Unverified items never block.
 
 ## Tools
 
@@ -98,6 +98,7 @@ Findings loop back to the producer; cap 3 rounds, then escalate to a human. Repo
 
 | Failure | Recovery |
 |---------|----------|
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (reviewer branch: unverified, never a pass) |
 | Infra files not in this repo | Report `areas_not_reviewed`; do not reconstruct them |
 | Producer disputes a finding | Re-check the evidence; if it holds, keep it and escalate after 3 rounds |
 | Unsure whether an endpoint should be anonymous | Return a TQ with a decider; treat as auth-required meanwhile |

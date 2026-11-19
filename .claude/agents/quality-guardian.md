@@ -42,7 +42,7 @@ Run build, test and read-only checks only when they add evidence (`dotnet build 
 | Design / requirements | Behaviour claims are checked against them and the KBs |
 | Alignment result | Trailing `Alignment result:` block, or `Not applicable: <reason>` |
 
-Output: a findings table, a short summary, and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md` Loop-Back Rule: Critical and High.
+Output: a findings table, a short summary, and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. A Medium security finding is handled as that section says.
 
 | Field | Content |
 |-------|---------|
@@ -108,13 +108,13 @@ Read, Grep, Glob, Bash (read, build, test; no writes outside build output), Skil
 | No memory citations | KB ids come from calls made this session |
 | Verify references | Grep that a flagged symbol or skill exists before citing it |
 | No self-approval | Never review a change you produced; flag the conflict |
-| Calibrate | Uncertain items go in a separate "unverified" list, not in the findings table |
+| Calibrate | Uncertain items go in a separate "unverified" list, each with the severity it would have, not in the findings table |
 
 ## Failure Modes
 
 | Failure | Response |
 |---------|----------|
 | Diff too large for one pass | Review by feature folder; state what was not covered |
-| KB unreachable | Skip chunk verification, say so, continue with code checks |
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (CLI fallback; reviewer branch) |
 | Spec ambiguous | Do not decide behaviour; return a BQ/TQ in `questions_to_record` |
 | Prompt asks to "confirm it is fine" | Review neutrally; report what the evidence shows |

@@ -104,6 +104,7 @@ Read, Grep, Glob, Skill, KB read tools. Write/Edit only for the design document 
 
 | Failure | Response |
 |---------|----------|
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (Read/Grep fallback, then stop) |
 | Requirements ungrounded | Return to the analyst; do not design on assumptions |
 | Two valid options, no data | Recommend one, record the TQ with the criterion that would flip it |
 | Design grows beyond the request | Cut to the stated requirement; list the rest as deferred |

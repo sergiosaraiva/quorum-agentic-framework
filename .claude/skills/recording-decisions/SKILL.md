@@ -41,7 +41,7 @@ Status flow: `open` -> `answered` (a question answered) or `decided` (an owner d
 
 | Step | Action |
 |------|--------|
-| 1 | Search `qa-kb` first: `mcp__qa-kb__search` (filters `query`, `k`, `kind`, `status`) with the topic, synonyms and the slice id; then `mcp__qa-kb__get` for the id. Without MCP: Grep `questions/records/` |
+| 1 | Search `qa-kb` first: `mcp__qa-kb__search` (filters `query`, `k`, `kind`, `status`) with the topic, synonyms and the slice id; then `mcp__qa-kb__get` for the id. Without MCP: `_SHARED-PATTERNS.md` Never Invent rule 7 |
 | 2 | Re-read the record; a `closed` record's History may point to its replacement. Never quote an id from memory |
 | 3 | Found and `decided` or `answered`: act on it, cite the id, no question |
 | 4 | Found, records conflict: flag both ids and ask once, batched |

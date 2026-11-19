@@ -23,7 +23,7 @@ Every sentence asserting a fact about behaviour is a claim: "the endpoint requir
 
 | Situation | Action |
 |-----------|--------|
-| Citation with path and anchor (symbol, heading, quoted literal) | Grep the anchor, read around it, confirm the claim. Anchor not found: `fabricated-citation` or `stale` |
+| Citation with path and anchor (symbol, heading, quoted literal) | Grep the anchor, read around it, confirm the claim. Anchor not found: `fabricated-citation` if the symbol or heading never existed (`git log -S`), `stale` if it existed and moved; both block |
 | Commit-pinned citation | `git show <sha>:<path>` and check |
 | No citation | Grep/Glob for the likely referent and verify there |
 | Referent nowhere | Claim is ungrounded |
@@ -46,7 +46,10 @@ Public surface with no documentation (exported Angular services, public endpoint
 | Partially grounded | Found, details differ | Yes, if material |
 | Ungrounded | Not found anywhere | Yes |
 | Stale | Was true, code changed | Yes |
+| Fabricated citation | Cited anchor never existed | Yes |
 | Added line citation | `+` line with a line-number citation | Always, no cutoff |
+
+Blocking statuses: `ungrounded`, `fabricated-citation`, `stale`, `conflict`, `gate-failure` (`_SHARED-PATTERNS.md`, "What blocks").
 
 ### 6. Style spot-check (external docs only)
 
@@ -67,7 +70,7 @@ Per finding: location in the doc, quoted claim, status, confidence, evidence (fi
 ## Quality Checklist
 
 - [ ] Every claim checked against code or an external source
-- [ ] Below-0.80 items noted as reviewed, not reported as blocking
+- [ ] 0.50-0.79 items listed in `coverage_gaps` as unverified with their would-be status, never blocking; below 0.50 not reported
 - [ ] Stale distinguished from ungrounded
 - [ ] Coverage gaps reported separately
 - [ ] Business claims traced to KB ids or flagged

@@ -73,7 +73,7 @@ Output: findings table plus summary.
 | fix | Smallest change restoring parity |
 | test_would_catch | One sentence: the test (layer, setup, assertion) that fails before the fix and passes after |
 
-Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md` Loop-Back Rule: Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
+Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
 
 ## Tools
 
@@ -93,6 +93,7 @@ Read, Grep, Glob, Bash (`git diff|log|show|blame|status`, build and test; no wri
 
 | Failure | Response |
 |---------|----------|
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (reviewer branch: unverified, never a pass) |
 | No base ref | Use the merge-base with the integration branch; state it |
 | Generated file in the diff | Check the generator input instead; never request hand edits |
 | Too many twins | Sample by risk (auth, money, data); state coverage |

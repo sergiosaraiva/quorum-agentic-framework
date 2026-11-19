@@ -1,6 +1,6 @@
 # Shared Agent Patterns
 
-Single owner of the cross-agent rules. Agent files and the root `CLAUDE.md` restate only their own role and point here. Skills named here exist under `.claude/skills/<name>/SKILL.md` (index: `.claude/skills/SKILL-INDEX.md`); verify before citing one. Size budget: the lint limit for an agent file, 16 KB (`python3 scripts/framework_lint.py` warns above); new detail goes into a skill.
+Single owner of the cross-agent rules. Agent files and the root `CLAUDE.md` restate only their own role and point here. Skills named here exist under `.claude/skills/<name>/SKILL.md` (index: `.claude/skills/SKILL-INDEX.md`); verify before citing one. Size budget: 16 KB per agent file; new detail goes into a skill.
 
 ## Principles
 
@@ -14,7 +14,7 @@ Single owner of the cross-agent rules. Agent files and the root `CLAUDE.md` rest
 
 ## Subagent Limits
 
-A subagent cannot spawn subagents and cannot ask the user. No agent lists `Agent` or `AskUserQuestion` in `tools:`. "Re-invoke X", "ask the owner" and "involve Y" are instructions to the calling session. A subagent returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues with unblocked work.
+A subagent cannot spawn subagents and cannot ask the user. "Re-invoke X", "ask the owner" and "involve Y" are instructions to the calling session. A subagent returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues with unblocked work.
 
 ## Pipeline and Lanes
 
@@ -33,7 +33,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 | Full | Anything else: new feature, contract change, migration, auth, multi-layer | Every stage above, per its skip reason |
 | Spike | Throwaway exploration the owner explicitly asks for | Local only, no review, never merged; code is discarded or rebuilt through Full |
 
-Before starting, state the pipeline in one line: lane, each stage with a few words of reason per skip, whether the Alignment Gate applies. Example: `Pipeline: full lane · requirements-analyst skip (scope clear) · code-engineer -> QG||RD -> test-automator · docs: none · Alignment Gate: applies (src/)`.
+Before starting, state the pipeline in one line: lane, each stage with a few words of reason per skip, whether the Alignment Gate applies. Example in the root `CLAUDE.md`, Agent Workflow.
 
 ## Never Invent: KBs and Recorded Questions
 
@@ -48,9 +48,12 @@ Rules:
 2. Before asking anyone or assuming, `search` the Q&A KB; `get` a record for its decision and history. A `closed` record whose History says "Superseded by <id>" points to the live record. A recorded decision settles what is built.
 3. Cite `chunk_id`s and record ids you retrieved this session. Never cite one from memory.
 4. KB and code or spec disagree, or both are silent: do not guess. Record a question and continue with unblocked work.
-5. Record type: business or expected-behaviour question = BQ, `decider` a business role; technical question = TQ, `decider` the technical role. Never ask the wrong role; record with the right decider. Who writes the record: an agent whose role includes question records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself; every other agent returns it in `questions_to_record` and the session (or `documentation-curator`) writes it. Format: `questions/README.md`, skill `recording-decisions`.
+5. Record type: business or expected-behaviour question = BQ, `decider` a business role; technical question = TQ, `decider` the technical role. Who writes the record: an agent whose role includes question records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself; every other agent returns it in `questions_to_record` and the session (or `documentation-curator`) writes it. Format: `questions/README.md`, skill `recording-decisions`.
 6. "Flag" means record and continue. "Ask" means stop and ask, only when blocked on an owner decision no record settles, a scope change, or a destructive or outward-facing action the request did not cover. Batch every open item into one round, recommended option first.
-7. KB MCP unreachable: stop and return to the session to reconnect (`/mcp`); never proceed from memory.
+7. KB MCP unreachable (sole statement; agent failure rows point here), in order:
+   - First, agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Then, any agent reads `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep, losing BM25 ranking (local backend), `--graph`/`--related` and the filters. Say in the output which was used.
+   - Neither works (files unreadable), authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer` and `ux-usability-specialist` when authoring or defining): stop and return to the session (`/mcp`); never proceed from memory.
+   - Reviewing agents (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `infrastructure-engineer` and `ux-usability-specialist` when reviewing): list `unverified: chunk verification skipped, KB unreachable` (fields: `docs/concepts/07-independent-validation.md`), never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
 
 ## Pre-Development Alignment Gate (Mandatory)
 
@@ -73,7 +76,7 @@ Applies before the first line of any change to `src/`, `frontend/src/` or `tests
 
 ## Design Principles (Binding on every agent)
 
-Owner: the `## Design Principles` section of the root `CLAUDE.md` (simplest design, reuse first, no hard-coded values, vertical slice, built-ins first, ease of change, simplicity statement in design output). Reviewers flag over-engineering, hard-coded values, and under-engineering that violates an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, migration review, secrets, observability). Design findings belong to `quality-guardian`.
+Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers flag over-engineering, hard-coded values, and under-engineering that violates an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, migration review, secrets, observability).
 
 ## Mandatory Parallel Review Block
 
@@ -89,34 +92,28 @@ A blocking finding at a review gate returns to the artifact's writer, not forwar
 | `test-automator` (code) | Re-invoke `code-engineer` with failing tests or gap; re-run the pair before re-running `test-automator` | Code pipeline complete; docs stage if docs change |
 | `documentation-reviewer` (docs, `.claude/**`, KB chunks) | Re-invoke `documentation-curator`; re-run the reviewer | Done |
 
-What blocks (severity mapping, same everywhere):
+What blocks. This table is the only place that decides blocking; other files define severity labels and map them here. Among reported findings, severity alone decides, never confidence: 0.50-0.79 goes in the "unverified" list with its would-be severity (below 0.50: not reported). Unverified items never block; the report states each, and the session dispositions it like a non-blocking finding. A Medium security finding (from `security-engineer` or `quality-guardian`) does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD.
 
 | Reviewer | Blocks | Does not block |
 |----------|--------|----------------|
-| `quality-guardian`, `regression-detective`, `security-engineer` | Critical, High | Medium, Low |
+| `quality-guardian`, `regression-detective`, `security-engineer` | Critical, High | Medium, Low, Info |
 | `ux-usability-specialist` | Blocker, Major | Minor, Note |
-| `documentation-reviewer` | status `ungrounded`, `conflict` or `gate-failure` with confidence >= 0.8 | other statuses, style findings |
+| `documentation-reviewer` | status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` (reported at confidence >= 0.8) | other statuses, style findings |
 | AI review (`pr-review` skill; local, and GitHub when `ANTHROPIC_API_KEY` is set) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
 
 - Never skip a stage because an earlier iteration passed it.
-- Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched (the requirements or design may need revisiting). A single shared budget of 3 applies across both gates of a framework-doc change.
+- Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched. A single shared budget of 3 applies across both gates of a framework-doc change.
 - Every non-blocking finding gets a disposition (fix, defer with a recorded item, or reject with a reason) listed in the hand-off; none is dropped silently.
-Three independent counters; none shares state with another:
-
-| Counter | Where it lives | Resets |
-|---------|----------------|--------|
-| Loop-Back cap (3 per gate chain) | In the session only; no stored state | Each new gate chain |
-| Local `scripts/ai_review_local.py --max-rounds` (default 3) | `.ai-review/state.json`, one entry per branch (`{"branches": {name: {rounds, findings}}}`) | `--reset` clears the current branch's entry; a corrupt or old-format file exits 2 until `--reset` |
-| GitHub `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml` (default 3; only with `ANTHROPIC_API_KEY`) | `<!-- ai-review-round -->` marker comments by `github-actions[bot]` on the PR, counted across pushes | A human deletes the markers or raises `MAX_ROUNDS` |
+Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no state: skill `running-local-ai-review`, Counters.
 
 ## Independent Review Rule
 
 | Rule | Detail |
 |------|--------|
-| Different role | The reviewer is never the writer's role (`code-engineer` code is reviewed by `quality-guardian`, `regression-detective`, `test-automator`) |
-| Fresh context | Reviewers get the diff, the spec/design and the alignment result, not the writer's reasoning or conclusion. Independence comes from fresh context, not from memory |
-| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus`. `documentation-reviewer` runs `sonnet` because it checks grounding mechanically against sources (`docs/reference/model-selection-and-costs.md`) |
-| Read-only | Reviewers have no Write/Edit tools. Bash is for read, build and test commands and must not write outside build output. They return findings in the structured form below |
+| Different role | The reviewer is never the writer's role |
+| Fresh context | Reviewers get the diff, the spec/design and the alignment result, not the writer's reasoning or conclusion. |
+| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus`. `documentation-reviewer` runs `sonnet` because its check is mechanical (`docs/reference/model-selection-and-costs.md`) |
+| Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. They return findings in the structured form below |
 | No anchoring | A prompt that hands over a hypothesis ("confirm X is fine") is rewritten as a neutral task |
 
 Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`, `file` + anchor (and `line` as a pointer in the review output only), `scenario` (concrete input that fails), `fix`. A finding without a failing scenario is dropped.
@@ -130,11 +127,11 @@ Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`; no API key; `--model opus` for auth, data model, migrations, money or core logic; cap 3 via `--max-rounds`, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; fix its findings (`MAX_ROUNDS`, label `needs-human-review`). Without the key it is skipped; green is not a review.
+Before a branch's first push and after any later change: run `quality-guardian` || `regression-detective` over the whole branch diff against the base, with the alignment result appended, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (otherwise skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
 
 ## Citation Format (Mandatory)
 
-Stored artifacts (docs, specifications, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once), for example `src/Api/Program.cs` `UseAuthentication` call. Review output (a transient finding) keeps a `line` field as a pointer.
+Stored artifacts (docs, specifications, agent and skill bodies, CLAUDE.md) never cite line numbers. Name the file path plus a stable anchor (code symbol, markdown heading, test title, or a short quoted literal occurring once). Review output (a transient finding) keeps a `line` field as a pointer.
 
 ## Anti-Hallucination Rules (All Agents)
 
@@ -161,7 +158,7 @@ Bash for reviewers: build, test, lint, `git status|diff|log|show|blame`, read-on
 
 ## Known Non-Issues
 
-Facts reviewers must not flag on their own. Keep this list short; add an entry only with the reason and the recorded decision.
+Facts reviewers must not flag. Keep this list short; each entry needs a reason and a recorded decision.
 
 | Item | Why it is not an issue |
 |------|------------------------|
@@ -171,10 +168,4 @@ Facts reviewers must not flag on their own. Keep this list short; add an entry o
 
 ## Verification Commands
 
-```bash
-dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format Quorum.slnx --verify-no-changes   # backend
-(cd frontend && npm ci && npm run build && npm test)               # frontend
-python3 scripts/framework_lint.py                                  # agents and skills
-python3 scripts/kb/check_chunks.py                                 # KB chunks and Q&A records
-python3 -m unittest discover -s scripts/kb/tests                   # KB tooling tests
-```
+The single list is in the root `CLAUDE.md`, section Verification Commands.

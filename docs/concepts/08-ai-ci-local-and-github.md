@@ -78,7 +78,7 @@ The workflow has two jobs. The gate job counts review rounds; the review job run
 
 | Item | Rule |
 |------|------|
-| Model API key | A repository or organisation secret (`${{ secrets.ANTHROPIC_API_KEY }}` or your name for it); never committed |
+| Model API key | A repository or organisation secret (`${{ secrets.ANTHROPIC_API_KEY }}` or your name for it); when unset, the review job is skipped with a notice; never committed |
 | Token permissions | Least privilege, set per job; the top level is `permissions: {}`. The gate job has `pull-requests: write` (read comments, add the label, post the cap comment). The review job has `contents: read` and `pull-requests: write` (summary, inline comments, round marker). Neither has `id-token` or `issues`; the action uses the workflow token (`github_token`) instead of an OIDC exchange |
 | Cloud access | Where the workflow needs AWS, it uses OIDC federation to a role, no long-lived keys |
 | Forks | Secrets are not exposed to PRs from forks; the workflow must either skip them or use a safe trigger design (verify the trigger choice before enabling on a public repository) |

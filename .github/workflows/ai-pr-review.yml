@@ -5,6 +5,7 @@ name: AI PR Review
 #
 # Trust model: reviewer instructions (CLAUDE.md and .claude/**) are read from the BASE branch checkout, never
 # from the PR head, so a PR cannot weaken its own reviewer. The PR head is checked out in a subfolder (pr-head/, stripped of instruction files) as data.
+# Without the repository secret ANTHROPIC_API_KEY the review job is skipped (the PR stays green); the gate prints a notice.
 # Uses `pull_request` (not `pull_request_target`): fork PRs get no secrets and are skipped on purpose.
 #
 # Optional extensions NOT implemented in this template (the pr-review skill lists them as ideas): diff
@@ -40,9 +41,23 @@ jobs:
     permissions:
       pull-requests: write   # read PR comments, add the label, post the cap comment
     outputs:
+      has_key: ${{ steps.key.outputs.has_key }}
       proceed: ${{ steps.count.outputs.proceed }}
       round: ${{ steps.count.outputs.round }}
     steps:
+      # Without the secret the review is skipped (green check, no model call). Add ANTHROPIC_API_KEY to turn it on.
+      - name: Check for the API key
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=AI review skipped::Repository secret ANTHROPIC_API_KEY is not set, so no review ran."
+          fi
+
       - name: Count review rounds from PR comments
         id: count
         env:
@@ -75,7 +90,7 @@ jobs:
   review:
     name: AI review (round ${{ needs.gate.outputs.round }})
     needs: gate
-    if: needs.gate.outputs.proceed == 'true'
+    if: needs.gate.outputs.proceed == 'true' && needs.gate.outputs.has_key == 'true'
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:

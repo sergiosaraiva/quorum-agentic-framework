@@ -117,7 +117,7 @@ The example knowledge-base content describes an invented "Acme Orders" domain. R
 | Reviewers | quality-guardian and regression-detective prompts | the same two reviewer agents, instructions read from the base branch |
 | Model | default `sonnet`: a cheap rehearsal that does not replace the GitHub gate | default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
 | Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
-| Needs | the `claude` CLI | repository secret `ANTHROPIC_API_KEY` |
+| Needs | the `claude` CLI | repository secret `ANTHROPIC_API_KEY`; without it the review job is skipped and the PR stays green |
 
 Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-bin --timeout --reset --dry-run`. Run `python3 scripts/ai_review_local.py --dry-run` to see the prompt without calling a model. The GitHub review posts one summary and up to 20 inline comments per round, with the reviewer instructions read from the base branch. It does not resolve threads, tier models by path or chunk large diffs; those are optional extensions, not implemented in the template.
 

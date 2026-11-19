@@ -14,7 +14,7 @@ A Quorum review finding without evidence cannot be acted on or disputed, so ever
 | Medium | Wrong on an edge path, a design violation |
 | Low | Maintainability with a concrete cost; nothing else is reported |
 
-Critical and High block; Medium and Low do not. Other reviewers map onto the same rule in `_SHARED-PATTERNS.md`: ux-usability-specialist blocks on Blocker and Major, documentation-reviewer blocks on status `ungrounded`, `conflict` or `gate-failure` with confidence of at least 0.8, and the GitHub AI review blocks on Blocker, not on Warning or Info.
+Critical and High block; Medium and Low do not. The local AI review blocks on `blocking` findings. Other reviewers map onto the same rule in `_SHARED-PATTERNS.md`: ux-usability-specialist blocks on Blocker and Major, documentation-reviewer blocks on status `ungrounded`, `conflict` or `gate-failure` with confidence of at least 0.8, and the GitHub AI review (when `ANTHROPIC_API_KEY` is set) blocks on Blocker, not on Warning or Info.
 
 Every non-blocking finding gets a disposition in the hand-off: fixed, deferred with a recorded item, or rejected with a reason. None is dropped silently.
 

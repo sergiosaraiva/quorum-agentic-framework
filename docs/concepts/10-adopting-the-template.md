@@ -10,7 +10,7 @@ This is the step-by-step path from the template repository to a project that use
 | .NET 10 SDK, Node (current LTS) and npm | Backend and Angular frontend |
 | PostgreSQL 16+ with the `pgvector` extension | A local Docker container is enough to start |
 | Python 3.11+ (`python3`) | KB scripts, framework lint and the local AI review |
-| A GitHub repository and an Anthropic API key available as a secret | For the GitHub AI CI; never committed |
+| A GitHub repository; optionally an Anthropic API key as a secret | Only for the optional GitHub AI CI; never committed |
 | An embedding provider or local model | Only for pgvector search that is semantic; the default hash stub is not (see `scripts/kb/README.md`) |
 
 ## Steps
@@ -64,11 +64,11 @@ Run `python3 scripts/kb/ingest.py` for both KBs; each run re-embeds everything. 
 
 ### 10. Set up CI
 
-Add the repository secret `ANTHROPIC_API_KEY` (optional: without it the review is skipped; and any deployment credentials your platform needs, stored as secrets) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 3); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. Enable `.github/workflows/ai-pr-review.yml` and make its check required on the integration branch. The frontend CI job runs only once `frontend/package-lock.json` exists (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
+Add the repository secret `ANTHROPIC_API_KEY` (optional: without it the review is skipped; and any deployment credentials your platform needs, stored as secrets) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 3); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. The required review is local (the in-session pair plus `python3 scripts/ai_review_local.py --base origin/main --require`, no API key). Enable `.github/workflows/ai-pr-review.yml` as an optional second gate only if you set the key, and then make its check required on the integration branch; without the key the job is skipped and a green check is not a review. The frontend CI job runs only once `frontend/package-lock.json` exists (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
 
 ### 11. Run your first slice
 
-Pick a small capability. Add it to `docs/slices/INDEX.md` as `VS-001`, run the readiness analysis (S1 to S5) with the template in `docs/slices/templates/`, record any gaps as questions, and build rung R1 to R4 through the full lane. Use the one-line pipeline statement at the start, let the review pair run in parallel, and open the PR. Watch the local and GitHub reviews work through at least one finding loop. [06](06-vertical-slices-and-planning.md) explains the flow.
+Pick a small capability. Add it to `docs/slices/INDEX.md` as `VS-001`, run the readiness analysis (S1 to S5) with the template in `docs/slices/templates/`, record any gaps as questions, and build rung R1 to R4 through the full lane. Use the one-line pipeline statement at the start, let the review pair run in parallel, and open the PR. Watch the local review (and the GitHub review, if you set `ANTHROPIC_API_KEY`) work through at least one finding loop. [06](06-vertical-slices-and-planning.md) explains the flow.
 
 ### 12. Tune models and effort
 
@@ -87,7 +87,7 @@ Start with the defaults in `docs/reference/model-selection-and-costs.md` (Opus a
 | [ ] | Search finds a known chunk; you know what an unknown topic returns on your backend |
 | [ ] | `.mcp.json` registers both servers; tools respond in a session |
 | [ ] | Secrets and variables set in the repository; none in the code |
-| [ ] | AI review workflow enabled and required; local script runs |
+| [ ] | Local script runs; AI review workflow enabled only if `ANTHROPIC_API_KEY` is set |
 | [ ] | First slice analysed, built, reviewed and merged |
 | [ ] | Models and effort reviewed after the first few PRs |
 

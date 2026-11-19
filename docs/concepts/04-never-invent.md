@@ -67,7 +67,7 @@ Acme Orders has chunk `BC-003` (refund within 30 days after delivery of a line).
 | Rule stated in the root file | `CLAUDE.md` section "Never Invent (Grounding Rule)" |
 | KB tools in the agents' tool allow-lists | Agent frontmatter (`mcp__business-kb__*`, `mcp__qa-kb__*`) |
 | Anti-hallucination block shared by all agents | `.claude/agents/_SHARED-PATTERNS.md` |
-| Alignment check section in each code PR | PR description, checked by the AI review |
+| Alignment check section in each code PR | PR description, checked by the local AI review (and the GitHub review when enabled) |
 | Reviewers verify cited ids exist and say what the code claims | quality-guardian, documentation-reviewer |
 | Citation format (file path plus anchor, never a bare line number that drifts) | Shared patterns |
 

@@ -15,7 +15,7 @@ Single owner of these rules; other files point here. They never waive the Immuta
 | Act by default | Recall prior decisions first (search `qa-kb`). Ask only when the records do not settle it and you are blocked on a decision that is the user's: product behaviour where the KB, spec and prototype conflict or are silent, a scope change, a destructive or outward-facing action the request did not cover. Otherwise take the conventional option, state the choice in one line, continue |
 | Flag is not ask | "Flag it" and "do not guess" mean: record the item (BQ business question, TQ technical question, PR description) and carry on with what is unblocked. They do not mean stop |
 | Batch questions | When a stop is warranted, finish all unblocked work, collect every open item, ask once in a numbered list, recommended option first. Never one question per turn |
-| Standing authorizations | A task that produces a change ends with branch, commit (Commit Metadata), push, PR into the integration branch, and the AI review loop until a round is clean (the GitHub review caps at `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml`, default 3, then a human). Merge only when asked |
+| Standing authorizations | A task that produces a change ends with branch, commit (Commit Metadata), push, PR into the integration branch, and the AI review loop until a round is clean (local rounds before the first push, cap 3 via `--max-rounds`, then a human; plus the GitHub rounds, cap `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml`, default 3, when `ANTHROPIC_API_KEY` is set). Merge only when asked |
 | Answers | Lead with the result or decision, then only the detail needed to act. Gloss an internal id (VS-, BQ-, TQ-, OD-) in a few words the first time it appears |
 
 ## Never Invent (Grounding Rule)
@@ -137,7 +137,7 @@ Beyond a trivial one-line fix, delegate; the producer never reviews its own work
 | `docs/**`, `README.md` | `documentation-curator` then `documentation-reviewer`; generated files are regenerated, never hand-edited |
 | `scripts/**` | `code-engineer` |
 
-Run the local AI review before the first push: `python3 scripts/ai_review_local.py --base origin/main` (a cheap rehearsal; the GitHub review is the gate).
+Run the local AI review before the first push: `python3 scripts/ai_review_local.py --base origin/main --require` (fails with exit 2 if the `claude` CLI is missing; the required gate with the in-session review pair; no API key needed, uses your `claude` sign-in; `--model opus` for auth, data model, migrations, money or core logic). The GitHub review is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; without it the job is skipped and its green check is not a review. A human merges.
 
 ## Verification Commands
 

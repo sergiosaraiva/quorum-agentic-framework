@@ -15,7 +15,7 @@ The Quorum cost guide lists levers in the order to try them:
 6. Cap loops: the three-round review cap bounds the worst case.
 7. Cap output with `max_tokens` and structured findings.
 8. Use task budgets on long runs.
-9. Run the local AI CI first so the paid GitHub review starts from clean diffs.
+9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs.
 
 Prompt caching: the cache-read price is a fraction of the input price. In the price figures taken from Anthropic's published API reference on 2026-11-03 (verify on the pricing page), cache reads cost $0.20 per million tokens on Opus 5.5 and Fable 5.2 and $0.10 on Sonnet 5.5, against input prices of $4.00, $8.00 and $2.00. Cache-write prices and minimum cacheable sizes vary by model and must be checked.
 

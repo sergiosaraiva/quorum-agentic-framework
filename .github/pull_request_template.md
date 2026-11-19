@@ -16,8 +16,8 @@ What changed and why, in two or three sentences.
 
 | Item | Status |
 |------|--------|
-| Local AI review (`scripts/ai_review_local.py`) | round `n`, findings dispositioned |
-| GitHub AI review round | `n` of `MAX_ROUNDS` (default 3); label `needs-human-review` if capped |
+| Local AI review (`scripts/ai_review_local.py`), required | round `n` of `--max-rounds` (default 3), findings dispositioned |
+| GitHub AI review round (optional; only if `ANTHROPIC_API_KEY` is set, else skipped and not a review) | `n` of `MAX_ROUNDS` (default 3); label `needs-human-review` if capped |
 | Review findings | fixed / rejected with reason / deferred (record id) |
 
 ## Checklist

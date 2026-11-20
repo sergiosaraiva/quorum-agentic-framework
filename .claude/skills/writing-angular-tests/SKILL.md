@@ -49,14 +49,14 @@ describe('ReportList', () => {
 
   it('shows the empty state when the API returns no reports', async () => {
     fixture.detectChanges();   // request pending
-    http.expectOne(r => r.url.startsWith('/api/v1/reports')).flush({ items: [], totalCount: 0 });
+    http.expectOne(r => r.url.startsWith('/api/reports')).flush({ items: [], page: 1, pageSize: 20, totalCount: 0 });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain('No reports yet');
   });
 
   it('shows an alert when the API call fails', async () => {
     fixture.detectChanges();
-    http.expectOne(r => r.url.startsWith('/api/v1/reports'))
+    http.expectOne(r => r.url.startsWith('/api/reports'))
         .flush('error', { status: 500, statusText: 'Server Error' });
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeTruthy();

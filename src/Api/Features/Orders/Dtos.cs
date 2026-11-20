@@ -30,7 +30,7 @@ public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int Page
 
 /// <summary>
 /// Validated list filters (VS-004 R1, OD-002, OD-003, OD-005). Dates are UTC calendar days, both bounds inclusive;
-/// the name is a case-insensitive substring. R2 (VS-004, OD-002, OD-004, TQ-010): the status is an exact,
+/// the name is a case-insensitive substring. R2 (VS-004, OD-002, OD-004, TQ-011): the status is an exact,
 /// case-sensitive match on one BC-001 state. Built only through <see cref="Parse"/>.
 /// </summary>
 public sealed record OrderListFilter(DateOnly? CreatedFrom, DateOnly? CreatedTo, string? CustomerName, string? Status = null)

@@ -17,7 +17,7 @@ description: Use when testing an endpoint end to end or anything that depends on
 | Overrides | Test-only service swaps via `ConfigureTestServices`; configuration via in-memory config, never edit `appsettings.json` |
 | Auth | Test authentication scheme in the factory instead of JWT bearer (`tests/CLAUDE.md`; `TestAuthHandler`, `X-Test-Anonymous` in `ApiFactory.cs`); test authenticated and anonymous calls |
 | Cancellation | Pass `TestContext.Current.CancellationToken` |
-| Error keys | Assert the exact key casing the API returns, case-sensitively, never `OrdinalIgnoreCase`: it hides a casing defect (TQ-008). The create path returns member names (`CustomerName`), list filters camelCase; TQ-008 is open (recommended: camelCase), so update the assertion when it is decided. Landed: `OrdersSearchTests.List_InvalidFilters_ErrorKeysAreExactlyTheCamelCaseParameterNames` |
+| Error keys | camelCase everywhere (TQ-008): assert exact keys, case-sensitively, never `OrdinalIgnoreCase`, which hides a casing defect. Landed: `OrdersSearchTests.List_InvalidFilters_ErrorKeysAreExactlyTheCamelCaseParameterNames` |
 | Scope | Contract, validation, auth, persistence, status codes, Problem Details. Pure logic: `creating-xunit-tests` |
 
 ## Decision Tree
@@ -117,7 +117,7 @@ public async Task PostReports_EmptyTitle_Returns400ProblemDetails()
     var response = await client.PostAsJsonAsync("/api/reports", new { title = "" }, TestContext.Current.CancellationToken);
     Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(TestContext.Current.CancellationToken);
-    Assert.Contains("Title", problem!.Errors.Keys);   // member name, case-sensitive
+    Assert.Contains("title", problem!.Errors.Keys);   // camelCase, case-sensitive
 }
 
 [Fact]

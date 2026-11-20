@@ -19,8 +19,21 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string TestScheme = "Test";
     public const string AnonymousHeader = "X-Test-Anonymous";
 
+    /// <summary>Optional header naming the test principal; default is <see cref="DefaultTestUser"/>. Lets a test prove per-user partitioning.</summary>
+    public const string UserHeader = "X-Test-User";
+    public const string DefaultTestUser = "test-user";
+
     /// <summary>Hosting environment for the test host; override to test environment-specific behaviour.</summary>
     protected virtual string EnvironmentName => "Testing";
+
+    /// <summary>
+    /// Configuration overrides applied last. The base host gets a limit no test reaches, so the shared fixtures never
+    /// trip the rate limiter; a test of the limiter itself overrides it with a tiny value.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<string, string?> ExtraSettings { get; } = new Dictionary<string, string?>
+    {
+        ["RateLimiting:PermitLimit"] = "100000",
+    };
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
@@ -34,12 +47,16 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(EnvironmentName);
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.ConfigureAppConfiguration((_, config) =>
         {
-            ["ConnectionStrings:Default"] = _postgres.GetConnectionString(),
-            ["Auth:Authority"] = "https://idp.invalid",
-            ["Auth:Audience"] = "test",
-        }));
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = _postgres.GetConnectionString(),
+                ["Auth:Authority"] = "https://idp.invalid",
+                ["Auth:Audience"] = "test",
+            });
+            config.AddInMemoryCollection(ExtraSettings);
+        });
         builder.ConfigureServices(services =>
         {
             services.AddAuthentication(TestScheme).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestScheme, _ => { });
@@ -62,6 +79,19 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 public sealed class DevelopmentApiFactory : ApiFactory
 {
     protected override string EnvironmentName => "Development";
+}
+
+/// <summary>Host with a tiny per-user rate limit and a one-second command timeout (TQ-007).</summary>
+public sealed class TinyLimitsApiFactory : ApiFactory
+{
+    public const int PermitLimit = 2;
+
+    protected override IReadOnlyDictionary<string, string?> ExtraSettings { get; } = new Dictionary<string, string?>
+    {
+        ["RateLimiting:PermitLimit"] = PermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["RateLimiting:WindowSeconds"] = "3600", // far longer than a test run, so the window never rolls over mid-test
+        ["Database:CommandTimeoutSeconds"] = "1",
+    };
 }
 
 /// <summary>Host whose database is unreachable; no container. Proves readiness fails while liveness stays up.</summary>
@@ -90,7 +120,10 @@ public sealed class TestAuthHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "test-user")], ApiFactory.TestScheme);
+        var user = Request.Headers.TryGetValue(ApiFactory.UserHeader, out var named) && !string.IsNullOrEmpty(named)
+            ? named.ToString()
+            : ApiFactory.DefaultTestUser;
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user)], ApiFactory.TestScheme);
         return Task.FromResult(AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), ApiFactory.TestScheme)));
     }

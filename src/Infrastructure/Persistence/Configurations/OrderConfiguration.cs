@@ -6,7 +6,7 @@ namespace Infrastructure.Persistence.Configurations;
 
 public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
-    /// <summary>BC-001 states (VS-005, OD-004), generated from <see cref="OrderStatuses.All"/>.</summary>
+    /// <summary>The five BC-001 states built so far; `cancelled` is added with a cancellation feature (OD-013) (VS-005, OD-004), generated from <see cref="OrderStatuses.All"/>.</summary>
     internal static readonly string StatusCheck =
         $"status in ({string.Join(",", OrderStatuses.All.Select(s => $"'{s}'"))})";
 

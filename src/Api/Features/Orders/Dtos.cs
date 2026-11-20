@@ -5,7 +5,7 @@ using Infrastructure.Persistence.Entities;
 namespace Api.Features.Orders;
 
 public sealed record CreateOrderRequest(
-    [property: Required, StringLength(Order.CustomerNameMaxLength, MinimumLength = 1)] string CustomerName,
+    [property: Required, StringLength(Order.CustomerNameMaxLength, MinimumLength = 1), NoNulCharacter] string CustomerName,
     [property: Range(0.01, 1_000_000_000), MaxDecimalPlaces(2)] decimal TotalAmount);
 
 /// <summary>Rejects values with more decimal places than the column stores (numeric(18,2)), so the 201 response equals the stored value.</summary>
@@ -17,6 +17,52 @@ public sealed class MaxDecimalPlacesAttribute(int places) : ValidationAttribute
 
     public override string FormatErrorMessage(string name) =>
         $"The field {name} must have at most {places} decimal places.";
+}
+
+/// <summary>
+/// Rejects U+0000 (TQ-009): PostgreSQL refuses 0x00 in text (error 22021), which would otherwise be a 500.
+/// Same rule as the list filter. The message never echoes the input.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]
+public sealed class NoNulCharacterAttribute : ValidationAttribute
+{
+    public override bool IsValid(object? value) =>
+        value is not string s || !s.Contains('\0');
+
+    public override string FormatErrorMessage(string name) =>
+        $"The field {name} must not contain the NUL character.";
+}
+
+/// <summary>
+/// Explicit parsing of <c>page</c> and <c>pageSize</c> (TQ-005 option 1): they bind as strings so a malformed value
+/// gives validation problem details keyed by the parameter name instead of a bodiless 400 (or a 500 in Development).
+/// Any value that fits an <see cref="int"/> is accepted, including zero and negatives; the service clamps them
+/// (<see cref="OrdersService.NormalizePaging"/>). Text, decimals and values beyond the <see cref="int"/> range are rejected.
+/// Messages never echo input.
+/// </summary>
+public static class PagingQuery
+{
+    public const string PageKey = "page";
+    public const string PageSizeKey = "pageSize";
+
+    internal static (int? Page, int? PageSize) Parse(string? page, string? pageSize, Dictionary<string, string[]> errors) =>
+        (ParseInt(page, PageKey, errors), ParseInt(pageSize, PageSizeKey, errors));
+
+    private static int? ParseInt(string? value, string key, Dictionary<string, string[]> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (int.TryParse(value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        errors[key] = [$"{key} must be a whole number between {int.MinValue} and {int.MaxValue}."];
+        return null;
+    }
 }
 
 public sealed record OrderResponse(

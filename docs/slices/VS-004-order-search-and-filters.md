@@ -79,7 +79,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | Follow-up code landed for `OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`: Contract (named policy, string-parsed `page`/`pageSize`, 429 row, camelCase POST keys, NUL rejection), Deferred, Alignment table and the TQ-005, TQ-007, TQ-008, TQ-009 Resolved rows updated; `TQ-013` to `TQ-015` raised (non-blocking) (code-engineer) |
 | 2026-11-20 | Security review follow-up: per-user concurrency limit and `Retry-After` on the 503 (`OD-029`), `TQ-016` raised (open, non-blocking: pool size and load test) (code-engineer) |
 | 2026-11-20 | `TQ-013` to `TQ-015` answered (`OD-026`, `OD-027`, `OD-025`): Contract (page cap and 400 key, 503 row, new defaults), Deferred, S3 rate-limit row and S5 rows updated; open-question mentions removed (code-engineer, documentation-curator) |
-| 2026-11-20 | `TQ-016` answered by `OD-030` from a local 1M-row measurement: `Database:MaxPoolSize` (default 20), `Orders:MaxPageNumber` default 10000 lowered to 1000 (Contract: page cap row and 400 message), trigram index threshold reached and recorded as a follow-up (code-engineer, documentation-curator) |
+| 2026-11-20 | `TQ-016` answered by `OD-030` from a local 1M-row measurement: `Database:MaxPoolSize` (default 20), `Orders:MaxPageNumber` default 10000 lowered to 1000 (Contract: page cap row and 400 message), trigram index threshold reached, raised as the open non-blocking `TQ-017` (code-engineer, documentation-curator) |
 
 ---
 
@@ -141,7 +141,7 @@ No Contradicted or Missing item for R1. Chunks read: `BC-001`, `BC-005` (`BC-005
 | Case-insensitive substring | `EF.Functions.ILike(o.CustomerName, pattern, "\\")` with `pattern = "%" + EscapeLikePattern(term) + "%"`; the SQL is `customer_name ILIKE @pattern ESCAPE '\'` (verified with `ToQueryString()` on Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3) | `CustomerName.ToLower().Contains(term)`: EF escapes the pattern itself (verified), but it folds the column in PostgreSQL (`lower()`) and the term in .NET, which can disagree on non-ASCII letters, and a future trigram index would have to be an expression index |
 | Wildcard escaping | Escape `\` first, then `%` and `_`, each prefixed with `\` | Escaping `[`, `]`, `^` as the Npgsql XML doc for `ILike` suggests: those are SQL Server wildcards; PostgreSQL `LIKE`/`ILIKE` has only `%` and `_` |
 | Length cap for `customerName` | Reject more than `Order.CustomerNameMaxLength` (200) characters: a longer term cannot match a stored name, and the cap bounds the input | A new Options key: the limit is a fact of the column, not a tunable |
-| Index or migration | None. `ix_order_created_at` already serves the date range and the ordering | A `pg_trgm` GIN index for `ILIKE '%x%'`: needs `CREATE EXTENSION` and a reviewed migration; deferred until a measured query shows a need (`tuning-postgresql-queries`); the 1M-row measurement of `OD-030` shows it (name search p95 0.31 to 0.58 s), so it is a recorded follow-up, not yet added |
+| Index or migration | None. `ix_order_created_at` already serves the date range and the ordering | A `pg_trgm` GIN index for `ILIKE '%x%'`: needs `CREATE EXTENSION` and a reviewed migration; deferred until a measured query shows a need (`tuning-postgresql-queries`); the 1M-row measurement of `OD-030` shows it (name search p95 0.31 to 0.58 s), so it is the open non-blocking `TQ-017`, not yet added |
 
 #### Simplicity statement
 
@@ -151,7 +151,7 @@ No Contradicted or Missing item for R1. Chunks read: `BC-001`, `BC-005` (`BC-005
 | `Order.CustomerNameMaxLength` constant | The literal `200` already appears twice (`CreateOrderRequest` `StringLength`, `OrderConfiguration` `HasMaxLength`); the filter is the third use. The constant lives on the entity because `Infrastructure` cannot reference `Api`. The model does not change, so no migration |
 | New project, layer, interface, Options key, dependency | none |
 
-Deferred: trigram index (measured need, `OD-018`; the need is shown at 1M rows by `OD-030`, a follow-up before the production table passes about 500,000 rows); caller-selectable sort (`BQ-005`, `OD-010`); per-caller visibility (`BQ-006`, `OD-011`); status filter (R2, `VS-005`); problem details for `page`/`pageSize` (`TQ-005`, `OD-016`; done in the follow-up PR); non-ASCII case folding independent of the database locale (`TQ-006`, `OD-017` requires a UTF-8 `LC_CTYPE` instead); frontend.
+Deferred: trigram index (measured need, `OD-018`; the need is shown at 1M rows by `OD-030`, open non-blocking `TQ-017`, before the production table passes about 500,000 rows); caller-selectable sort (`BQ-005`, `OD-010`); per-caller visibility (`BQ-006`, `OD-011`); status filter (R2, `VS-005`); problem details for `page`/`pageSize` (`TQ-005`, `OD-016`; done in the follow-up PR); non-ASCII case folding independent of the database locale (`TQ-006`, `OD-017` requires a UTF-8 `LC_CTYPE` instead); frontend.
 
 #### Contract
 
@@ -311,7 +311,8 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-011 | TQ | tech-lead | none (status filter input rules, criterion 9) | yes, `OD-021` (2026-11-20) |
 | TQ-013 | TQ | tech-lead | none (rate-limit partition claim) | yes, `OD-026` (2026-11-20); implemented as a documented requirement (`src/Api/CLAUDE.md`) |
 | TQ-014 | TQ | tech-lead | none (where log redaction is enforced) | yes, `OD-027` (2026-11-20); a required infrastructure checklist item, deployment follow-up until a target is chosen |
-| TQ-016 | TQ | tech-lead | none (pool size, load test at the largest page and table) | yes, `OD-030` (2026-11-20); implemented (`Database:MaxPoolSize` default 20, `Orders:MaxPageNumber` default lowered to 1000; trigram index threshold reached, follow-up recorded, not added) |
+| TQ-016 | TQ | tech-lead | none (pool size, load test at the largest page and table) | yes, `OD-030` (2026-11-20); implemented (`Database:MaxPoolSize` default 20, `Orders:MaxPageNumber` default lowered to 1000; trigram index threshold reached, `TQ-017` open and non-blocking, index not added) |
+| TQ-017 | TQ | tech-lead | none (open, non-blocking: trigram index and minimum `customerName` term length, trigger about 500,000 rows or p95 above 300 ms, evidence in `OD-030`) | no |
 | TQ-015 | TQ | tech-lead | none (query cost bounds) | yes, `OD-025` (2026-11-20); implemented (page cap, timeout default 10 s, 503 on a timeout) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
 | OD-008 | OD | product-owner | R2 pickup (hard dependency VS-001 not `Done`) | yes, exception for R2 and VS-005 only |

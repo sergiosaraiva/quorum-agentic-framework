@@ -96,7 +96,7 @@ public class LoadMeasurementTests
         var database = host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
         var size = orders.MaxPageSize;
         var deep = orders.MaxPageNumber;
-        Line($"Settings under test: MaxPageNumber={deep}, MaxPageSize={size} (deepest offset {(long)(deep - 1) * size:N0} rows), ConcurrentRequestsPerUser={limits.ConcurrentRequestsPerUser}, CommandTimeoutSeconds={database.CommandTimeoutSeconds}, MaxPoolSize={database.MaxPoolSize}");
+        Line($"Settings under test: MaxPageNumber={deep}, MaxPageSize={size} (deepest offset {(long)(deep - 1) * size:N0} rows), ConcurrentRequestsPerUser={limits.ConcurrentRequestsPerUser}, CommandTimeoutSeconds={database.CommandTimeoutSeconds}, MaxPoolSize={database.MaxPoolSize}, ConnectionWaitTimeoutSeconds={database.ConnectionWaitTimeoutSeconds}");
         Line();
 
         var from = DateOnly.FromDateTime(DateTime.Parse(FixedNow, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal)).AddDays(-RecentWindowDays);
@@ -359,50 +359,61 @@ public class LoadMeasurementTests
         private int _peak;
         private int _peakActive;
         private int _peakWorkers;
+        private volatile string? _failure;
 
         public ConnectionSampler(string connectionString)
         {
             var builder = new NpgsqlConnectionStringBuilder(connectionString) { Pooling = false };
+            var token = _stop.Token;
             _loop = Task.Run(async () =>
             {
-                await using var conn = new NpgsqlConnection(builder.ConnectionString);
-                await conn.OpenAsync();
-                await using var cmd = new NpgsqlCommand(
-                    """
-                    SELECT count(*) FILTER (WHERE backend_type = 'client backend'),
-                           count(*) FILTER (WHERE backend_type = 'client backend' AND state = 'active'),
-                           count(*) FILTER (WHERE backend_type = 'parallel worker')
-                    FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
-                    """, conn);
-                while (!_stop.IsCancellationRequested)
+                try
                 {
-                    await using (var r = await cmd.ExecuteReaderAsync())
+                    await using var conn = new NpgsqlConnection(builder.ConnectionString);
+                    await conn.OpenAsync(token);
+                    await using var cmd = new NpgsqlCommand(
+                        """
+                        SELECT count(*) FILTER (WHERE backend_type = 'client backend'),
+                               count(*) FILTER (WHERE backend_type = 'client backend' AND state = 'active'),
+                               count(*) FILTER (WHERE backend_type = 'parallel worker')
+                        FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
+                        """, conn);
+                    while (!token.IsCancellationRequested)
                     {
-                        await r.ReadAsync();
-                        _peak = Math.Max(_peak, r.GetInt32(0));
-                        _peakActive = Math.Max(_peakActive, r.GetInt32(1));
-                        _peakWorkers = Math.Max(_peakWorkers, r.GetInt32(2));
-                    }
+                        await using (var r = await cmd.ExecuteReaderAsync(token))
+                        {
+                            await r.ReadAsync(token);
+                            _peak = Math.Max(_peak, r.GetInt32(0));
+                            _peakActive = Math.Max(_peakActive, r.GetInt32(1));
+                            _peakWorkers = Math.Max(_peakWorkers, r.GetInt32(2));
+                        }
 
-                    await Task.Delay(20);
+                        await Task.Delay(20, token);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Stopped on purpose by Dispose.
+                }
+                catch (Exception ex)
+                {
+                    // A broken sampler must never show up as a number: the report prints the reason instead.
+                    _failure = ex is PostgresException pg ? $"SQLSTATE {pg.SqlState}" : $"{ex.GetType().Name}: {ex.Message}";
                 }
             });
         }
 
-        public (int Connections, int Active, int Workers) Peak() => (_peak, _peakActive, _peakWorkers);
+        /// <summary>The peaks as text, or <c>sampler failed: reason</c> when polling broke (never a misleading number).</summary>
+        public (string Connections, string Active, string Workers) Peak() =>
+            _failure is { } reason
+                ? ($"sampler failed: {reason}", "n/a", "n/a")
+                : (_peak.ToString(CultureInfo.InvariantCulture), _peakActive.ToString(CultureInfo.InvariantCulture), _peakWorkers.ToString(CultureInfo.InvariantCulture));
 
         public void Dispose()
         {
             _stop.Cancel();
-            try
-            {
-                _loop.Wait(TimeSpan.FromSeconds(5));
-            }
-            catch (AggregateException)
-            {
-                // The sampler ends with the run; a cancelled poll is expected.
-            }
-
+            // The loop handles its own cancellation and records other faults, so a fault here is real and must surface.
+            _loop.Wait(TimeSpan.FromSeconds(5));
             _stop.Dispose();
         }
     }

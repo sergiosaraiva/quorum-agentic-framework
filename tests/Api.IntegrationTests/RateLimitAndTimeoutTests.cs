@@ -178,6 +178,8 @@ public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixt
     [InlineData("Database:RetryAfterSeconds", "0")]
     [InlineData("Database:MaxPoolSize", "0")]
     [InlineData("Database:MaxPoolSize", "1001")]
+    [InlineData("Database:ConnectionWaitTimeoutSeconds", "0")]
+    [InlineData("Database:ConnectionWaitTimeoutSeconds", "301")]
     public void Host_InvalidOptionValue_FailsAtStart(string key, string value)
     {
         using var invalid = new InvalidOptionsApiFactory(key, value);

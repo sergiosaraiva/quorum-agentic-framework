@@ -62,12 +62,22 @@ public class OptionsValidationTests
     public void DatabaseOptions_MaxPoolSize_IsRangeChecked(int value, bool expected) =>
         Assert.Equal(expected, IsValid(new DatabaseOptions { MaxPoolSize = value }));
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(300, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(301, false)]
+    public void DatabaseOptions_ConnectionWaitTimeoutSeconds_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new DatabaseOptions { ConnectionWaitTimeoutSeconds = value }));
+
     [Fact]
     public void Defaults_ConcurrencyAndRetryAfter_AreTheChosenValues()
     {
         Assert.Equal(4, new RateLimitingOptions().ConcurrentRequestsPerUser);
         Assert.Equal(5, new DatabaseOptions().RetryAfterSeconds);
         Assert.Equal(20, new DatabaseOptions().MaxPoolSize);
+        Assert.Equal(5, new DatabaseOptions().ConnectionWaitTimeoutSeconds);
     }
 
     [Fact]

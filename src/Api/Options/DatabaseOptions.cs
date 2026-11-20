@@ -20,10 +20,20 @@ public sealed class DatabaseOptions
 
     /// <summary>
     /// Npgsql <c>Maximum Pool Size</c>: the most connections this process opens to the database (TQ-016, OD-030). Set it so that
-    /// instances times this value stays below the server's <c>max_connections</c> (default 100). The default 20 comes from a
-    /// single-machine measurement (OD-030): the Npgsql default of 100 reached the server limit and answered 500; 20 kept the
-    /// connection count bounded and turned overload into the 503 with <c>Retry-After</c>. Re-measure on the deployment target.
+    /// instances times this value stays below the server's <c>max_connections</c> (default 100). The default 20 rests on that
+    /// arithmetic and on the measurement (OD-030): the Npgsql default of 100 reached the server limit and answered 500 (SQLSTATE
+    /// 53300) under 25 or more users sending the worst deep request, while smaller pools did not. It is not a latency optimum:
+    /// under saturation the database CPU is the limit. Re-measure on the deployment target.
     /// </summary>
     [Range(1, 1000)]
     public int MaxPoolSize { get; init; } = 20;
+
+    /// <summary>
+    /// Seconds a request waits for a free pooled connection before failing (Npgsql <c>Timeout</c>), a 503 with <c>Retry-After</c>
+    /// (OD-025, OD-029). A list request runs two commands (count, then the page), each taking a connection, so the worst case for
+    /// one request is about 2 x (this wait + <see cref="CommandTimeoutSeconds"/>). A chosen default (TQ-016, OD-030), not a measured
+    /// optimum; the Npgsql default is 15.
+    /// </summary>
+    [Range(1, 300)]
+    public int ConnectionWaitTimeoutSeconds { get; init; } = 5;
 }

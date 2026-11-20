@@ -30,4 +30,24 @@ public class DatabasePoolSizeTests(ApiFactory factory) : IClassFixture<ApiFactor
 
         Assert.Equal(7, new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString()).MaxPoolSize);
     }
+
+    [Fact]
+    public void DbContext_ConnectionWaitTimeout_IsAppliedFromTheOption()
+    {
+        using var configured = factory.WithWebHostBuilder(b => b.UseSetting("Database:ConnectionWaitTimeoutSeconds", "9"));
+
+        using var scope = configured.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Assert.Equal(9, new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString()).Timeout);
+    }
+
+    [Fact]
+    public void DbContext_WithoutOverride_UsesTheDefaultConnectionWaitTimeout()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        Assert.Equal(new Api.Options.DatabaseOptions().ConnectionWaitTimeoutSeconds, new NpgsqlConnectionStringBuilder(db.Database.GetConnectionString()).Timeout);
+    }
 }

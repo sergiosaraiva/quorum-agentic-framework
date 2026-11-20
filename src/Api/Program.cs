@@ -24,9 +24,10 @@ builder.Services.AddOptions<RateLimitingOptions>()
 builder.Services.AddDbContext<AppDbContext>((sp, o) =>
 {
     var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-    // TQ-016: the pool bound comes from the validated Database options, never from a literal.
+    // TQ-016: the pool bound and the connection wait come from the validated Database options, never from a literal.
     o.UseNpgsql(
-            DatabaseConnectionString.WithMaxPoolSize(builder.Configuration.GetConnectionString("Default"), database.MaxPoolSize),
+            DatabaseConnectionString.WithPoolSettings(
+                builder.Configuration.GetConnectionString("Default"), database.MaxPoolSize, database.ConnectionWaitTimeoutSeconds),
             npgsql => npgsql.CommandTimeout(database.CommandTimeoutSeconds))
         .UseSnakeCaseNamingConvention();
 });

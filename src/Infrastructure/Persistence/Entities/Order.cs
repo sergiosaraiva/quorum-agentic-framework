@@ -1,7 +1,7 @@
 namespace Infrastructure.Persistence.Entities;
 
 /// <summary>
-/// The order lifecycle states of BC-001 (aligned by VS-005, OD-004). Stored as text under check constraint
+/// The five BC-001 order lifecycle states built so far; `cancelled` is added with a cancellation feature (OD-013) (aligned by VS-005, OD-004). Stored as text under check constraint
 /// <c>ck_order_status</c>, which is built from <see cref="All"/>, so the vocabulary has one source.
 /// </summary>
 public static class OrderStatuses

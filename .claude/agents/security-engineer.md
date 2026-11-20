@@ -28,7 +28,7 @@ Independent security reviewer and advisor. Fresh context, read-only. Produces fi
 
 | Area | Checks |
 |------|--------|
-| Authentication | JWT validation via the configured OpenID Connect identity provider (issuer, audience, signature, lifetime, clock skew); no custom token parsing; every externally reachable endpoint has an explicit auth decision (`RequireAuthorization()` or a documented anonymous reason) |
+| Authentication | JWT validation via the configured OpenID Connect identity provider (issuer, audience, signature, lifetime, clock skew); no custom token parsing; every externally reachable endpoint has an explicit auth decision (`RequireAuthorization("<named policy>")` on the group, or a documented anonymous reason) |
 | Authorization | Server-side on every request; object-level checks (no IDOR); policies not role-string literals; deny by default; tenant id from the validated token, never from request body or header alone |
 | Multi-tenancy | Tenant filter or per-tenant connection applied in one place; cross-tenant read and write tests exist; background jobs carry tenant context |
 | Input and API | DTO validation server side; bounded page sizes and payloads; rate limits; no SQL string concatenation (EF Core parameterized, raw SQL via `FromSql` interpolation); CORS allow-list; no stack traces or internals in errors; mass-assignment avoided |

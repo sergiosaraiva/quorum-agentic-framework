@@ -112,6 +112,7 @@ public class OrderStatusMigrationTests : IAsyncLifetime
         var error = await Assert.ThrowsAnyAsync<Exception>(() => MigrateToAsync(null));
 
         Assert.Contains("BQ-009", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("OD-013", error.ToString(), StringComparison.Ordinal);
         // Npgsql runs each migration in a transaction, so nothing was changed.
         Assert.Equal("cancelled", await StatusOfAsync(cancelled));
         Assert.Equal("open", await StatusOfAsync(open));

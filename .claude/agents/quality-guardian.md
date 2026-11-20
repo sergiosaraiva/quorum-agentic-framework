@@ -61,7 +61,7 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names). State "no blocking 
 
 | Area | Check |
 |------|-------|
-| Endpoints | Explicit `RequireAuthorization()` or documented anonymous; typed results; ProblemDetails errors; no business logic in the handler |
+| Endpoints | Explicit `RequireAuthorization("<named policy>")` on the group or documented anonymous; typed results; ProblemDetails errors; no business logic in the handler |
 | DTOs | Records; validated server-side; no entity returned directly; no sensitive fields |
 | Services | DI lifetimes correct; no captive scoped dependency in a singleton; interface only at a real seam |
 | Options | Typed, validated at startup; no hard-coded URLs, limits, timeouts, page sizes |

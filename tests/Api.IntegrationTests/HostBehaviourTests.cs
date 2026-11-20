@@ -17,6 +17,15 @@ public class OpenApiMappingTests
     }
 
     [Fact]
+    public async Task EveryMappedEndpoint_InDevelopment_OutsideTheAnonymousAllowList_RequiresAuthorization()
+    {
+        await using var factory = new DevelopmentApiFactory();
+        await factory.InitializeAsync();
+
+        Assert.Empty(AnonymousAllowList.Unprotected(factory.Services));
+    }
+
+    [Fact]
     public async Task OpenApi_InTesting_IsNotMapped()
     {
         await using var factory = new ApiFactory();

@@ -9,10 +9,10 @@ Design Principles (simplest design, no speculative abstractions, no hard-coded v
 
 ## Quick Reference
 
-- One feature folder: `src/Api/Features/<Feature>/{<Feature>Endpoints.cs, <Feature>Service.cs, Dtos.cs}`. Group routes with `app.MapGroup("/api/v1/<feature>")` and register the group in `Program.cs`
+- One feature folder: `src/Api/Features/<Feature>/{<Feature>Endpoints.cs, <Feature>Service.cs, Dtos.cs}`. Group routes with `app.MapGroup("/api/<feature>")` (as the landed `src/Api/Features/Orders/OrdersEndpoints.cs` does) and register the group in `Program.cs`. Add a version segment (`/api/v1/<feature>`) only when an owner decision (OD) records API versioning; none does today
 - Every endpoint declares `.Produces<T>(status)` for each response shape, or returns `Results<...>` typed results
-- Every endpoint has an explicit auth decision: `.RequireAuthorization("<policy>")`, or a one-line comment "intentionally anonymous: <reason>"
-- Input binds to a typed `record` DTO; never parse `HttpContext.Request` by hand
+- Every endpoint has an explicit auth decision: `.RequireAuthorization()` on the group (as Orders does), a named policy `.RequireAuthorization("<policy>")` where roles or scopes differ, or a one-line comment "intentionally anonymous: <reason>"
+- Input binds to a typed `record` DTO; never parse `HttpContext.Request` by hand. Simple rules use DataAnnotations checked with `Validator.TryValidateObject` and return `Results.ValidationProblem` (the Orders default); FluentValidation is for cross-field rules (`creating-dtos-and-validation`)
 - The endpoint method holds no business logic and no EF Core query: it validates, calls the service, maps the result to a status code
 - `await` everything; never `.Result` / `.Wait()`. Thread `CancellationToken` into every awaited call
 - No controllers, mediator/CQRS pipeline, endpoint base classes or generic CRUD helpers until a third endpoint repeats the same code
@@ -22,14 +22,16 @@ Design Principles (simplest design, no speculative abstractions, no hard-coded v
 
 ```
 New feature area?   -> Features/<Name>/<Name>Endpoints.cs + MapGroup in Program.cs
-Needs pagination?   -> page/pageSize query params, cap from Options, return {items, totalCount, page, pageSize}
+Needs pagination?   -> page/pageSize query params, cap and default from the feature Options, return `PagedResponse<T>` (Items, Page, PageSize, TotalCount)
 Needs a service?    -> inject the concrete service (interface only at a real seam: creating-application-services)
-Auth?               -> named policy; resource-level checks (ownership, tenant) belong in the service
+Auth?               -> group-level `RequireAuthorization()`, or a named policy where roles differ; resource-level checks (ownership, tenant) belong in the service
 Error from service? -> catch specific exception types; let unexpected ones reach the global exception handler (ProblemDetails)
 Public anonymous?   -> only health checks and documented public routes; comment why
 ```
 
 ## Examples
+
+The example below is illustrative (Reports is not template code). For the landed shape read `src/Api/Features/Orders/`.
 
 ```csharp
 // Features/Reports/ReportsEndpoints.cs
@@ -57,21 +59,21 @@ public static class ReportsEndpoints
         var validation = await validator.ValidateAsync(request, ct);   // validate before any service call
         if (!validation.IsValid) return TypedResults.ValidationProblem(validation.ToDictionary());
         var dto = await service.CreateAsync(request, ct);
-        return TypedResults.Created($"/api/v1/reports/{dto.Id}", dto);
+        return TypedResults.Created($"/api/reports/{dto.Id}", dto);
     }
 }
 
 // Program.cs
-app.MapGroup("/api/v1/reports").MapReportsEndpoints();
+app.MapGroup("/api/reports").MapReportsEndpoints();
 ```
 
-Pagination: take `[AsParameters] PageRequest(int Page = 1, int PageSize = 20)` and clamp with `Math.Min(PageSize, paging.Value.MaxPageSize)`, where `PagingOptions.MaxPageSize` is `[Range(1, 1000)]`, has no default and is bound with `ValidateOnStart()` so a missing value fails startup instead of returning zero rows. `PagedResult<T>` is the one shared generic: every list endpoint returns it.
+Pagination: take `int? page, int? pageSize` and clamp the page size with `Math.Clamp(pageSize ?? options.DefaultPageSize, 1, options.MaxPageSize)`, where the feature options (`OrdersOptions` in `src/Api/Options/`) declare `MaxPageSize` and `DefaultPageSize` as `[Range(1, 1000)]` and are bound with `ValidateOnStart()`, so an out-of-range value fails startup instead of returning zero rows. `PagedResponse<T>` (`src/Api/Features/Orders/Dtos.cs`) is the list response; move it to `Common/` at the third feature that needs it (`src/Api/CLAUDE.md`).
 
 ## Quality Checklist
 
 - [ ] `.Produces` / typed results cover every status the endpoint can return
 - [ ] Explicit auth decision present
-- [ ] Input is a record DTO, validated before the service is called (FluentValidation needs an explicit call or filter)
+- [ ] Input is a record DTO, validated before the service is called (DataAnnotations: `Validator.TryValidateObject`; FluentValidation needs an explicit call or filter)
 - [ ] Page size capped server-side from Options
 - [ ] No business logic, EF query, interface or base class the endpoint does not need
 - [ ] `CancellationToken` threaded through; group registered in `Program.cs`

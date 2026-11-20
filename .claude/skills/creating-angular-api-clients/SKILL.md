@@ -36,12 +36,12 @@ Pick Observable or `httpResource` per method; do not write both for one call.
 
 ```typescript
 export interface ReportDto { id: string; title: string; status: 'draft' | 'published' }
-export interface Page<T> { items: T[]; totalCount: number }
+export interface Page<T> { items: T[]; page: number; pageSize: number; totalCount: number }   // mirrors PagedResponse<T>
 
 @Injectable({ providedIn: 'root' })
 export class ReportsApi {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = '/api/v1/reports';
+  private readonly baseUrl = '/api/reports';
 
   create(request: { title: string }): Observable<ReportDto> {
     return this.http.post<ReportDto>(this.baseUrl, request);

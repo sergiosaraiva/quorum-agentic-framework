@@ -23,6 +23,10 @@ Create your repository from the template (fork, or "use this template"). Keep th
 
 The agents, skills, hooks and settings already live in `.claude/`, and the MCP registration in `.mcp.json`. Install the pre-commit lint hook with `bash .claude/hooks/install-framework-check-hook.sh` and check the result with `python3 scripts/framework_lint.py`.
 
+Start Claude Code in the repository root, every time. `.mcp.json` launches `scripts/kb/mcp_server.py` by a relative path, and the client is assumed to find `.claude/agents` and `.claude/skills` from the folder it starts in (an assumption drawn from the trial, not verified against the client's documentation). In the VS-004 trial a session started from a parent folder had no KB MCP tools, its agents were not registered agent types and the Skill tool listed no skills (`docs/reference/pipeline-trial-findings.md`, A3, B7, G2); nothing reports this, and `framework_lint` cannot see it.
+
+Check at the start of a session: if your client has an agent-listing command (for example `/agents`; unverified here), it shows the framework agents, and the skill list and the `mcp__business-kb__search` and `mcp__qa-kb__search` tools are present. If a session cannot start in the root, read the `SKILL.md` that `.claude/skills/SKILL-INDEX.md` names for the task, and use `python3 scripts/kb/search.py` for the KBs (rule 7 in `.claude/agents/_SHARED-PATTERNS.md`).
+
 ### 3. Replace the placeholders
 
 Search for `{{` across the repo and replace each one.
@@ -85,7 +89,7 @@ Start with the defaults in `docs/reference/model-selection-and-costs.md` (Opus a
 | [ ] | First business chunks written, reviewed, checked |
 | [ ] | (Optional) PostgreSQL with `pgvector` running; ingest applied both schemas |
 | [ ] | Search finds a known chunk; you know what an unknown topic returns on your backend |
-| [ ] | `.mcp.json` registers both servers; tools respond in a session |
+| [ ] | `.mcp.json` registers both servers; tools respond in a session started in the repo root |
 | [ ] | Secrets and variables set in the repository; none in the code |
 | [ ] | Local script runs; AI review workflow enabled only if `ANTHROPIC_API_KEY` is set |
 | [ ] | First slice analysed, built, reviewed and merged |

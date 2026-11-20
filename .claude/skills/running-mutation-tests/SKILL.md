@@ -32,7 +32,10 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 {
   "stryker-config": {
     "project": "src/Api/Api.csproj",
-    "test-projects": ["tests/Api.UnitTests/Api.UnitTests.csproj"],
+    "test-projects": [
+      "tests/Api.UnitTests/Api.UnitTests.csproj",
+      "tests/Api.IntegrationTests/Api.IntegrationTests.csproj"
+    ],
     "mutate": [
       "src/Api/Features/Billing/Pricing/**/*.cs",
       "src/Api/Common/PermissionEvaluator.cs"
@@ -43,7 +46,9 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 }
 ```
 
-Match project paths to your solution (the paths above are an example, not files in the template). Verify option names against the installed Stryker version.
+Match project paths to your solution (the `mutate` paths above are an example, not files in the template). Verify option names against the installed Stryker version.
+
+Which test projects to list: behaviour that a unit test can observe alone (calculations, pure filters) needs only `Api.UnitTests`. Behaviour that shows only through the database or the HTTP pipeline (query ordering and tiebreaks, SQL translation, status codes) is killed only by `Api.IntegrationTests`; a config that omits that project reports those mutants as survivors. Listing it makes each run start containers and need Docker, so keep `mutate` narrow and run it in the separate job, not the per-commit suite.
 
 ## Example: run and triage
 

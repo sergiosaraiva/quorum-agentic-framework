@@ -17,7 +17,7 @@ The Q&A KB (`questions/`, MCP server `qa-kb`) is the shared memory of every ques
 
 Ids are `BQ-001`, `TQ-001`, `OD-001` (zero padded, next free number, never reused). Files: `questions/records/<ID>.md`.
 
-Owner of the OD-versus-answer rule (proposed, pending owner confirmation; the owner has not decided it). An `OD` is mandatory for a waiver of a rule or gate (for example a slice pickup exception), a scope change and an accepted risk. An answered BQ/TQ settles a design choice by itself; it needs an `OD` only when the choice binds work beyond the question. The `decider` is the role that owns the subject of the decision, not the person present: one person holding both roles answers each record in the role it belongs to, and `## History` says so ("answered as technical lead"). When the subject has no clear owner role, record a TQ asking which role decides.
+The OD-versus-answer rule (confirmed in OD-022). An `OD` is mandatory for a waiver of a rule or gate (for example a slice pickup exception), a scope change and an accepted risk. An answered BQ/TQ settles a design choice by itself; it needs an `OD` only when the choice binds work beyond the question. The `decider` is the role that owns the subject of the decision, not the person present: one person holding both roles answers each record in the role it belongs to, and `## History` says so ("answered as technical lead"). When the subject has no clear owner role, record a TQ asking which role decides.
 
 ## Record fields (as shipped)
 
@@ -28,7 +28,7 @@ Frontmatter:
 | `id`, `kind`, `title` | Prefix plus number; `kind` matches the prefix; one-line searchable title |
 | `status` | `open`, `answered`, `decided` or `closed` (no other value) |
 | `decider` | Role that owns the answer (a role, not a person); required |
-| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; proposed definition, pending owner confirmation) to `P3`. A change of priority edits the frontmatter and adds a History line with the reason in the same edit; the frontmatter is the current value |
+| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; confirmed in OD-022) to `P3`. A change of priority edits the frontmatter and adds a History line with the reason in the same edit; the frontmatter is the current value |
 | `asked` | Date raised (`YYYY-MM-DD`) |
 | `answered` | Optional date the answer or decision was recorded |
 | `related` | Other record ids; lint fails on an unknown id |

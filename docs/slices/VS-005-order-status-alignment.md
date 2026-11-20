@@ -4,20 +4,20 @@ Status: see [`INDEX.md`](INDEX.md) (not copied here). Owner: `tech-lead`. EXAMPL
 
 ## Goal
 
-Orders carry the lifecycle states the business defines (draft, placed, paid, shipped, closed) instead of the three the first build used (open, paid, cancelled), so that later features, starting with the VS-004 status filter, speak one vocabulary.
+Orders carry the five built BC-001 lifecycle states (draft, placed, paid, shipped, closed; BC-001 also has `cancelled`, `OD-013`) instead of the three the first build used (open, paid, cancelled), so that later features, starting with the VS-004 status filter, speak one vocabulary.
 
 ## Grounding
 
 | Claim | Source (chunk id or record id) |
 |-------|--------------------------------|
-| An order has five states: draft, placed, paid, shipped, closed | `BC-001` |
+| An order has five states: draft, placed, paid, shipped, closed (as read on 2026-11-20; `BC-001` now adds `cancelled`, `OD-013`) | `BC-001` |
 | A draft is edited freely; placing freezes lines and prices | `BC-001` |
 | An order is cancelled only in draft or placed; after payment a refund is used, not cancellation | `BC-001` |
 | The code's statuses are replaced by the BC-001 states in a separate VS-001 follow-up | `TQ-003`, `OD-004` |
 | Enums are stored as text with a check constraint | `src/Infrastructure/CLAUDE.md` (Enums convention; not a KB record) |
 | A destructive or narrowing schema change needs a recorded decision and a reviewed migration | `src/Infrastructure/CLAUDE.md`, root `CLAUDE.md` Immutable Rule 2 (not KB records) |
 
-Gaps (non-blocking, working assumptions below): how legacy rows and new orders map to BC-001 (`TQ-010`, answered by `OD-007`); how a cancelled order is represented, since BC-001 has no such state (`BQ-009`, product owner).
+Gaps (non-blocking, working assumptions below): how legacy rows and new orders map to BC-001 (`TQ-010`, answered by `OD-007`); how a cancelled order is represented, since BC-001 has no such state (`BQ-009`, product owner; answered 2026-11-20 in `OD-013`: a sixth state `cancelled`, added to the code vocabulary when a cancellation feature is built).
 
 ## Acceptance criteria
 
@@ -33,7 +33,7 @@ Gaps (non-blocking, working assumptions below): how legacy rows and new orders m
 
 ## Scope
 
-In: the five-state vocabulary in `Infrastructure` (constants), the check constraint, the data-mapping migration, the create default, tests, the frontend test fixture. Out: transitions (placing, paying, shipping, closing; BC-001 transition rules and the recorded timestamp and acting user), cancellation (`BQ-009`), a status field in `CreateOrderRequest`, the status filter itself (`VS-004` R2). Deferred: transition endpoints and the state-change audit trail, until a slice asks for them.
+In: the five-state vocabulary in `Infrastructure` (constants), the check constraint, the data-mapping migration, the create default, tests, the frontend test fixture. Out (see `OD-013` for the `cancelled` state): transitions (placing, paying, shipping, closing; BC-001 transition rules and the recorded timestamp and acting user), cancellation (`BQ-009`), a status field in `CreateOrderRequest`, the status filter itself (`VS-004` R2). Deferred: transition endpoints and the state-change audit trail, until a slice asks for them.
 
 ## Design
 
@@ -46,13 +46,13 @@ In: the five-state vocabulary in `Infrastructure` (constants), the check constra
 
 Simplest option chosen: string constants beside the entity (Infrastructure cannot reference Api, and Api needs them for the default and for the R2 filter), one migration. Rejected: a C# enum with a value converter (a converter, a mapping table for the text values and no consumer needing more than strings); a transitional constraint accepting both vocabularies (a two-step rollout is only needed if old and new API versions share a database, see `TQ-010`, `OD-007`); a `Domain` project (none exists, no logic to hold).
 
-Mapping (decided in `OD-007`; `BQ-009` open):
+Mapping (decided in `OD-007`; `BQ-009` answered in `OD-013`, the migration still stops on a `cancelled` row until a cancellation feature exists):
 
 | Old | New | Reason |
 |-----|-----|--------|
 | `open` | `draft` | an `open` row has only a name and a total and nothing says it was placed; `placed` would claim frozen lines and prices (BC-001) that nothing enforced |
 | `paid` | `paid` | exact match |
-| `cancelled` | migration aborts | BC-001 has no cancelled state; `closed` would claim delivery or refund and a settled invoice. No code path ever wrote `cancelled`, so none is expected; an abort loses nothing and invents nothing |
+| `cancelled` | migration aborts | the code vocabulary has no cancelled state until a cancellation feature is built (`OD-013`); `closed` would claim delivery and a settled invoice. No code path ever wrote `cancelled`, so none is expected; an abort loses nothing and invents nothing |
 | new order | `draft` | BC-001: a draft is edited freely |
 
 Down: draft and placed -> `open`, paid, shipped and closed -> `paid`; information is lost by necessity (five states into three).
@@ -73,22 +73,23 @@ Hard: `VS-001` (the orders entity and endpoints; still `In progress` in `INDEX.m
 |------|--------|
 | 2026-11-20 | Spec and readiness analysis created; implementation on branch `feat/vs005-vs004-r2`; `TQ-010`, `BQ-009` recorded (code-engineer and requirements-analyst; independent review pending) |
 | 2026-11-20 | Owner decisions: `TQ-010` answered (`OD-007`), dependency waiver (`OD-008`); `BQ-009` stays open, non-blocking (code-engineer) |
+| 2026-11-20 | `BQ-009` answered (`OD-013`): `BC-001` now has a sixth state, `cancelled`; the code vocabulary adds it only when a cancellation feature is built, so this slice's five states and the migration abort on a cancelled row are unchanged (documentation-curator) |
 
 ---
 
 # Readiness analysis: VS-005
 
-Baseline commit: `2a74f27` (2026-11-20, `main`, branch `feat/vs005-vs004-r2`). Analyst: `requirements-analyst` role (done in the same session as the build; independent reviewers run afterwards). Result: `Ready` (no blocking record; `TQ-010` answered by `OD-007`, dependency waived by `OD-008`, `BQ-009` open and non-blocking). The KB MCP tools were not used; the same sources were read from `kb/chunks` and `questions/records`.
+Baseline commit: `2a74f27` (2026-11-20, `main`, branch `feat/vs005-vs004-r2`). Analyst: `requirements-analyst` role (done in the same session as the build; independent reviewers run afterwards). Result: `Ready` (no blocking record; `TQ-010` answered by `OD-007`, dependency waived by `OD-008`, `BQ-009` non-blocking, since answered in `OD-013`). The KB MCP tools were not used; the same sources were read from `kb/chunks` and `questions/records`.
 
 ## S1 Ground
 
 | Question | Finding | Source |
 |----------|---------|--------|
-| What must the product do? | Five states in a fixed lifecycle; cancellation only in draft or placed; no state for a cancelled order; the initial state is not named | `BC-001` |
+| What must the product do? | Five states in a fixed lifecycle; cancellation only in draft or placed; no state for a cancelled order (added later the same day, `OD-013`); the initial state is not named | `BC-001` |
 | Prior decisions that apply | Align the code to BC-001 in a follow-up | `TQ-003`, `OD-004` |
 | Silent or conflicting | Silent: legacy-row mapping, the initial state, the representation of cancellation. Conflict (resolved by `OD-004`): code statuses vs BC-001 | `TQ-010`, `BQ-009` |
 
-Landed code facts (not KB): status is a `varchar(20)` text column with `ck_order_status` (`open`, `paid`, `cancelled`); the only writer sets `open`; no code path sets `paid` or `cancelled`; the frontend shows the status as text.
+Landed code facts (not KB; the code at the baseline commit, before VS-005): status is a `varchar(20)` text column with `ck_order_status` (`open`, `paid`, `cancelled`); the only writer sets `open`; no code path sets `paid` or `cancelled`; the frontend shows the status as text.
 
 ## S2 Scope
 
@@ -115,7 +116,7 @@ See the spec above. Risks: an irreversible mapping (Down is lossy; take a backup
 | TQ-003 | TQ | tech-lead | the slice itself | yes, `OD-004` |
 | TQ-010 | TQ | tech-lead | none | yes, `OD-007` |
 | OD-008 | OD | product-owner | pickup (hard dependency VS-001 not `Done`) | yes, exception for VS-005 and VS-004 R2 only |
-| BQ-009 | BQ | product-owner | none (migration aborts on a cancelled row; no filter value for it) | no, non-blocking |
+| BQ-009 | BQ | product-owner | none (migration aborts on a cancelled row; no filter value for it) | yes, `OD-013` (2026-11-20); the code change waits for a cancellation feature |
 
 ## Priority inputs
 

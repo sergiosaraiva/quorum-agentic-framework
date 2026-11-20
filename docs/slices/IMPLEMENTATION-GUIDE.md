@@ -53,11 +53,11 @@ Done by `requirements-analyst` then `solution-architect`, recorded with [`templa
 | `Ready -> In progress` | the first code PR of the slice carries the INDEX update; a docs-only R0 PR does not move it |
 | `In progress -> Done` | the last rung is merged and the definition of done (section 7) holds |
 | back to `Analysed` | a material delta in the pickup check (section 6) |
-| any -> `Blocked` (proposed, pending owner confirmation) | work cannot continue; the INDEX Readiness cell names the blocking record or slice; the slice returns to its earlier status when that is resolved |
+| any -> `Blocked` (OD-022) | work cannot continue; the INDEX Readiness cell names the blocking record or slice; the slice returns to its earlier status when that is resolved |
 
 ### 4c. Splitting a slice
 
-Proposed guidance, pending owner confirmation. Split when one increment cannot ship until something else does, or the slice outgrows a few days. Take the next `VS-nnn` for the new part, never reuse the old id. In the INDEX, give the new row its own scores and a hard dependency edge from the part it waits on, and add the edge to the Mermaid graph (a rung-only dependency is written `R2 also VS-nnn` in the `Depends on` column, with a dotted edge). The original slice keeps the rungs that can ship alone; its spec says which rung moved and links the new spec, and the new spec links back. Record the split in both revision logs and in the INDEX log; move the open blockers to the slice that now owns the work.
+Confirmed in OD-022. Split when one increment cannot ship until something else does, or the slice outgrows a few days. Take the next `VS-nnn` for the new part, never reuse the old id. In the INDEX, give the new row its own scores and a hard dependency edge from the part it waits on, and add the edge to the Mermaid graph (a rung-only dependency is written `R2 also VS-nnn` in the `Depends on` column, with a dotted edge). The original slice keeps the rungs that can ship alone; its spec says which rung moved and links the new spec, and the new spec links back. Record the split in both revision logs and in the INDEX log; move the open blockers to the slice that now owns the work.
 
 ## 5. Priority scoring
 

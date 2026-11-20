@@ -337,7 +337,8 @@ def check_shared_rules(root: Path, report: Report) -> None:
              (RETIRED_UNVERIFIED_FIELDS) or the phrase "coverage gaps" (case-insensitive); the shared file defines
              the field (a line starting "Field `unverified`"); every agent in REVIEWER_AGENTS has the contract form,
              a JSON key `"unverified":` or a table row whose first cell is `unverified`
-    probes   the shared file defines `probe_requests`; every agent in PROBE_AGENTS names it
+    probes   the shared file defines `probe_requests`; every agent in PROBE_AGENTS names it; a name in either list
+             with no agent file is an error (fail closed)
     tools    agents in NO_BASH_AGENTS (checked against Common Tool Permissions) must not list Bash; every other
              agent with KB MCP tools must list Bash; every agent named in rule 7 has a file."""
     shared_path = root / "agents" / SHARED_FILE
@@ -401,6 +402,10 @@ def check_shared_rules(root: Path, report: Report) -> None:
         report.error(shared_path, "the Finding form paragraph does not define the field (a line starting \"Field `unverified`\")")
     if "probe_requests" not in shared:
         report.error(shared_path, "Subagent Limits does not define `probe_requests`")
+    for name in REVIEWER_AGENTS + PROBE_AGENTS:
+        if name not in agent_files:
+            report.error(agents_dir, f"{name!r} is listed in REVIEWER_AGENTS or PROBE_AGENTS but agents/{name}.md does not exist; "
+                                     "update the constant in framework_lint.py")
     for name in REVIEWER_AGENTS:
         if name in agent_files and not re.search(UNVERIFIED_FIELD, agent_files[name].read_text(encoding="utf-8", errors="replace"), re.M):
             report.error(agent_files[name], 'reviewer contract lacks the `unverified` field: add a JSON key "unverified": '

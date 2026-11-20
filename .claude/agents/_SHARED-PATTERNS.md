@@ -14,7 +14,7 @@ Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate 
 
 ## Subagent Limits
 
-A subagent cannot spawn subagents or ask the user. "Re-invoke X", "ask the owner" and "involve Y" are instructions to the calling session. A subagent returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues with unblocked work. `requirements-analyst` and `solution-architect` have no `Bash` (Common Tool Permissions) and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
+A subagent cannot spawn agents or ask the user. "Re-invoke X", "ask the owner" and "involve Y" are instructions to the calling session. It returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues with unblocked work. `requirements-analyst` and `solution-architect` have no `Bash` (Common Tool Permissions) and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
 
 ## Pipeline and Lanes
 
@@ -51,13 +51,13 @@ Rules:
 5. Record type: business or expected-behaviour question = BQ, `decider` a business role; technical question = TQ, `decider` the technical role. Who writes the record: an agent whose role includes question records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself; every other agent returns it in `questions_to_record` and the session (or `documentation-curator`) writes it. Format: `questions/README.md`, skill `recording-decisions`.
 6. "Flag" means record and continue. "Ask" means stop and ask, only when blocked on an owner decision no record settles, a scope change, or a destructive or outward-facing action the request did not cover. Batch every open item into one round, recommended option first.
 7. KB MCP unreachable (sole statement; agent failure rows point here), in order:
-   - First, agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Then, any agent reads `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep, losing BM25 ranking (local backend), `--graph`/`--related` and the filters. Say in the output which was used.
+   - First, agents with `Bash` use the CLI: `python3 scripts/kb/search.py "<query>" [--topic <t>] [--get <id>] [--graph <id> --depth N] [--stats]` (Business KB; framework `QF-*` chunks share `kb/chunks/`, `--topic` takes a topic from `--stats`; an unknown topic returns nothing and exits 0, which is not KB silence); `--kb qa` selects the Q&A KB (`--get`, `--open`, `--related <id>`). Then, any agent reads `kb/chunks/*.md` and `questions/records/*.md` with Read/Grep, losing BM25 ranking (local backend), `--graph`, `--related` and filters. State which was used.
    - Neither works (files unreadable), authoring agents (`requirements-analyst`, `solution-architect`, `code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer` and `ux-usability-specialist` when authoring or defining): stop and return to the session (`/mcp`); never proceed from memory.
    - Reviewing agents (`quality-guardian`, `regression-detective`, `security-engineer`, `documentation-reviewer`, `infrastructure-engineer` and `ux-usability-specialist` when reviewing): list `unverified: chunk verification skipped, KB unreachable` (fields: `docs/concepts/07-independent-validation.md`), never a pass; KB-dependent findings are unverified, not clean; continue the code checks.
 
 ## Pre-Development Alignment Gate (Mandatory)
 
-Applies before the first line of any change to `src/`, `frontend/src/` or `tests/` that implements specified behaviour; once per change. Not for changes touching only `.github/`, `scripts/`, `.claude/`, `docs/`, build files, Dockerfiles or generated output (state `Not applicable: <reason>`).
+Applies before the first line of any change to `src/`, `frontend/src/` or `tests/` that implements specified behaviour; once per change. Not for changes only to `.github/`, `scripts/`, `.claude/`, `docs/`, build files, Dockerfiles or generated output (state `Not applicable: <reason>`).
 
 | # | Step | Detail |
 |---|------|--------|
@@ -76,11 +76,11 @@ Applies before the first line of any change to `src/`, `frontend/src/` or `tests
 
 ## Design Principles (Binding on every agent)
 
-Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers flag over-engineering, hard-coded values, and under-engineering breaking an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, secrets).
+Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers flag over-engineering, hard-coded values, and under-engineering breaking an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, migration review, secrets, observability).
 
 ## Mandatory Parallel Review Block
 
-After `code-engineer` finishes, the orchestrating session spawns `quality-guardian` and `regression-detective` in one message (UI paths touched: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6; `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned (code artifacts) and consumes `test_would_catch` from `regression-detective`.
+After `code-engineer` finishes, the session spawns `quality-guardian` and `regression-detective` in one message (UI paths: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6; `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned (code artifacts) and consumes `test_would_catch` from `regression-detective`.
 
 ## Loop-Back Rule (Mandatory)
 
@@ -103,7 +103,7 @@ What blocks. This table is the only place that decides blocking; other files def
 
 - Never skip a stage because an earlier iteration passed it.
 - Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern to the user once, batched. A single shared budget of 3 applies across both gates of a framework-doc change.
-- Every non-blocking finding gets a disposition (fix, defer with a recorded item, or reject with a reason) listed in the hand-off; none is dropped silently.
+- Every non-blocking finding gets a disposition (fix, defer with a recorded item, or reject with a reason) in the hand-off; none is dropped silently.
 Round counters share no state: skill `running-local-ai-review`, Counters.
 
 ## Independent Review Rule
@@ -118,7 +118,7 @@ Round counters share no state: skill `running-local-ai-review`, Counters.
 
 Finding form (every reviewer agent; contracts add only agent-specific fields): `id`, `category`, `severity` (Critical/High/Medium/Low/Info; ux scale and documentation-reviewer `status` map via "What blocks"), `file` + `anchor` (symbol or heading; `line` optional in review output, never in stored docs), `scenario` (evidence and failing input), `fix` (minimal), `confidence` (optional, default 1.0). A finding without a failing scenario is dropped.
 
-Field `unverified` (optional list, every reviewer contract; owner of this definition): one string per item, `unverified (would-be <severity-or-status>): what and why` for a finding at confidence 0.50 to 0.79, `unverified: <check>, <reason>` for a check that could not run. Never blocks; the hand-off dispositions each. Mapping: `docs/concepts/07-independent-validation.md`.
+Field `unverified` (optional list, every reviewer contract; defined here): one string per item, `unverified (would-be <severity-or-status>): what and why` for a finding at confidence 0.50 to 0.79, `unverified: <check>, <reason>` for a check that could not run. Never blocks; the hand-off dispositions each; mapping: `docs/concepts/07-independent-validation.md`.
 
 | Severity | Meaning |
 |----------|---------|
@@ -130,7 +130,7 @@ Field `unverified` (optional list, every reviewer contract; owner of this defini
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change, run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). A human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (otherwise skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
+Before a branch's first push and after any later change, run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (otherwise skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
 
 ## Citation Format (Mandatory)
 

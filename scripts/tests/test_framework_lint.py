@@ -99,7 +99,8 @@ class LintTests(unittest.TestCase):
         self.assertEqual(len(self.run_lint({}, {"s": big_skill}, strict=True).errors), 1)
 
     def test_shared_patterns_file_is_not_treated_as_an_agent(self):
-        with mock.patch.object(fl, "NO_BASH_AGENTS", ()):
+        with mock.patch.object(fl, "NO_BASH_AGENTS", ()), mock.patch.object(fl, "REVIEWER_AGENTS", ()), \
+                mock.patch.object(fl, "PROBE_AGENTS", ()):
             r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\nField `unverified` here; `probe_requests`.\n7. KB MCP unreachable: stop\n## Common Tool Permissions\n"}, {})
         self.assertEqual(r.errors, [])
 
@@ -312,6 +313,12 @@ class SharedRuleTests(unittest.TestCase):
         a = self.good()
         a["doc-reviewer"] = agent("doc-reviewer", f"Read, Bash, {KB}", "| KB unreachable | rule 7 |\n| unverified | optional list |\n")
         self.assertEqual(self.errors(a), [])
+
+    def test_listed_agent_without_file_fails_closed(self):
+        for attr in ("REVIEWER_AGENTS", "PROBE_AGENTS"):
+            with mock.patch.object(fl, attr, ("ghost-agent",)):
+                e = self.errors(self.good())
+            self.assertTrue(any("'ghost-agent' is listed" in x for x in e), attr)
 
     def test_probe_agent_must_name_probe_requests(self):
         a = self.good()

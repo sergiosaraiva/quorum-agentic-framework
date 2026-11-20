@@ -37,16 +37,25 @@ public sealed class NoNulCharacterAttribute : ValidationAttribute
 /// Explicit parsing of <c>page</c> and <c>pageSize</c> (TQ-005, decided in OD-016): they bind as strings so a malformed value
 /// gives validation problem details keyed by the parameter name instead of a bodiless 400 (or a 500 in Development).
 /// Any value that fits an <see cref="int"/> is accepted, including zero and negatives; the service clamps them
-/// (<see cref="OrdersService.NormalizePaging"/>). Text, decimals and values beyond the <see cref="int"/> range are rejected.
-/// Messages never echo input.
+/// (<see cref="OrdersService.NormalizePaging"/>). Text, decimals and values beyond the <see cref="int"/> range are rejected,
+/// and so is a page above the configured maximum page number (TQ-015, OD-025), which bounds the row offset. Messages never echo input.
 /// </summary>
 public static class PagingQuery
 {
     public const string PageKey = "page";
     public const string PageSizeKey = "pageSize";
 
-    internal static (int? Page, int? PageSize) Parse(string? page, string? pageSize, Dictionary<string, string[]> errors) =>
-        (ParseInt(page, PageKey, errors), ParseInt(pageSize, PageSizeKey, errors));
+    internal static (int? Page, int? PageSize) Parse(string? page, string? pageSize, int maxPageNumber, Dictionary<string, string[]> errors)
+    {
+        var parsedPage = ParseInt(page, PageKey, errors);
+        if (parsedPage > maxPageNumber)
+        {
+            errors[PageKey] = [$"{PageKey} must be at most {maxPageNumber}."];
+            parsedPage = null;
+        }
+
+        return (parsedPage, ParseInt(pageSize, PageSizeKey, errors));
+    }
 
     private static int? ParseInt(string? value, string key, Dictionary<string, string[]> errors)
     {

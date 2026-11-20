@@ -1,9 +1,14 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Api.Features.Orders;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,7 +102,55 @@ public sealed class TinyLimitsApiFactory : ApiFactory
         ["RateLimiting:PermitLimit"] = PermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture),
         ["RateLimiting:WindowSeconds"] = WindowSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), // far longer than a test run, so the window never rolls over mid-test
         ["Database:CommandTimeoutSeconds"] = "1",
+        ["Database:RetryAfterSeconds"] = RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["RateLimiting:ConcurrentRequestsPerUser"] = "1",
     };
+
+    public const int RetryAfterSeconds = 7;
+
+    /// <summary>Test-only routes that run a command longer than the timeout, or throw an unrelated exception with a recognisable message.</summary>
+    public const string SlowRoute = "/__test/slow";
+    public const string BoomRoute = "/__test/boom";
+    public const string BoomMessage = "zzsecret-exception-text-zz";
+
+    /// <summary>Test-only route under the orders list rate-limit policy that stays in flight until <see cref="ReleaseHold"/> is called.</summary>
+    public const string HoldRoute = "/__test/hold";
+
+    private readonly TaskCompletionSource _holdEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _holdRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task HoldEntered => _holdEntered.Task;
+
+    public void ReleaseHold() => _holdRelease.TrySetResult();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(_ => new TestRoutesStartupFilter(this)));
+    }
+
+    private sealed class TestRoutesStartupFilter(TinyLimitsApiFactory owner) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            next(app);
+            app.UseEndpoints(e =>
+            {
+                e.MapGet(SlowRoute, async (AppDbContext db, CancellationToken ct) =>
+                {
+                    await db.Database.ExecuteSqlRawAsync("SELECT pg_sleep(5)", ct);
+                    return Results.Ok();
+                });
+                e.MapGet(HoldRoute, async () =>
+                {
+                    owner._holdEntered.TrySetResult();
+                    await owner._holdRelease.Task;
+                    return Results.Ok();
+                }).RequireRateLimiting(OrdersRateLimit.PolicyName);
+                e.MapGet(BoomRoute, () => { throw new InvalidOperationException(BoomMessage); });
+            });
+        };
+    }
 }
 
 /// <summary>Host with invalid options and no container; building it must fail at start (ValidateOnStart).</summary>

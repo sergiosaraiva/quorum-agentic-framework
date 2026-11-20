@@ -22,6 +22,7 @@ This file exists because it is loaded when you work under `src/Infrastructure/`;
 | Enums | stored as text with a check constraint, not as integers |
 | Audit columns | `created_at`, `updated_at` on every entity; soft delete (`deleted_at`) only when a requirement names it |
 | Database locale | every environment's database is created with a UTF-8 `LC_CTYPE` (for example `en_US.utf8`), written into the infrastructure code; case-insensitive text search uses `ILIKE` and depends on it for non-ASCII letters (OD-017) |
+| Log redaction | required before the first deployment (OD-012, OD-027): the `customerName` query value and bound parameters are redacted or omitted in application logs (Information-level request lines carry the query string: keep HTTP logging and EF sensitive-data logging off, set levels per category), telemetry (`url.query`, `url.full`, `http.url`, `db.query.text`, `db.statement`, span events), PostgreSQL (`log_min_duration_statement`, `log_statement`, `log_parameter_max_length`, `log_parameter_max_length_on_error`, `auto_explain`), and proxy, access and edge components (CDN, WAF, load balancer, browser referrer); set in the infrastructure code of the chosen target and verified by the infrastructure review. Until a target is chosen it is a deployment follow-up: record a TQ at target selection |
 | Nullability | entity properties follow nullable reference types; optional means `T?` and a nullable column |
 
 ## Migration workflow
@@ -31,7 +32,7 @@ This file exists because it is loaded when you work under `src/Infrastructure/`;
 3. Read the generated SQL: `dotnet ef migrations script --idempotent`. Prefer additive changes; a destructive change (drop, rename, type narrowing) needs a recorded decision and a two-step rollout.
 4. Large tables: create indexes concurrently in a hand-edited migration with `suppressTransaction: true`.
 5. Never edit a migration already applied to a shared environment; add a new one.
-6. `EnsureCreated()` only in tests; apply migrations at deploy time through a job, not at API startup in production.
+6. `EnsureCreated()` only in tests; apply migrations at deploy time through a job, not at API startup in production. The API's `Database:CommandTimeoutSeconds` (default 10, OD-025) applies to every command of this host's `DbContext`, migrations included, so the migration run sets its own larger value (the tests set one on the context).
 
 ## Do not
 

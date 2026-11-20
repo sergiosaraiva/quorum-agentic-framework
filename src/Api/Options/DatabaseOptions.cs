@@ -7,7 +7,14 @@ public sealed class DatabaseOptions
 {
     public const string SectionName = "Database";
 
-    /// <summary>Command timeout in seconds for every EF Core command (TQ-007, OD-018): bounds a slow order search.</summary>
+    /// <summary>
+    /// Command timeout in seconds for every EF Core command (TQ-007, OD-018): bounds a slow order search. The default is 10
+    /// (TQ-015, OD-025): the worst measured search took 0.4 to 1.6 seconds at 1M rows. A migration job sets its own larger value.
+    /// </summary>
     [Range(1, 600)]
-    public int CommandTimeoutSeconds { get; init; } = 30;
+    public int CommandTimeoutSeconds { get; init; } = 10;
+
+    /// <summary>Value of the <c>Retry-After</c> header, in seconds, on the 503 answered for a command timeout (OD-029). A chosen default.</summary>
+    [Range(1, 3600)]
+    public int RetryAfterSeconds { get; init; } = 5;
 }

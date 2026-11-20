@@ -16,7 +16,7 @@ A user of the orders list can narrow it down by criteria and find an order witho
 
 Decided 2026-11-19: filters are status, created-date range and customer name, no amount filter (`BQ-003`, `OD-002`); customer name is a case-insensitive substring match (`BQ-004`, `OD-003`); order statuses are aligned to BC-001 in follow-up `VS-005` (`TQ-003`, `OD-004`).
 
-Decided 2026-11-20 (the nine earlier non-blocking questions, now answered): sort order `BQ-005` (`OD-010`), visibility `BQ-006` (`OD-011`), the amount filter stays deferred `TQ-004` (`OD-015`), typed-binding problem details for `page`/`pageSize` `TQ-005` (`OD-016`), container locale for case folding `TQ-006` (`OD-017`); from the R1 review: search cost `TQ-007` (`OD-018`), customer name in URLs `BQ-008` (`OD-012`), error-key casing `TQ-008` (`OD-019`), NUL in create `TQ-009` (`OD-020`); the R2 input rules `TQ-011` (`OD-021`). The code that these decisions require (`OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`) landed in the slice follow-up PR (2026-11-20): named policy, string-parsed paging, rate limit and command timeout, camelCase keys, NUL rejection.
+Decided 2026-11-20 (the nine earlier non-blocking questions, now answered): sort order `BQ-005` (`OD-010`), visibility `BQ-006` (`OD-011`), the amount filter stays deferred `TQ-004` (`OD-015`), typed-binding problem details for `page`/`pageSize` `TQ-005` (`OD-016`), container locale for case folding `TQ-006` (`OD-017`); from the R1 review: search cost `TQ-007` (`OD-018`), customer name in URLs `BQ-008` (`OD-012`), error-key casing `TQ-008` (`OD-019`), NUL in create `TQ-009` (`OD-020`); the R2 input rules `TQ-011` (`OD-021`); from the follow-up PR review: query cost bounds `TQ-015` (`OD-025`), rate-limit partition claim `TQ-013` (`OD-026`), where log redaction is enforced `TQ-014` (`OD-027`). The code that these decisions require (`OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`) landed in the slice follow-up PR (2026-11-20): named policy, string-parsed paging, rate limit and command timeout, camelCase keys, NUL rejection.
 
 ## Acceptance criteria
 
@@ -34,7 +34,7 @@ Decided 2026-11-20 (the nine earlier non-blocking questions, now answered): sort
 
 ## Scope
 
-In: backend filtering of the existing order list (query parameters). Out: frontend, amount filter (`OD-002`, `TQ-004`), selectable sorting (`BQ-005`, `OD-010`), per-caller visibility changes (`BQ-006`, `OD-011`). Deferred: database indexes for the chosen filters, until the filter set is decided and a query shows a need (`OD-018`: a trigram index only on measured need); a cap on the page offset, a lower read timeout and the 500 vs 503/504 mapping on a timeout (`TQ-015`); the rate-limit partition claim (`TQ-013`); where log redaction is enforced (`TQ-014`, `OD-012`).
+In: backend filtering of the existing order list (query parameters). Out: frontend, amount filter (`OD-002`, `TQ-004`), selectable sorting (`BQ-005`, `OD-010`), per-caller visibility changes (`BQ-006`, `OD-011`). Deferred: database indexes for the chosen filters, until the filter set is decided and a query shows a need (`OD-018`: a trigram index only on measured need); the redaction configuration of the deployment target (`OD-012`; where it is enforced and verified is `OD-027`). The page cap, the lower timeout default and the 503 on a timeout are decided (`OD-025`) and implemented, as is the rate-limit partition claim requirement (`OD-026`).
 
 ## Design
 
@@ -77,6 +77,8 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | `OD-008` recorded: the VS-001 dependency rule is waived for R2 and VS-005; R2 still merges after VS-005 (code-engineer) |
 | 2026-11-20 | Owner decisions recorded: `BQ-005`, `BQ-006`, `TQ-004` to `TQ-009`, `BQ-008` and `TQ-011` answered as `OD-010` to `OD-012` and `OD-015` to `OD-021` (documentation-curator); the slice code that follows from `OD-011`, `OD-016`, `OD-018`, `OD-019` and `OD-020` is tracked in the slice follow-up PR |
 | 2026-11-20 | Follow-up code landed for `OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`: Contract (named policy, string-parsed `page`/`pageSize`, 429 row, camelCase POST keys, NUL rejection), Deferred, Alignment table and the TQ-005, TQ-007, TQ-008, TQ-009 Resolved rows updated; `TQ-013` to `TQ-015` raised (non-blocking) (code-engineer) |
+| 2026-11-20 | Security review follow-up: per-user concurrency limit and `Retry-After` on the 503 (`OD-029`), `TQ-016` raised (open, non-blocking: pool size and load test) (code-engineer) |
+| 2026-11-20 | `TQ-013` to `TQ-015` answered (`OD-026`, `OD-027`, `OD-025`): Contract (page cap and 400 key, 503 row, new defaults), Deferred, S3 rate-limit row and S5 rows updated; open-question mentions removed (code-engineer, documentation-curator) |
 
 ---
 
@@ -152,11 +154,11 @@ Deferred: trigram index (measured need, `OD-018`); caller-selectable sort (`BQ-0
 
 #### Contract
 
-`GET /api/orders?page&pageSize&createdFrom&createdTo&customerName`. Auth: inherited from the `/api/orders` group, `RequireAuthorization("orders")` (Immutable Rule 7). The named policy `orders` requires an authenticated user and is the seam for staff and customer roles (`OD-011`, `BQ-006`). Rate limit: the list endpoint only, per user, from `RateLimiting` options (`OD-018`, `TQ-007`).
+`GET /api/orders?page&pageSize&createdFrom&createdTo&customerName`. Auth: inherited from the `/api/orders` group, `RequireAuthorization("orders")` (Immutable Rule 7). The named policy `orders` requires an authenticated user and is the seam for staff and customer roles (`OD-011`, `BQ-006`). Rate limit: the list endpoint only, per user, from `RateLimiting` options (`OD-018`, `TQ-007`; chosen default 60 requests per 60 seconds, `OD-018`; at most `RateLimiting:ConcurrentRequestsPerUser` (default 4) requests of one user at the same time, `OD-029`); the partition is the `NameIdentifier` claim, then `sub`, and the identity provider must issue one of them (`OD-026`).
 
 | Parameter | Type on the wire | Rule | Absent or empty |
 |-----------|------------------|------|-----------------|
-| `page`, `pageSize` | string holding an integer | parsed explicitly by `PagingQuery.Parse` (`OD-016`, `TQ-005`): an int in range is accepted, text, decimals, a NUL or a value beyond the int range is a 400 keyed `page` or `pageSize`; zero and negatives are clamped as in VS-001 (`NormalizePaging`, `ComputeSkip`, `OrdersOptions`) | defaults |
+| `page`, `pageSize` | string holding an integer | parsed explicitly by `PagingQuery.Parse` (`OD-016`, `TQ-005`): an int in range is accepted, text, decimals, a NUL or a value beyond the int range is a 400 keyed `page` or `pageSize`; a `page` above `Orders:MaxPageNumber` (default 10000) is a 400 keyed `page` (`OD-025`, `TQ-015`), which bounds the row offset; zero and negatives are clamped as in VS-001 (`NormalizePaging`, `ComputeSkip`, `OrdersOptions`) | defaults |
 | `createdFrom` | string `yyyy-MM-dd` | `DateOnly.TryParseExact(value, OrderListFilter.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)` | null, empty or whitespace: no lower bound |
 | `createdTo` | string `yyyy-MM-dd` | same parse; must not be before `createdFrom` when both are given; `9999-12-31` means no upper bound (avoids the `AddDays(1)` overflow) | null, empty or whitespace: no upper bound |
 | `customerName` | string | trimmed; at most `Order.CustomerNameMaxLength` characters after trimming | null, empty or whitespace: no name filter |
@@ -168,7 +170,8 @@ Responses:
 | 200 | valid input | `PagedResponse<OrderResponse>` unchanged: `items`, `page`, `pageSize`, `totalCount` (the filtered count) |
 | 400 | any filter value invalid | `Results.ValidationProblem(errors)`: `application/problem+json`, `title` "One or more validation errors occurred.", `status` 400, `errors` keyed by parameter name. All errors are reported at once |
 | 401 | no credentials | from the group |
-| 429 | the per-user limit is exceeded (`RateLimiting:PermitLimit` per `WindowSeconds`) | `application/problem+json`, `status` 429, fixed `title` "Too many requests.", `type`, `traceId`; header `Retry-After` in seconds (`OD-018`, `TQ-007`) |
+| 503 | a database command exceeds `Database:CommandTimeoutSeconds` (default 10) | `application/problem+json`, `status` 503, fixed `title` "Service temporarily unavailable.", fixed `detail`, `type`, `traceId`; header `Retry-After` of `Database:RetryAfterSeconds` (default 5, `OD-029`); no exception text (`OD-025`, `TQ-015`) |
+| 429 | the per-user limit is exceeded (`RateLimiting:PermitLimit` per `WindowSeconds`), or more than `RateLimiting:ConcurrentRequestsPerUser` of the user's requests are in flight (`OD-029`; no `Retry-After` then) | `application/problem+json`, `status` 429, fixed `title` "Too many requests.", `type`, `traceId`; header `Retry-After` in seconds (`OD-018`, `TQ-007`) |
 
 Error keys and messages (messages never echo the input):
 
@@ -180,8 +183,9 @@ Error keys and messages (messages never echo the input):
 | `customerName` | `customerName must be at most 200 characters.` (the number comes from the constant) | too long |
 | `customerName` | `customerName must not contain the NUL character.` | contains U+0000 (PostgreSQL rejects 0x00 in text) |
 | `page`, `pageSize` | `page must be a whole number between -2147483648 and 2147483647.` (same for `pageSize`) | not an integer, contains U+0000, or outside the int range |
+| `page` | `page must be at most 10000.` (the number is the configured `Orders:MaxPageNumber`, never the input) | `page` above the cap |
 
-The POST `/api/orders` validation uses camelCase keys too (`customerName`, `totalAmount`; `OD-019`, `TQ-008`) and rejects U+0000 in `customerName` with a 400 (`OD-020`, `TQ-009`). A malformed request that the framework reports as a `BadHttpRequestException` (for example invalid JSON) is a 400 problem response in every environment, Development included (`OD-016`). A database command timeout of `Database:CommandTimeoutSeconds` applies to every command (`OD-018`).
+The POST `/api/orders` validation uses camelCase keys too (`customerName`, `totalAmount`; `OD-019`, `TQ-008`) and rejects U+0000 in `customerName` with a 400 (`OD-020`, `TQ-009`). A malformed request that the framework reports as a `BadHttpRequestException` (for example invalid JSON) is a 400 problem response in every environment, Development included (`OD-016`). A database command timeout of `Database:CommandTimeoutSeconds` (default 10, lowered from 30 in `OD-025`) applies to every command (`OD-018`); a timeout answers 503 with `Retry-After`, any other exception keeps its status. A migration run sets its own larger value.
 
 Ordering: unchanged, `CreatedAt` descending, then `Id` ascending (`BQ-005` working assumption). Filters combine with AND.
 
@@ -267,7 +271,7 @@ The trigger is an API contract change in which caller input reaches a database q
 | Error content | Messages are fixed text, never echo input; no exception text | I5 bodies |
 | Personal data | A customer name may identify a person. It travels in the query string, so it can land in access logs, proxy logs and OpenTelemetry `url.query`. The design does not log the term. Moving to POST is not proposed | Classification call: is a customer name personal data here; is query-string redaction needed in observability (adopter's backend, not yet configured) |
 | Visibility | Any authenticated caller can search all orders, which makes name enumeration easier than paging. Decided in `OD-011`; the named policy `orders` is the seam for roles | Revisit as Critical before customers can obtain tokens |
-| Rate limiting | Per-user fixed window and a command timeout, from validated options (`OD-018`); the partition claim is `TQ-013`, cost bounds are `TQ-015` | Limits from options, 429 problem response, per-user partition |
+| Rate limiting | Per-user fixed window and a command timeout, from validated options (`OD-018`); the partition claim is decided in `OD-026`, the cost bounds in `OD-025` (page cap, timeout default 10 s, 503) | Limits from options, 429 problem response, per-user partition |
 
 #### Risks and questions
 
@@ -277,7 +281,7 @@ The trigger is an API contract change in which caller input reaches a database q
 | `TQ-006` | TQ | tech-lead | no | Non-ASCII case-insensitivity depends on the database `LC_CTYPE` |
 | `BQ-007` | BQ | product-owner | no | Time zone of a calendar day for the created-date filter: answered, UTC days (`OD-005`) |
 | `BQ-005`, `BQ-006` | BQ | product-owner | no | answered 2026-11-20 (`OD-010`, `OD-011`) |
-| `TQ-013`, `TQ-014`, `TQ-015` | TQ | tech-lead | no | raised 2026-11-20 by the follow-up PR review: rate-limit partition claim, where log redaction is enforced, query cost bounds |
+| `TQ-013`, `TQ-014`, `TQ-015` | TQ | tech-lead | no | raised 2026-11-20 by the follow-up PR review, answered the same day: rate-limit partition claim (`OD-026`), where log redaction is enforced (`OD-027`), query cost bounds (`OD-025`) |
 
 ## S4 Dependencies
 
@@ -304,12 +308,16 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | yes, `OD-019` (2026-11-20); implemented (camelCase keys, case-sensitive POST test) |
 | TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | yes, `OD-020` (2026-11-20); implemented (create rejects U+0000 with a 400) |
 | TQ-011 | TQ | tech-lead | none (status filter input rules, criterion 9) | yes, `OD-021` (2026-11-20) |
+| TQ-013 | TQ | tech-lead | none (rate-limit partition claim) | yes, `OD-026` (2026-11-20); implemented as a documented requirement (`src/Api/CLAUDE.md`) |
+| TQ-014 | TQ | tech-lead | none (where log redaction is enforced) | yes, `OD-027` (2026-11-20); a required infrastructure checklist item, deployment follow-up until a target is chosen |
+| TQ-016 | TQ | tech-lead | none (open, non-blocking: pool size, load test at the largest page and table) | no |
+| TQ-015 | TQ | tech-lead | none (query cost bounds) | yes, `OD-025` (2026-11-20); implemented (page cap, timeout default 10 s, 503 on a timeout) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
 | OD-008 | OD | product-owner | R2 pickup (hard dependency VS-001 not `Done`) | yes, exception for R2 and VS-005 only |
 
 BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'. Answered 2026-11-20 in `OD-011` (all orders visible to any authenticated caller, a named authorization policy now, revisit as Critical before customers can obtain tokens); the named policy `orders` is implemented. [Updated 2026-11-20: implemented in the follow-up PR]
 
-[Updated 2026-11-20: the policy, rate limit and command timeout are implemented in the follow-up PR.] Both Medium findings are now decided, not accepted as risks: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) in `OD-018` (rate limiter and command timeout, implemented; the remaining query-cost questions are `TQ-015`), and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs) in `OD-012` (personal data, GET kept, redaction requirements; the redaction configuration is deployment work, where it is enforced is `TQ-014`). Until that configuration exists the SEC-002 exposure described in the finding remains, and so do the open cost bounds of `TQ-015`. The R1 PR may cite this paragraph.
+[Updated 2026-11-20: the policy, rate limit and command timeout are implemented in the follow-up PR.] Both Medium findings are now decided, not accepted as risks: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) in `OD-018` (rate limiter and command timeout, implemented; the remaining query-cost questions were answered in `OD-025`), and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs) in `OD-012` (personal data, GET kept, redaction requirements; the redaction configuration is deployment work, where it is enforced is `TQ-014`). Until that configuration exists the SEC-002 exposure described in the finding remains; where it is enforced is decided in `OD-027` (a required infrastructure checklist item). The cost bounds of `TQ-015` are decided in `OD-025` and implemented (page cap, 10 s default timeout, 503 on a timeout). The R1 PR may cite this paragraph.
 
 Blockers (rows that block a rung) are all resolved for R1. The nine rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) were non-blocking and are all answered (see the Resolved column). R2 additionally waits for `VS-005` to be `Done`. [Superseded 2026-11-20: R2 is built stacked on VS-005 (`In progress`), the dependency rule is waived by `OD-008`, and R2 cannot merge before VS-005; see the pickup delta log.]
 

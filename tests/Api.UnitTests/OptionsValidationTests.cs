@@ -37,6 +37,29 @@ public class OptionsValidationTests
     public void DatabaseOptions_CommandTimeoutSeconds_IsRangeChecked(int value, bool expected) =>
         Assert.Equal(expected, IsValid(new DatabaseOptions { CommandTimeoutSeconds = value }));
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(1000, true)]
+    [InlineData(0, false)]
+    [InlineData(1001, false)]
+    public void RateLimitingOptions_ConcurrentRequestsPerUser_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new RateLimitingOptions { ConcurrentRequestsPerUser = value }));
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(3600, true)]
+    [InlineData(0, false)]
+    [InlineData(3601, false)]
+    public void DatabaseOptions_RetryAfterSeconds_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new DatabaseOptions { RetryAfterSeconds = value }));
+
+    [Fact]
+    public void Defaults_ConcurrencyAndRetryAfter_AreTheChosenValues()
+    {
+        Assert.Equal(4, new RateLimitingOptions().ConcurrentRequestsPerUser);
+        Assert.Equal(5, new DatabaseOptions().RetryAfterSeconds);
+    }
+
     [Fact]
     public void Defaults_AreValid()
     {
@@ -72,7 +95,7 @@ public class OptionsValidationTests
     {
         var errors = new Dictionary<string, string[]>();
 
-        PagingQuery.Parse(page, pageSize, errors);
+        PagingQuery.Parse(page, pageSize, int.MaxValue, errors);
 
         Assert.Equal(valid, errors.Count == 0);
     }
@@ -82,12 +105,68 @@ public class OptionsValidationTests
     {
         var errors = new Dictionary<string, string[]>();
 
-        var (page, size) = PagingQuery.Parse("-3", "x", errors);
+        var (page, size) = PagingQuery.Parse("-3", "x", 10, errors);
 
         Assert.Equal(-3, page);
         Assert.Null(size);
         Assert.Equal(["pageSize"], errors.Keys);
     }
+
+    [Theory]
+    [InlineData("10", true)]
+    [InlineData("9", true)]
+    [InlineData("11", false)]
+    [InlineData("2147483647", false)]
+    [InlineData("0", true)]
+    [InlineData("-5", true)]
+    public void PagingQuery_Parse_PageAboveMaxPageNumber_IsRejectedAtTheBoundary(string page, bool valid)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        var (parsed, _) = PagingQuery.Parse(page, null, 10, errors);
+
+        Assert.Equal(valid, errors.Count == 0);
+        Assert.Equal(valid, parsed is not null);
+        if (!valid)
+        {
+            Assert.Equal(["page"], errors.Keys);
+            Assert.Equal(["page must be at most 10."], errors["page"]);
+        }
+    }
+
+    [Fact]
+    public void PagingQuery_Parse_PageSizeIsNotCappedByMaxPageNumber()
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        var (_, size) = PagingQuery.Parse(null, "50", 10, errors);
+
+        Assert.Empty(errors);
+        Assert.Equal(50, size);
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(1_000_000, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(1_000_001, false)]
+    public void OrdersOptions_MaxPageNumber_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new OrdersOptions { MaxPageNumber = value }));
+
+    [Fact]
+    public void OrdersOptions_Defaults_AreValidAndBoundTheOffset()
+    {
+        var options = new OrdersOptions();
+
+        Assert.True(IsValid(options));
+        Assert.Equal(10_000, options.MaxPageNumber);
+        Assert.True((long)(options.MaxPageNumber - 1) * options.MaxPageSize < int.MaxValue);
+    }
+
+    [Fact]
+    public void DatabaseOptions_DefaultTimeout_IsTenSeconds() =>
+        Assert.Equal(10, new DatabaseOptions().CommandTimeoutSeconds);
 
     private static ClaimsPrincipal Principal(bool authenticated, params Claim[] claims) =>
         new(authenticated ? new ClaimsIdentity(claims, "Test") : new ClaimsIdentity(claims));

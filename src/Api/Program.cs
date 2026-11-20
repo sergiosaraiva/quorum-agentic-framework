@@ -1,3 +1,4 @@
+using Api.Common;
 using Api.Features.Orders;
 using Api.Options;
 using Infrastructure.Persistence;
@@ -42,11 +43,11 @@ builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>()
     .Configure<IOptions<RateLimitingOptions>>((rl, limits) => rl.AddOrdersListPolicy(limits.Value));
 
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = DatabaseTimeoutProblem.Customize);
 // TQ-005 (OD-016): a malformed request (for example invalid JSON) is a client error, not a 500, also in Development where
-// the framework throws BadHttpRequestException instead of answering 400 itself.
-builder.Services.Configure<ExceptionHandlerOptions>(o =>
-    o.StatusCodeSelector = ex => ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError);
+// the framework throws BadHttpRequestException instead of answering 400 itself. TQ-015 (OD-025): a database command timeout is a 503;
+// any other exception stays a 500.
+builder.Services.Configure<ExceptionHandlerOptions>(o => o.StatusCodeSelector = DatabaseTimeoutProblem.SelectStatusCode);
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>(tags: ["ready"]);
 

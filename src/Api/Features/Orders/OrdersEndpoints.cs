@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using Api.Options;
+using Microsoft.Extensions.Options;
 
 namespace Api.Features.Orders;
 
@@ -17,10 +19,10 @@ public static class OrdersEndpoints
         // Rate limited per user (TQ-007, OD-018): each call costs two scans.
         group.MapGet("/", async (
             string? page, string? pageSize, string? createdFrom, string? createdTo, string? customerName, string? status,
-            OrdersService service, CancellationToken ct) =>
+            OrdersService service, IOptions<OrdersOptions> orders, CancellationToken ct) =>
         {
             var (filter, errors) = OrderListFilter.Parse(createdFrom, createdTo, customerName, status);
-            var (pageNumber, size) = PagingQuery.Parse(page, pageSize, errors);
+            var (pageNumber, size) = PagingQuery.Parse(page, pageSize, orders.Value.MaxPageNumber, errors);
             return errors.Count > 0
                 ? Results.ValidationProblem(errors)
                 : Results.Ok(await service.ListAsync(pageNumber, size, filter, ct));

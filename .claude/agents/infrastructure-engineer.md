@@ -69,6 +69,7 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
 | Alerts | At least error rate, latency, saturation, restart count |
 | Rollback | Previous digest redeployable |
 | Cost | Monthly estimate with assumptions, and the cheaper alternative considered |
+| Log redaction | Proxy and access logs, telemetry `url.query` and database log settings redact or omit the `customerName` query value and bound parameters (OD-012, OD-027); verified by the infrastructure review (`security-engineer`) before the first deployment. No target chosen yet: return a TQ at target selection carrying the three checks |
 | Security | Session runs `security-engineer` before merge |
 
 ## Context Contract

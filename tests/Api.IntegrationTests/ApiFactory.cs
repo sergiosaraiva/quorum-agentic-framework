@@ -2,8 +2,11 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -98,6 +101,34 @@ public sealed class TinyLimitsApiFactory : ApiFactory
         ["RateLimiting:WindowSeconds"] = WindowSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), // far longer than a test run, so the window never rolls over mid-test
         ["Database:CommandTimeoutSeconds"] = "1",
     };
+
+    /// <summary>Test-only routes that run a command longer than the timeout, or throw an unrelated exception with a recognisable message.</summary>
+    public const string SlowRoute = "/__test/slow";
+    public const string BoomRoute = "/__test/boom";
+    public const string BoomMessage = "zzsecret-exception-text-zz";
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestRoutesStartupFilter>());
+    }
+
+    private sealed class TestRoutesStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            next(app);
+            app.UseEndpoints(e =>
+            {
+                e.MapGet(SlowRoute, async (AppDbContext db, CancellationToken ct) =>
+                {
+                    await db.Database.ExecuteSqlRawAsync("SELECT pg_sleep(5)", ct);
+                    return Results.Ok();
+                });
+                e.MapGet(BoomRoute, () => { throw new InvalidOperationException(BoomMessage); });
+            });
+        };
+    }
 }
 
 /// <summary>Host with invalid options and no container; building it must fail at start (ValidateOnStart).</summary>

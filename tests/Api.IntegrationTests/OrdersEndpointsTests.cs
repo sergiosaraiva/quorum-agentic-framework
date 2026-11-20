@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using Api.Features.Orders;
+using Api.Options;
 using Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Api.IntegrationTests;
 
@@ -91,11 +93,13 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
     }
 
     [Fact]
-    public async Task List_HugePageNumber_ReturnsEmptyPageNotServerError()
+    public async Task List_PageAtMaxPageNumber_ReturnsEmptyPageNotServerError()
     {
         var client = factory.CreateClient();
+        var max = factory.Services.GetRequiredService<IOptions<OrdersOptions>>().Value;
 
-        var response = await client.GetAsync($"/api/orders?page={int.MaxValue}&pageSize=50", TestContext.Current.CancellationToken);
+        // The largest accepted offset: (MaxPageNumber - 1) * MaxPageSize (TQ-015, OD-025). Above the cap is a 400, see OrdersListParsingTests.
+        var response = await client.GetAsync($"/api/orders?page={max.MaxPageNumber}&pageSize={max.MaxPageSize}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

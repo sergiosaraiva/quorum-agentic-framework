@@ -90,6 +90,50 @@ public class OrdersListParsingTests(ApiFactory factory) : IClassFixture<ApiFacto
         Assert.Equal(factory.Services.GetRequiredService<IOptions<OrdersOptions>>().Value.DefaultPageSize, body.PageSize);
     }
 
+    private int MaxPageNumber => factory.Services.GetRequiredService<IOptions<OrdersOptions>>().Value.MaxPageNumber;
+
+    // TQ-015 (OD-025): the page number is capped so the row offset is bounded.
+    [Fact]
+    public async Task List_PageAtMaxPageNumber_IsAccepted()
+    {
+        var response = await factory.CreateClient().GetAsync($"/api/orders?page={MaxPageNumber}", Ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PagedResponse<OrderResponse>>(Ct);
+        Assert.Equal(MaxPageNumber, body?.Page);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1_000_000)]
+    [InlineData(int.MaxValue)]
+    public async Task List_PageAboveMaxPageNumber_Returns400KeyedPageWithFixedMessage(int above)
+    {
+        var page = above == 1 ? MaxPageNumber + 1 : above;
+
+        var response = await factory.CreateClient().GetAsync($"/api/orders?page={page}", Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        using var doc = JsonDocument.Parse(text);
+        var errors = doc.RootElement.GetProperty("errors");
+        Assert.Equal(["page"], errors.EnumerateObject().Select(p => p.Name));
+        Assert.Equal($"page must be at most {MaxPageNumber}.", errors.GetProperty("page")[0].GetString());
+        // The message names the configured cap, never the caller's value.
+        Assert.DoesNotContain(page.ToString(System.Globalization.CultureInfo.InvariantCulture), text, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("page=0", 1)]
+    [InlineData("page=-7", 1)]
+    public async Task List_PageBelowOne_StillClampsToOne(string query, int expected)
+    {
+        var body = await factory.CreateClient().GetFromJsonAsync<PagedResponse<OrderResponse>>("/api/orders?" + query, Ct);
+
+        Assert.Equal(expected, body?.Page);
+    }
+
     [Fact]
     public async Task List_PagingErrorDoesNotEchoInput()
     {

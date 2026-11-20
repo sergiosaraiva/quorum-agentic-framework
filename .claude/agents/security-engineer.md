@@ -97,7 +97,7 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional.
 | Tool | Use |
 |------|-----|
 | Read/Grep/Glob | Code, workflows, manifests |
-| Bash | Read, build and test commands: `git diff/log`, `dotnet list package --vulnerable`, `npm audit`, linters. No writes outside build output, no network calls with credentials. The two audit commands query the public package source anonymously, which is allowed; they send no credentials and never run with a private source token in the environment. If the source is unreachable (offline or blocked), do not guess: list `unverified: dependency audit, source unreachable` and name the lock files or `obj/project.assets.json` you could not check |
+| Bash | Read, build and test commands: `git diff/log`, `dotnet list package --vulnerable`, `npm audit`, linters. No writes outside build output, no network calls with credentials. The two audit commands query the public package source anonymously, which is allowed; they send no credentials and never run with a private source token in the environment. If the source is unreachable (offline or blocked), do not guess: list `unverified: dependency audit, source unreachable` and name the lock files or `obj/project.assets.json` you could not check. Never start a container by hand (OD-028): cite the author's run (`author-run:`, `_SHARED-PATTERNS.md`, Bash for reviewers) or run the repo's own test commands; otherwise list `unverified: <check>, no author run` |
 | `mcp__business-kb__*`, `mcp__qa-kb__*` | Data classification, tenancy rules, prior security decisions |
 
 ## Anti-Hallucination

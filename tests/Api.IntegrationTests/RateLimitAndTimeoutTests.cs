@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Api.Common;
 using Api.Features.Orders;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -96,11 +97,44 @@ public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixt
         Assert.True(ex is NpgsqlException || ex.InnerException is NpgsqlException || ex is TimeoutException, ex.GetType().Name);
     }
 
+    // TQ-015 (OD-025): a command timeout is a 503 problem response with fixed text; any other exception stays a 500.
+    [Fact]
+    public async Task CommandTimeout_Returns503ProblemDetailsWithFixedTextAndNoExceptionText()
+    {
+        var response = await factory.CreateClient().GetAsync(TinyLimitsApiFactory.SlowRoute, Ct);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        using var doc = JsonDocument.Parse(text);
+        Assert.Equal(503, doc.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(DatabaseTimeoutProblem.Title, doc.RootElement.GetProperty("title").GetString());
+        Assert.Equal(DatabaseTimeoutProblem.Detail, doc.RootElement.GetProperty("detail").GetString());
+        Assert.Equal(DatabaseTimeoutProblem.Type, doc.RootElement.GetProperty("type").GetString());
+        Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("traceId").GetString()));
+        foreach (var leak in new[] { "pg_sleep", "Npgsql", "TimeoutException", "57014", "Exception", "   at " })
+        {
+            Assert.DoesNotContain(leak, text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task OtherException_StillReturns500WithoutExceptionText()
+    {
+        var response = await factory.CreateClient().GetAsync(TinyLimitsApiFactory.BoomRoute, Ct);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        Assert.DoesNotContain(TinyLimitsApiFactory.BoomMessage, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(DatabaseTimeoutProblem.Detail, text, StringComparison.Ordinal);
+    }
+
     // ValidateOnStart proof: an invalid value stops the host before it serves anything.
     [Theory]
     [InlineData("RateLimiting:PermitLimit", "0")]
     [InlineData("RateLimiting:WindowSeconds", "0")]
     [InlineData("Database:CommandTimeoutSeconds", "0")]
+    [InlineData("Orders:MaxPageNumber", "0")]
     public void Host_InvalidOptionValue_FailsAtStart(string key, string value)
     {
         using var invalid = new InvalidOptionsApiFactory(key, value);

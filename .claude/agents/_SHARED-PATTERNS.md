@@ -157,7 +157,7 @@ Map changed paths to skills with `routing-to-skills`; a layer with no skill is a
 | Analysts (`requirements-analyst`, `solution-architect`) | Read, Grep, Glob, Skill, KB read tools; Write/Edit only for question records, the design or requirements document and (`requirements-analyst`) the slice spec and its INDEX row |
 | `prompt-engineer` | Read, Grep, Glob, Skill; returns the refined prompt as text |
 
-Bash for reviewers: build, test, lint, `git status|diff|log|show|blame`, read-only inspection. Never a write outside build output, `git commit|push|checkout|reset`, a package install, a production network call or anything printing secrets. At the Pre-Push Branch Gate or a mid-branch review, review only the committed range (state it), report a dirty tree; otherwise review the diff the prompt names. If a build would collide with the author's (shared output), cite the author's run: `author-run: <command>, <commit>, <result>`.
+Bash for reviewers: build, test, lint, `git status|diff|log|show|blame`, read-only inspection. Never a write outside build output, `git commit|push|checkout|reset`, a package install, a production network call or anything printing secrets. At the Pre-Push Branch Gate or a mid-branch review, review only the committed range (state it), report a dirty tree; otherwise review the diff the prompt names. If a build would collide with the author's (shared output), cite the author's run: `author-run: <command>, <commit>, <result>`. Never start a container by hand (OD-028).
 
 ## Known Non-Issues
 

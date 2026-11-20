@@ -471,12 +471,11 @@ def check_slice_index(root: Path, report: Report) -> None:
     graph = block.group(1) if block else ""
     nodes = set(re.findall(r"\b(VS\d+)\s*[\[({]", graph))
     classed: dict[str, str] = {}
-    for m in re.finditer(r"^\s*class\s+([\w,\s]+?)\s+(\w+)\s*;?\s*$", graph, re.M):
+    for m in re.finditer(r"^\s*class\s+([\w,\s]+?)\s+(\w+)\s*;?\s*(?:%%.*)?$", graph, re.M):
         for n in re.split(r"[,\s]+", m.group(1).strip()):
             classed[n] = m.group(2)
-    for m in re.finditer(r"\b(VS\d+)(?:\s*[\[({][^\n]*?[\])}])?:::(\w+)", graph):
+    for m in re.finditer(r"\b(VS\d+)(?:\s*(?:\[[^\]\n]*\]|\([^)\n]*\)|\{[^}\n]*\}))?:::(\w+)", graph):
         classed[m.group(1)] = m.group(2)
-        nodes.add(m.group(1))
     for node, st in sorted(status.items()):
         want = SLICE_STATUS_CLASS.get(st.lower())
         if want is None:

@@ -508,6 +508,28 @@ class SliceIndexTests(unittest.TestCase):
         text = self.base() + "\n## Blockers\n\n| Slice | Record |\n|---|---|\n| VS-001 | TQ-001 |\n"
         self.assertEqual(self.run_index(text=text), [])
 
+    def test_triple_colon_does_not_span_nodes(self):  # a label match must stay inside one node
+        text = self.base(c2="x").replace("class VS002 x;\n", "").replace("class VS001 inprogress;", "class VS001 inprogress;").replace(
+            '--> VS002["B"]', '--> VS002["B"]:::proposed')
+        self.assertEqual(self.run_index(text=text), [])
+        bad = text.replace(':::proposed', ':::inprogress')
+        self.assertTrue(any("VS-002" in e and "found 'inprogress'" in e for e in self.run_index(text=bad)))
+        self.assertFalse(any("VS-001" in e for e in self.run_index(text=bad)))
+
+    def test_triple_colon_overrides_a_class_line(self):
+        text = self.base().replace('--> VS002["B"]', '--> VS002["B"]:::inprogress')
+        self.assertTrue(any("VS-002" in e for e in self.run_index(text=text)))
+
+    def test_class_line_with_trailing_comment(self):
+        text = self.base().replace("class VS001 inprogress;", "class VS001 inprogress; %% hand edited")
+        self.assertEqual(self.run_index(text=text), [])
+        self.assertEqual(self.run_index(text=self.base().replace("class VS001 inprogress;", "class VS001 inprogress %% c")), [])
+
+    def test_triple_colon_after_round_and_curly_nodes(self):
+        for opener, closer in (("(", ")"), ("{", "}")):
+            text = self.base(c2="x").replace("class VS002 x;\n", "").replace('VS002["B"]', f"VS002{opener}B{closer}:::inprogress")
+            self.assertTrue(any("VS-002" in e and "found 'inprogress'" in e for e in self.run_index(text=text)), opener)
+
     def test_no_index_file_is_skipped(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = build(Path(tmp) / ".claude", {"a": GOOD_AGENT.format(n="a")}, {"s": GOOD_SKILL.format(n="s")})

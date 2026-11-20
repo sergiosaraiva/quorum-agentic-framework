@@ -1,12 +1,12 @@
 # Shared Agent Patterns
 
-Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate only their role. Skills live under `.claude/skills/<name>/SKILL.md` (index: `SKILL-INDEX.md`); verify before citing one. Budget: 16 KB per agent file; new detail goes in a skill.
+Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate only their role. Skills: `.claude/skills/<name>/SKILL.md` (index `SKILL-INDEX.md`); verify before citing one. Budget: 16 KB per agent file; new detail goes in a skill.
 
 ## Principles
 
 | # | Principle | Consequence |
 |---|-----------|-------------|
-| 1 | Never invent | Every behaviour claim rests on a KB chunk or recorded decision; silence or conflict becomes a question |
+| 1 | Never invent | Every behaviour claim rests on a KB chunk or decision; silence or conflict becomes a question |
 | 2 | No single point of failure | The producer never approves its own work; a different role with fresh context and an equal or stronger model does |
 | 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity |
 | 4 | Vertical slices | One feature end to end, planned in `docs/slices/` |
@@ -14,7 +14,7 @@ Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate 
 
 ## Subagent Limits
 
-A subagent cannot spawn agents or ask the user. "Re-invoke X", "ask the owner", "involve Y" are instructions to the calling session. It returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues unblocked work. `requirements-analyst` and `solution-architect` have no `Bash` (Common Tool Permissions) and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
+A subagent cannot spawn agents or ask the user. "Re-invoke X", "ask the owner", "involve Y" are instructions to the calling session. It returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues. `requirements-analyst` and `solution-architect` have no `Bash` (Common Tool Permissions) and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
 
 ## Pipeline and Lanes
 
@@ -31,7 +31,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 | Trivial | One-line fix, typo, no behaviour change | Edit directly; no gate |
 | Iterate | Small, low-risk, reversible, one slice, no new contract, no migration, no auth/data/infra change. Example threshold: about 150 added lines, 5 files | `code-engineer`; review pair at the gate (before push); `test-automator` only for behaviour no test covers |
 | Full | Anything else: new feature, contract change, migration, auth, multi-layer | Every stage above, per its skip reason |
-| Spike | Throwaway exploration the owner explicitly asks for | Local only, no review, never merged; code is discarded or rebuilt through Full |
+| Spike | Throwaway exploration the owner explicitly asks for | Local only, no review, never merged; discard the code or rebuild it through Full |
 
 Before starting, state the pipeline in one line: lane, a reason per skipped stage, whether the Alignment Gate applies (root `CLAUDE.md`).
 
@@ -76,11 +76,11 @@ Applies before the first line of any change to `src/`, `frontend/src/` or `tests
 
 ## Design Principles (Binding on every agent)
 
-Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers flag over-engineering, hard-coded values and under-engineering that breaks an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, migration review, secrets, observability).
+Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers flag over-engineering, hard-coded values, under-engineering breaking an Immutable Rule. Principles never waive an Immutable Rule or a required concern (auth, validation, migration review, secrets, observability).
 
 ## Mandatory Parallel Review Block
 
-After `code-engineer` finishes, the session spawns `quality-guardian` and `regression-detective` in one message (UI paths: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and design findings; `regression-detective` owns B1-B6, C1-C6 and docs drift; `ux-usability-specialist` owns UI usability. `test-automator` runs after every reviewer in that message has returned (code artifacts) and consumes `test_would_catch` from `regression-detective`.
+After `code-engineer` finishes, the session spawns `quality-guardian` and `regression-detective` in one message (UI: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and design findings; `regression-detective` owns B1-B6, C1-C6 and docs drift; `ux-usability-specialist` owns UI usability. `test-automator` runs after every reviewer in that message has returned (code artifacts) and consumes `test_would_catch` from `regression-detective`.
 
 ## Loop-Back Rule (Mandatory)
 
@@ -101,9 +101,9 @@ What blocks. This table is the only place that decides blocking; other files def
 | `documentation-reviewer` | status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` (reported at confidence >= 0.8) | other statuses, style findings |
 | AI review (`pr-review` skill; local, and GitHub when `ANTHROPIC_API_KEY` is set) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
 
-- Never skip a stage that an earlier iteration passed.
+- Never skip a stage an earlier iteration passed.
 - Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern once, batched. A framework-doc change shares one budget of 3 across both gates.
-- Every non-blocking finding gets a disposition (fix, defer with a record, or reject with a reason) in the hand-off.
+- Every non-blocking finding gets a disposition (fix, defer with a record, reject with a reason) in the hand-off.
 Round counters: skill `running-local-ai-review`.
 
 ## Independent Review Rule
@@ -112,7 +112,7 @@ Round counters: skill `running-local-ai-review`.
 |------|--------|
 | Different role | Never the writer's role |
 | Fresh context | Reviewers get the diff, spec/design and alignment result, not the writer's reasoning |
-| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux) run `opus`; `documentation-reviewer` `sonnet` (mechanical; `docs/reference/model-selection-and-costs.md`) |
+| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux): `opus`; `documentation-reviewer` `sonnet` (mechanical; `docs/reference/model-selection-and-costs.md`) |
 | Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. Findings use the form below |
 | No anchoring | A hypothesis in a prompt ("confirm X is fine") is rewritten as a neutral task |
 
@@ -154,10 +154,10 @@ Map changed paths to skills with `routing-to-skills`; a layer with no skill is a
 | Writers (`code-engineer`, `test-automator`, `documentation-curator`, `infrastructure-engineer`) | Read, Write, Edit, Grep, Glob, Bash, Skill, KB read tools |
 | Reviewers (`quality-guardian`, `regression-detective`, `documentation-reviewer`, `security-engineer`) | Read, Grep, Glob, Bash (read, build, test only), Skill, KB read tools. No Write/Edit |
 | `ux-usability-specialist` | Reviewer tools plus `Write` for a scratch mockup pack in the OS temp directory only, never a repository file |
-| Analysts (`requirements-analyst`, `solution-architect`) | Read, Grep, Glob, Skill, KB read tools; Write/Edit only for question records and the design or requirements document |
+| Analysts (`requirements-analyst`, `solution-architect`) | Read, Grep, Glob, Skill, KB read tools; Write/Edit only for question records, the design or requirements document and (`requirements-analyst`) the slice spec and its INDEX row |
 | `prompt-engineer` | Read, Grep, Glob, Skill; returns the refined prompt as text |
 
-Bash for reviewers: build, test, lint, `git status|diff|log|show|blame`, read-only inspection. Never a write outside build output, `git commit|push|checkout|reset`, a package install, a production network call, or anything printing secrets. At the Pre-Push Branch Gate or a mid-branch review, review only the committed range (state it) and report a dirty tree; otherwise review the diff the prompt names. If a build would collide with the author's (shared output), cite the author's run: `author-run: <command>, <commit>, <result>`.
+Bash for reviewers: build, test, lint, `git status|diff|log|show|blame`, read-only inspection. Never a write outside build output, `git commit|push|checkout|reset`, a package install, a production network call or anything printing secrets. At the Pre-Push Branch Gate or a mid-branch review, review only the committed range (state it), report a dirty tree; otherwise review the diff the prompt names. If a build would collide with the author's (shared output), cite the author's run: `author-run: <command>, <commit>, <result>`.
 
 ## Known Non-Issues
 

@@ -1,13 +1,15 @@
 using System.Net;
 using System.Text.Json;
+using Api.Features.Orders;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Api.IntegrationTests;
 
-/// <summary>TQ-007: per-user rate limit on the list endpoint and the database command timeout, from Options.</summary>
+/// <summary>TQ-007 (OD-018): per-user rate limit on the list endpoint and the database command timeout, from Options.</summary>
 public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixture<TinyLimitsApiFactory>
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -33,9 +35,15 @@ public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixt
 
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.Equal("application/problem+json", limited.Content.Headers.ContentType?.MediaType);
-        Assert.NotNull(limited.Headers.RetryAfter);
+        var delta = limited.Headers.RetryAfter?.Delta;
+        Assert.NotNull(delta);
+        Assert.True(delta > TimeSpan.Zero && delta <= TimeSpan.FromSeconds(TinyLimitsApiFactory.WindowSeconds), delta.ToString());
         using var doc = JsonDocument.Parse(await limited.Content.ReadAsStringAsync(Ct));
         Assert.Equal(429, doc.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(OrdersRateLimit.TooManyRequestsTitle, doc.RootElement.GetProperty("title").GetString());
+        // Same shape as every other problem response (written through IProblemDetailsService).
+        Assert.Equal(OrdersRateLimit.TooManyRequestsType, doc.RootElement.GetProperty("type").GetString());
+        Assert.False(string.IsNullOrEmpty(doc.RootElement.GetProperty("traceId").GetString()));
     }
 
     [Fact]
@@ -86,5 +94,27 @@ public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixt
         // The timeout is enforced by the real server: a command that outlives it fails instead of hanging.
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("SELECT pg_sleep(5)", Ct));
         Assert.True(ex is NpgsqlException || ex.InnerException is NpgsqlException || ex is TimeoutException, ex.GetType().Name);
+    }
+
+    // ValidateOnStart proof: an invalid value stops the host before it serves anything.
+    [Theory]
+    [InlineData("RateLimiting:PermitLimit", "0")]
+    [InlineData("RateLimiting:WindowSeconds", "0")]
+    [InlineData("Database:CommandTimeoutSeconds", "0")]
+    public void Host_InvalidOptionValue_FailsAtStart(string key, string value)
+    {
+        using var invalid = new InvalidOptionsApiFactory(key, value);
+
+        var ex = Assert.ThrowsAny<Exception>(() => invalid.CreateClient());
+
+        Assert.Contains(Chain(ex), e => e is OptionsValidationException);
+    }
+
+    private static IEnumerable<Exception> Chain(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            yield return e;
+        }
     }
 }

@@ -7,12 +7,17 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Api.Features.Orders;
 
 /// <summary>
-/// Per-user rate limit for the order list and search endpoint (TQ-007, owner decision option 1). The limits come from
+/// Per-user rate limit for the order list and search endpoint (TQ-007, decided in OD-018). The limits come from
 /// <see cref="RateLimitingOptions"/>; the policy name and the anonymous partition key are protocol constants.
 /// </summary>
 public static class OrdersRateLimit
 {
     public const string PolicyName = "orders-list";
+
+    public const string TooManyRequestsTitle = "Too many requests.";
+
+    /// <summary>Problem type for 429 (RFC 6585 section 4); the framework defaults carry no type for this status. A protocol constant.</summary>
+    public const string TooManyRequestsType = "https://www.rfc-editor.org/rfc/rfc6585#section-4";
 
     /// <summary>
     /// Shared bucket for callers without an identifiable principal. Authentication rejects them before the limiter in
@@ -46,16 +51,13 @@ public static class OrdersRateLimit
             }
 
             http.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            // RFC 9457 body; the text is fixed and echoes nothing from the request.
-            await http.Response.WriteAsJsonAsync(
-                new Microsoft.AspNetCore.Mvc.ProblemDetails
-                {
-                    Status = StatusCodes.Status429TooManyRequests,
-                    Title = "Too many requests.",
-                },
-                options: null,
-                contentType: "application/problem+json",
-                cancellationToken: ct);
+            // Written through IProblemDetailsService so the body has the same shape (type, traceId) as every other
+            // problem response; the title is fixed and echoes nothing from the request.
+            await http.RequestServices.GetRequiredService<IProblemDetailsService>().WriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = http,
+                ProblemDetails = { Status = StatusCodes.Status429TooManyRequests, Title = TooManyRequestsTitle, Type = TooManyRequestsType },
+            });
         };
     }
 }

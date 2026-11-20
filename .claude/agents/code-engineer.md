@@ -67,7 +67,7 @@ Full edit and Bash rights inside the repo. Bash: build, test, format, `git statu
 | Secrets | Never in source; `dotnet user-secrets` or `.env` locally, the platform's secret store when deployed; placeholders `${ENV_VAR}` |
 | Configuration | Typed validated Options; no hard-coded URLs, limits, timeouts, page sizes |
 | Nullability | `<Nullable>enable</Nullable>`; `!` only with a comment explaining why |
-| Endpoints | Every endpoint has an explicit auth decision (`RequireAuthorization()` or a documented anonymous reason); validate DTOs server-side |
+| Endpoints | Every endpoint has an explicit auth decision (`RequireAuthorization("<named policy>")` on the group, or a documented anonymous reason); validate DTOs server-side |
 | EF Core | No `EnsureCreated()` outside local dev/tests; migrations reviewed before a shared environment; no N+1; page or bound every list query; `AsNoTracking` for reads; no `ToList()` before filtering |
 | Resources | `HttpClient` via `IHttpClientFactory`; dispose scopes; background work honours cancellation and bounds its collections |
 | Errors | No empty `catch`; surface or log; map to ProblemDetails |

@@ -20,7 +20,7 @@ public sealed class MaxDecimalPlacesAttribute(int places) : ValidationAttribute
 }
 
 /// <summary>
-/// Rejects U+0000 (TQ-009): PostgreSQL refuses 0x00 in text (error 22021), which would otherwise be a 500.
+/// Rejects U+0000 (TQ-009, decided in OD-020): PostgreSQL refuses 0x00 in text (error 22021), which would otherwise be a 500.
 /// Same rule as the list filter. The message never echoes the input.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]
@@ -34,7 +34,7 @@ public sealed class NoNulCharacterAttribute : ValidationAttribute
 }
 
 /// <summary>
-/// Explicit parsing of <c>page</c> and <c>pageSize</c> (TQ-005 option 1): they bind as strings so a malformed value
+/// Explicit parsing of <c>page</c> and <c>pageSize</c> (TQ-005, decided in OD-016): they bind as strings so a malformed value
 /// gives validation problem details keyed by the parameter name instead of a bodiless 400 (or a 500 in Development).
 /// Any value that fits an <see cref="int"/> is accepted, including zero and negatives; the service clamps them
 /// (<see cref="OrdersService.NormalizePaging"/>). Text, decimals and values beyond the <see cref="int"/> range are rejected.
@@ -55,7 +55,8 @@ public static class PagingQuery
             return null;
         }
 
-        if (int.TryParse(value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
+        // Number parsing tolerates a trailing U+0000 ("5\0" parses as 5); every other input rule here rejects NUL, so this does too.
+        if (!value.Contains('\0') && int.TryParse(value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
         {
             return parsed;
         }

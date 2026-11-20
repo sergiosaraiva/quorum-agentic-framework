@@ -1,10 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Api.Features.Orders;
 using Api.Options;
 
 namespace Api.UnitTests;
 
-/// <summary>TQ-007 options are validated at startup (ValidateDataAnnotations + ValidateOnStart); these tests prove the ranges.</summary>
+/// <summary>TQ-007 (OD-018) options are validated at startup (ValidateDataAnnotations + ValidateOnStart); these tests prove the ranges.</summary>
 public class OptionsValidationTests
 {
     private static bool IsValid(object options) =>
@@ -62,6 +63,8 @@ public class OptionsValidationTests
     [InlineData(null, "1.5", false)]
     [InlineData("1.0", null, false)]
     [InlineData("2147483648", null, false)]
+    [InlineData("5\0", null, false)]
+    [InlineData(null, "\0", false)]
     [InlineData("1e3", null, false)]
     [InlineData("1,000", null, false)]
     [InlineData("١٢", null, false)] // non-ASCII digits are not accepted
@@ -85,4 +88,27 @@ public class OptionsValidationTests
         Assert.Null(size);
         Assert.Equal(["pageSize"], errors.Keys);
     }
+
+    private static ClaimsPrincipal Principal(bool authenticated, params Claim[] claims) =>
+        new(authenticated ? new ClaimsIdentity(claims, "Test") : new ClaimsIdentity(claims));
+
+    [Fact]
+    public void PartitionKey_NullPrincipal_IsAnonymous() =>
+        Assert.Equal("anonymous", OrdersRateLimit.PartitionKey(null));
+
+    [Fact]
+    public void PartitionKey_Unauthenticated_IsAnonymousEvenWithClaims() =>
+        Assert.Equal("anonymous", OrdersRateLimit.PartitionKey(Principal(false, new Claim(ClaimTypes.NameIdentifier, "u1"))));
+
+    [Fact]
+    public void PartitionKey_NameIdentifier_IsUsed() =>
+        Assert.Equal("u1", OrdersRateLimit.PartitionKey(Principal(true, new Claim(ClaimTypes.NameIdentifier, "u1"), new Claim("sub", "s1"))));
+
+    [Fact]
+    public void PartitionKey_OnlySub_IsUsed() =>
+        Assert.Equal("s1", OrdersRateLimit.PartitionKey(Principal(true, new Claim("sub", "s1"))));
+
+    [Fact]
+    public void PartitionKey_AuthenticatedWithoutIdClaims_IsAnonymous() =>
+        Assert.Equal("anonymous", OrdersRateLimit.PartitionKey(Principal(true, new Claim("name", "x"))));
 }

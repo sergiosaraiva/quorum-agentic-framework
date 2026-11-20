@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.IntegrationTests;
 
-/// <summary>TQ-005: explicit paging parameter parsing and the BadHttpRequestException mapping.</summary>
+/// <summary>TQ-005 (OD-016): explicit paging parameter parsing and the BadHttpRequestException mapping.</summary>
 public class OrdersListParsingTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -20,6 +20,8 @@ public class OrdersListParsingTests(ApiFactory factory) : IClassFixture<ApiFacto
     [InlineData("page=1.0", "page")]
     [InlineData("page=99999999999", "page")]
     [InlineData("page=-99999999999", "page")]
+    [InlineData("page=5%00", "page")]
+    [InlineData("pageSize=%005", "pageSize")]
     [InlineData("pageSize=abc", "pageSize")]
     [InlineData("pageSize=2147483648", "pageSize")]
     [InlineData("page=1&pageSize=x%00y", "pageSize")]
@@ -99,7 +101,7 @@ public class OrdersListParsingTests(ApiFactory factory) : IClassFixture<ApiFacto
 }
 
 /// <summary>
-/// TQ-005: in Development the framework throws BadHttpRequestException for a malformed request instead of answering 400.
+/// TQ-005 (OD-016): in Development the framework throws BadHttpRequestException for a malformed request instead of answering 400.
 /// The exception handler must map it to its own client-error status with problem details, never a 500.
 /// </summary>
 public class BadHttpRequestMappingTests

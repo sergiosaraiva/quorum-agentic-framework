@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Api.Options;
 
-/// <summary>Per-user rate limit of the order list and search endpoint (TQ-007). A fixed window, no queueing.</summary>
+/// <summary>Per-user rate limit of the order list and search endpoint (TQ-007, OD-018). A fixed window, no queueing.</summary>
 public sealed class RateLimitingOptions
 {
     public const string SectionName = "RateLimiting";

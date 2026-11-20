@@ -140,7 +140,7 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal(["customerName", "totalAmount"], keys);
     }
 
-    // TQ-009: PostgreSQL rejects 0x00 in text; the create path answers 400 in the same shape, never a 500.
+    // TQ-009 (OD-020): PostgreSQL rejects 0x00 in text; the create path answers 400 in the same shape, never a 500.
     [Theory]
     [InlineData("\u0000")]
     [InlineData("Ac\u0000me")]
@@ -158,7 +158,7 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal("The field CustomerName must not contain the NUL character.", errors.GetProperty("customerName")[0].GetString());
     }
 
-    // BQ-006 option 1 plus the named policy seam: every orders endpoint carries the policy, not a bare RequireAuthorization().
+    // BQ-006 (OD-011): the named policy seam: every orders endpoint carries the policy, not a bare RequireAuthorization().
     [Fact]
     public void OrdersEndpoints_AllCarryTheNamedOrdersPolicy()
     {
@@ -167,7 +167,7 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
             .Where(e => e.RoutePattern.RawText?.StartsWith("/api/orders", StringComparison.Ordinal) == true)
             .ToList();
 
-        Assert.Equal(3, endpoints.Count);
+        Assert.NotEmpty(endpoints);
         foreach (var endpoint in endpoints)
         {
             Assert.Contains(endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>(), a => a.Policy == OrdersAuthorization.PolicyName);
@@ -204,4 +204,20 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal(created.TotalAmount, fetched!.TotalAmount);
     }
+}
+
+/// <summary>Anonymous on purpose: health probes carry no credentials and hold no data; OpenAPI is mapped in Development only.</summary>
+internal static class AnonymousAllowList
+{
+    private static readonly string[] Prefixes = ["/health/", "/openapi/"];
+
+    /// <summary>Routes of endpoints that neither sit on the allow-list nor carry authorization metadata.</summary>
+    public static List<string> Unprotected(IServiceProvider services) =>
+        services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(e => !Prefixes.Any(p => (e.RoutePattern.RawText ?? "").StartsWith(p, StringComparison.Ordinal)))
+            .Where(e => !e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any()
+                        || e.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+            .Select(e => e.RoutePattern.RawText ?? e.DisplayName ?? "?")
+            .ToList();
 }

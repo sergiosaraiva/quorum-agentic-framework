@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace Api.Features.Orders;
 
 /// <summary>
-/// Named authorization policy of the orders endpoints (BQ-006, owner decision option 1: any authenticated caller sees
+/// Named authorization policy of the orders endpoints (BQ-006, decided in OD-011: any authenticated caller sees
 /// all orders). It requires an authenticated user and nothing else. It is the seam for staff/customer roles: change the
 /// requirement here and every orders endpoint follows. The name is a protocol constant, not a tunable.
 /// </summary>

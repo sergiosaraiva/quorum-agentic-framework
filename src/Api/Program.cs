@@ -37,13 +37,13 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization(o => o.AddOrdersPolicy());
 
-// TQ-007: built-in per-user rate limiter; limits come from the validated RateLimiting options.
+// TQ-007 (OD-018): built-in per-user rate limiter; limits come from the validated RateLimiting options.
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>()
     .Configure<IOptions<RateLimitingOptions>>((rl, limits) => rl.AddOrdersListPolicy(limits.Value));
 
 builder.Services.AddProblemDetails();
-// TQ-005: a malformed request (for example invalid JSON) is a client error, not a 500, also in Development where
+// TQ-005 (OD-016): a malformed request (for example invalid JSON) is a client error, not a 500, also in Development where
 // the framework throws BadHttpRequestException instead of answering 400 itself.
 builder.Services.Configure<ExceptionHandlerOptions>(o =>
     o.StatusCodeSelector = ex => ex is BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError);

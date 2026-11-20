@@ -7,7 +7,7 @@ public sealed class DatabaseOptions
 {
     public const string SectionName = "Database";
 
-    /// <summary>Command timeout in seconds for every EF Core command (TQ-007): bounds a slow order search.</summary>
+    /// <summary>Command timeout in seconds for every EF Core command (TQ-007, OD-018): bounds a slow order search.</summary>
     [Range(1, 600)]
     public int CommandTimeoutSeconds { get; init; } = 30;
 }

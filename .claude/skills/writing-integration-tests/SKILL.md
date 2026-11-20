@@ -69,6 +69,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             });
         });
     }
+
+    public new async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
 }
 
 public sealed class ReportsEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
@@ -127,9 +133,8 @@ public async Task Migrations_ApplyCleanlyToFreshDatabase()
 
 ## Quality Checklist
 
-- [ ] Real PostgreSQL via Testcontainers; real migrations applied
-- [ ] One container per class; data isolated between tests
-- [ ] Auth tested both ways (401 without token, 403 wrong role, 2xx allowed)
+- [ ] Real PostgreSQL (Testcontainers), real migrations, one container per class, isolated data
+- [ ] Auth tested both ways (401 anonymous, 403 wrong role, 2xx allowed)
 - [ ] Validation, error body shape and status codes asserted
 - [ ] Image tag declared in the factory; error keys exact and case-sensitive; no secrets in source
 - [ ] Concurrency or duplicate-protection test where the code claims it
@@ -139,13 +144,12 @@ public async Task Migrations_ApplyCleanlyToFreshDatabase()
 | Wrong | Correct |
 |-------|---------|
 | EF in-memory provider | Testcontainers PostgreSQL |
-| Container started per test | One fixture per class |
 | Skipping the anonymous case | Send `X-Test-Anonymous`, assert 401 |
 | Shared rows, order dependence | Unique data per test |
-| Asserting only 200 | Assert body, headers and the persisted row |
+| Asserting only 200 | Assert body, headers, persisted row |
 
 ## Related Skills
 
 - `creating-xunit-tests`: pure logic
 - `writing-playwright-e2e-tests`: browser journeys
-- `load-and-performance-testing`: concurrency at scale
+- `load-and-performance-testing`: scale

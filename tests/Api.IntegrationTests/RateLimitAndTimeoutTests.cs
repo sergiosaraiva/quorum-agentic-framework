@@ -176,6 +176,8 @@ public class RateLimitAndTimeoutTests(TinyLimitsApiFactory factory) : IClassFixt
     [InlineData("Orders:MaxPageNumber", "0")]
     [InlineData("RateLimiting:ConcurrentRequestsPerUser", "0")]
     [InlineData("Database:RetryAfterSeconds", "0")]
+    [InlineData("Database:MaxPoolSize", "0")]
+    [InlineData("Database:MaxPoolSize", "1001")]
     public void Host_InvalidOptionValue_FailsAtStart(string key, string value)
     {
         using var invalid = new InvalidOptionsApiFactory(key, value);

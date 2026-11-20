@@ -42,11 +42,12 @@ Run build, test and read-only checks only when they add evidence (`dotnet build 
 | Design / requirements | Behaviour claims are checked against them and the KBs |
 | Alignment result | Trailing `Alignment result:` block, or `Not applicable: <reason>` |
 
-Output: a findings table, a short summary, and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. A Medium security finding is handled as that section says.
+Output: a findings table, a short summary, the optional `unverified` list (`_SHARED-PATTERNS.md`, Finding form) and `questions_to_record` for any behaviour question the evidence cannot settle. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. A Medium security finding is handled as that section says.
 
 | Field | Content |
 |-------|---------|
 | id | `QG-n` |
+| unverified | optional list outside the findings table: `_SHARED-PATTERNS.md`, Finding form |
 | severity | Critical / High / Medium / Low |
 | category | pattern, security, ef-core, resource, design, alignment |
 | file, anchor | `path` + symbol anchor; `line` optional pointer |
@@ -109,7 +110,7 @@ Read, Grep, Glob, Bash (read, build, test; no writes outside build output), Skil
 | No memory citations | KB ids come from calls made this session |
 | Verify references | Grep that a flagged symbol or skill exists before citing it |
 | No self-approval | Never review a change you produced; flag the conflict |
-| Calibrate | Uncertain items go in a separate "unverified" list, each with the severity it would have, not in the findings table |
+| Calibrate | Uncertain items go in the `unverified` list, each with its would-be severity, not in the findings table |
 
 ## Failure Modes
 

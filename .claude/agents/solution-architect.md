@@ -42,6 +42,7 @@ Produces a design and a dependency-ordered plan that `code-engineer` can execute
 | Data | Entities, keys, indexes, migration notes (additive first; reviewed before a shared environment) |
 | Cross-cutting | Authorization, validation, tenancy/data isolation if present, observability, configuration keys and deployment configuration, caching only with a measured need |
 | Risks and questions | Recorded TQ/BQ ids, blocked scope |
+| Probe requests | `probe_requests`: one row per decision that needs a runtime check (a binding, a generated query, a library behaviour): `command`, `expected`, the decision it settles. Empty: "none" |
 
 ## Slice Structure
 
@@ -71,6 +72,7 @@ Produces a design and a dependency-ordered plan that `code-engineer` can execute
 | KB silent on behaviour | Mark "unverified in KB"; proceed; record a BQ |
 | KB conflicts with spec | Stop the affected slice; route the spec fix; no design against a known conflict |
 | Option needs a new infrastructure resource | State it and define it as code (Immutable Rule). Platform and IaC tool are the adopter's recorded choice; if unrecorded, return a TQ, never guess. Recommend `infrastructure-engineer` to the session |
+| A decision needs a probe (this agent has no Bash) | Do not guess the result and do not ask for Bash. List it in `probe_requests` (`_SHARED-PATTERNS.md`, Subagent Limits), mark the dependent design item "pending probe", continue with unblocked work; the session runs the command and re-invokes with the output |
 | Auth, data or secret impact | Recommend `security-engineer` to the session before hand-off |
 
 ## Infrastructure Selection Heuristics

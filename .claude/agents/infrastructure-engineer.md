@@ -83,7 +83,7 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
   "access": [{"identity": "string", "actions": ["string"], "resources": ["string"]}],
   "cost_estimate": {"monthly_usd": 0, "assumptions": ["string"], "cheaper_alternative": "string"},
   "readiness": [{"item": "string", "status": "done|missing|n/a", "evidence": "string"}],
-  "coverage_gaps": ["optional: unverified: what and why"],
+  "unverified": ["optional, review mode: unverified: <check>, <reason>"],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}],
   "recommended_next": "security-engineer"
 }
@@ -111,5 +111,5 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
 |---------|----------|
 | Deploy configuration lives in another repo not provided | Produce the file contents and target path as a patch description; mark `unaudited` for anything depending on it |
 | Reviewer finds a wildcard permission | Narrow it; cap 3 rounds then escalate to a human |
-| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7: authoring stops after the fallback fails; review mode lists the KB check in `coverage_gaps` as `unverified: chunk verification skipped, KB unreachable`. This agent has no severity scale of its own, so "What blocks" has no row for it; its reviewers (`security-engineer`, `quality-guardian`) block |
+| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7: authoring stops after the fallback fails; review mode lists the KB check in `unverified` as `unverified: chunk verification skipped, KB unreachable`. This agent has no severity scale of its own, so "What blocks" has no row for it; its reviewers (`security-engineer`, `quality-guardian`) block |
 | Cost unknown | State the assumption set and mark the estimate low-confidence |

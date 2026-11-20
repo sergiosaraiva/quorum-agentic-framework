@@ -44,6 +44,17 @@ KB_TOOL_PREFIXES = ("mcp__business-kb", "mcp__qa-kb")
 # Agents without Bash by design. rule 7 names them as authoring agents but does not state that they have no Bash; the shared file's "Common Tool Permissions" table does
 # (Analysts and prompt-engineer rows), and check_shared_rules cross-checks the constant against that table.
 NO_BASH_AGENTS = ("requirements-analyst", "solution-architect", "prompt-engineer")
+# Agents whose output contract lists unverified items; each must name the field `unverified`, defined once in the shared
+# file's "Finding form". The two retired field names must not come back anywhere under the lint root.
+REVIEWER_AGENTS = ("security-engineer", "documentation-reviewer", "infrastructure-engineer", "quality-guardian",
+                   "regression-detective", "ux-usability-specialist")
+RETIRED_UNVERIFIED_FIELDS = ("areas_not_reviewed", "coverage_gaps")
+# Contract form: a JSON key `"unverified":` or a table row whose first cell is `unverified` (quality-guardian, regression-detective).
+UNVERIFIED_FIELD = r'"unverified"\s*:|^\|\s*`?unverified`?\s*\|'
+UNVERIFIED_DEFINITION = r"^Field `unverified`"
+RETIRED_PHRASE = r"coverage gaps?"
+# No-Bash agents that must name `probe_requests` (defined in the shared file, Subagent Limits).
+PROBE_AGENTS = ("requirements-analyst", "solution-architect")
 KB_UNREACHABLE = r"\bKB\b.{0,20}?unreachable"
 BLOCK_WORD = r"\bblock(?:s|ing|ed)?\b"
 BLOCKING_STATUSES = ("ungrounded", "fabricated-citation", "stale", "conflict", "gate-failure")
@@ -322,6 +333,11 @@ def check_shared_rules(root: Path, report: Report) -> None:
     blocks   outside the shared file no .md file has "still blocking" or a table header cell "Blocking when"; a line with
              at least 3 of the five blocking statuses and the word "block" must name "What blocks"
              (a line merely enumerating statuses, e.g. an output enum, has no "block" and passes).
+    unverified  *.md files only (the shared file included): none uses a retired field name
+             (RETIRED_UNVERIFIED_FIELDS) or the phrase "coverage gaps" (case-insensitive); the shared file defines
+             the field (a line starting "Field `unverified`"); every agent in REVIEWER_AGENTS has the contract form,
+             a JSON key `"unverified":` or a table row whose first cell is `unverified`
+    probes   the shared file defines `probe_requests`; every agent in PROBE_AGENTS names it
     tools    agents in NO_BASH_AGENTS (checked against Common Tool Permissions) must not list Bash; every other
              agent with KB MCP tools must list Bash; every agent named in rule 7 has a file."""
     shared_path = root / "agents" / SHARED_FILE
@@ -336,9 +352,16 @@ def check_shared_rules(root: Path, report: Report) -> None:
     agent_files = {f.stem: f for f in sorted(agents_dir.glob("*.md")) if not f.name.startswith("_")}
 
     for path in sorted(root.rglob("*.md")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for old in RETIRED_UNVERIFIED_FIELDS:
+            if old in text:
+                report.error(path, f"uses the retired field name `{old}`; unverified items go in `unverified` "
+                                   f"(defined once in {SHARED_FILE}, Finding form)")
+        if re.search(RETIRED_PHRASE, text, re.I):
+            report.error(path, "uses the retired phrase 'coverage gaps'; unverified items go in `unverified`, "
+                               "undocumented surface is an `incomplete` finding")
         if path == shared_path:
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
         is_agent = path.parent == agents_dir
         if re.search(r"python3?\s+scripts/kb/search\.py", text):
             report.error(path, "restates the rule 7 CLI fallback (`python3 scripts/kb/search.py`); "
@@ -373,6 +396,18 @@ def check_shared_rules(root: Path, report: Report) -> None:
         if not rows or any("Bash" in ln for ln in rows):
             report.error(shared_path, f"NO_BASH_AGENTS lists {name!r} but the Common Tool Permissions table "
                                       "has no Bash-free row for it; update the table or NO_BASH_AGENTS in framework_lint.py")
+
+    if not re.search(UNVERIFIED_DEFINITION, shared, re.M):
+        report.error(shared_path, "the Finding form paragraph does not define the field (a line starting \"Field `unverified`\")")
+    if "probe_requests" not in shared:
+        report.error(shared_path, "Subagent Limits does not define `probe_requests`")
+    for name in REVIEWER_AGENTS:
+        if name in agent_files and not re.search(UNVERIFIED_FIELD, agent_files[name].read_text(encoding="utf-8", errors="replace"), re.M):
+            report.error(agent_files[name], 'reviewer contract lacks the `unverified` field: add a JSON key "unverified": '
+                                            f"or a field-table row `unverified` (see {SHARED_FILE}, Finding form)")
+    for name in PROBE_AGENTS:
+        if name in agent_files and "probe_requests" not in agent_files[name].read_text(encoding="utf-8", errors="replace"):
+            report.error(agent_files[name], f"no-Bash agent does not name `probe_requests` (see {SHARED_FILE}, Subagent Limits)")
 
     for name, path in agent_files.items():
         block, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="replace"))

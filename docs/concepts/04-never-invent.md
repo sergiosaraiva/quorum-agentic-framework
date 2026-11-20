@@ -38,7 +38,7 @@ Before the first line of a pull request that changes source, frontend or tests, 
 | # | Step | Detail |
 |---|------|--------|
 | 1 | Scope | List the spec parts the change implements, with every cited `chunk_id` |
-| 2 | Re-fetch | `chunk` each cited id; `search` and `graph_traverse` for new chunks; `stats` for silence |
+| 2 | Re-fetch | `chunk` each cited id; `search` (with `topic`, or `--topic` on the CLI, to stay in the domain; see rule 7 in `_SHARED-PATTERNS.md`) and `graph_traverse` for new chunks; `stats` for silence |
 | 3 | Recall | Search the Q&A KB for recorded decisions and answers on the same topic |
 | 4 | Classify | Confirmed (KB agrees with the spec), Contradicted (they disagree, or a decided record says otherwise), KB silent (no chunk, `stats` checked) or Missing (the KB requires it, the spec omits it) |
 | 5 | Resolve | Contradicted or Missing: stop the affected change and return all items to the session (a spec fix or one batched owner question); a recorded owner decision settles it. KB silent: proceed and mark "unverified in KB". Never implement against a known conflict |

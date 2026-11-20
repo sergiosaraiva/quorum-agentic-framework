@@ -71,12 +71,12 @@ Infrastructure stance: the deploy platform and IaC tool are the adopter's record
   "findings": [
     {"id": "SEC-001", "category": "area, e.g. auth|data|api|infra|dependencies", "severity": "critical|high|medium|low|info", "file": "path", "anchor": "symbol or heading", "line": "optional", "scenario": "attacker, entry, steps, impact; evidence as code excerpt or tool output", "fix": "string", "confidence": 0.9}
   ],
-  "areas_not_reviewed": ["area and reason"],
+  "unverified": ["optional: unverified (would-be <severity>): what and why"],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }
 ```
 
-Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional. Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `areas_not_reviewed` as a string `unverified (would-be <severity>): ...`; below 0.50 is not reported. Unverified items never block.
+Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional. Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `unverified` (form: `_SHARED-PATTERNS.md`, Finding form); below 0.50 is not reported. An area not reviewed is an `unverified` entry too. Unverified items never block.
 
 ## Tools
 
@@ -99,6 +99,6 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional.
 | Failure | Recovery |
 |---------|----------|
 | KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (reviewer branch: unverified, never a pass) |
-| Infra files not in this repo | Report `areas_not_reviewed`; do not reconstruct them |
+| Infra files not in this repo | List `unverified: infrastructure files, not in this repo`; do not reconstruct them |
 | Producer disputes a finding | Re-check the evidence; if it holds, keep it and escalate after 3 rounds |
 | Unsure whether an endpoint should be anonymous | Return a TQ with a decider; treat as auth-required meanwhile |

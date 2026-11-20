@@ -27,10 +27,10 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 
 1. Run deterministic gates first when present (`scripts/kb/` validators for `kb/chunks/**`, link or path checkers, a build for doc code samples). Report output verbatim; skip a script that does not exist and note the skip.
 2. Extract claims: every sentence asserting a fact about the system.
-3. Verify each: Grep the cited anchor and Read around it; `git show <sha>:<path>` for a pinned citation; `mcp__business-kb__chunk` for a cited chunk; `mcp__qa-kb__get` for a cited record (KB unreachable: `_SHARED-PATTERNS.md` Never Invent rule 7; list the skipped check in `coverage_gaps` as `unverified`). An anchor not found is `fabricated-citation` if the symbol or heading never existed (check `git log -S`), `stale` if it existed and moved or changed; both block.
+3. Verify each: Grep the cited anchor and Read around it; `git show <sha>:<path>` for a pinned citation; `mcp__business-kb__chunk` for a cited chunk; `mcp__qa-kb__get` for a cited record (KB unreachable: `_SHARED-PATTERNS.md` Never Invent rule 7; list the skipped check in `unverified`). An anchor not found is `fabricated-citation` if the symbol or heading never existed (check `git log -S`), `stale` if it existed and moved or changed; both block.
 4. Score each claim: grounded / partially grounded, or a finding status from the output enum (`ungrounded`, `stale`, `fabricated-citation`, `conflict`, `gate-failure`, `incomplete`).
-5. Report findings with confidence >= 0.80 that the claim is wrong or unverifiable. 0.50-0.79: list in `coverage_gaps` as `unverified (would-be <status>): ...`; below 0.50 is not reported. Unverified items never block.
-6. Completeness pass: public endpoints, config keys, scripts and deploy values with zero doc coverage.
+5. Report findings with confidence >= 0.80 that the claim is wrong or unverifiable. 0.50-0.79: list in `unverified` as `unverified (would-be <status>): ...`; below 0.50 is not reported. Unverified items never block.
+6. Completeness pass: public endpoints, config keys, scripts and deploy values with zero doc coverage; report each as an `incomplete` finding (`claim` carries the surface name, for example the endpoint).
 7. Consistency pass: the doc against sibling docs, KB terminology and recorded decisions (`qa-kb`). A conflict silently resolved in the doc is a finding.
 8. Style pass (non-blocking): prose docs for clarity; internal docs for table-over-prose compactness; no AI-slop.
 9. Framework docs: check no rule was weakened or dropped without a recorded decision.
@@ -46,13 +46,13 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
   "findings": [
     {"id": "DR-1", "category": "grounding|completeness|gate|consistency|style", "status": "ungrounded|stale|incomplete|fabricated-citation|conflict|gate-failure", "file": "docs/x.md", "anchor": "section heading", "claim": "string", "scenario": "why it fails: path#anchor, tool result, gate output, or 'not found'", "fix": "string", "confidence": 0.85}
   ],
-  "coverage_gaps": ["undocumented surface or review dimension not performed"],
+  "unverified": ["optional: unverified (would-be <status>): what and why"],
   "style_findings": [{"issue": "string", "file": "docs/x.md", "anchor": "section heading"}],
   "unaudited": [{"claim": "string", "file": "docs/x.md", "anchor": "section heading", "reason": "referent not supplied"}]
 }
 ```
 
-The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Finding form: `_SHARED-PATTERNS.md`; `status` replaces `severity` and maps through "What blocks" (`claim` is agent-specific). Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `coverage_gaps` as unverified; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
+The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Finding form: `_SHARED-PATTERNS.md`; `status` replaces `severity` and maps through "What blocks" (`claim` is agent-specific). Undocumented public surface is an `incomplete` finding whose `claim` is the surface name. Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `unverified`; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
 
 ## Tools
 

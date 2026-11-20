@@ -50,6 +50,7 @@ Output (compact, tables):
 | Impact | Per layer: what changes, skill to use |
 | Open questions | Recorded ids, decider, blocked scope, recommended option |
 | Out of scope | Deferred items, recorded |
+| Probe requests | `probe_requests`: `command`, `expected`, the requirement it would confirm; "none" when empty |
 
 ## Tools
 
@@ -70,6 +71,7 @@ Read-only discovery plus Write/Edit for question records under `questions/record
 | Failure | Response |
 |---------|----------|
 | KB MCP unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (Read/Grep fallback, then stop) |
+| A requirement needs a runtime probe (this agent has no Bash) | List it in `probe_requests` (`_SHARED-PATTERNS.md`, Subagent Limits); mark the requirement "pending probe"; never assume the result or ask for Bash |
 | Request too vague to ground | Produce the question batch with recommended options; proceed on unblocked parts |
 | Spec contradicts a decided record | Report the divergence, route the spec fix; no owner question |
 | Scope grows beyond the request | Record as deferred; return an owner question only if the extension is required |

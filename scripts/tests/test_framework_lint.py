@@ -100,7 +100,7 @@ class LintTests(unittest.TestCase):
 
     def test_shared_patterns_file_is_not_treated_as_an_agent(self):
         with mock.patch.object(fl, "NO_BASH_AGENTS", ()):
-            r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\n7. KB MCP unreachable: stop\n## Common Tool Permissions\n"}, {})
+            r = self.run_lint({"_SHARED-PATTERNS": "# no frontmatter, shared document\nField `unverified` here; `probe_requests`.\n7. KB MCP unreachable: stop\n## Common Tool Permissions\n"}, {})
         self.assertEqual(r.errors, [])
 
     def test_skill_folder_without_skill_md_is_an_error(self):
@@ -185,6 +185,7 @@ class StagedTests(unittest.TestCase):
 
 
 SHARED = """# Shared
+Field `unverified` (optional list): defined here. Subagent Limits: `probe_requests` entries.
 7. KB MCP unreachable (sole statement), in order:
    - First, agents with `Bash` use `python3 scripts/kb/search.py "<q>"`.
    - Neither works, authoring agents (`doc-writer`): stop.
@@ -203,6 +204,9 @@ What blocks.
 KB = "mcp__business-kb__search, mcp__qa-kb__get"
 
 
+REVIEWER_BODY = "| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 |\n\"unverified\": [\"optional\"]\n"
+
+
 def agent(n, tools, body="| KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 |\n"):
     return f"---\nname: {n}\ndescription: d\nmodel: sonnet\ntools: {tools}\n---\n\n{body}"
 
@@ -211,9 +215,11 @@ class SharedRuleTests(unittest.TestCase):
     """check_shared_rules: rule 7 and 'What blocks' have one owner; tools match rule 7."""
 
     def setUp(self):
-        self.patch = mock.patch.object(fl, "NO_BASH_AGENTS", ("doc-analyst",))
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
+        for attr, value in (("NO_BASH_AGENTS", ("doc-analyst",)), ("REVIEWER_AGENTS", ("doc-reviewer",)),
+                             ("PROBE_AGENTS", ("doc-analyst",))):
+            patch = mock.patch.object(fl, attr, value)
+            patch.start()
+            self.addCleanup(patch.stop)
 
     def errors(self, agents, skills=None, shared=SHARED):
         agents = {"_SHARED-PATTERNS": shared, **agents}
@@ -226,8 +232,8 @@ class SharedRuleTests(unittest.TestCase):
             return report.errors
 
     def good(self):
-        return {"doc-writer": agent("doc-writer", f"Read, Bash, {KB}"), "doc-reviewer": agent("doc-reviewer", f"Read, Bash, {KB}"),
-                "doc-analyst": agent("doc-analyst", f"Read, {KB}")}
+        return {"doc-writer": agent("doc-writer", f"Read, Bash, {KB}"), "doc-reviewer": agent("doc-reviewer", f"Read, Bash, {KB}", REVIEWER_BODY),
+                "doc-analyst": agent("doc-analyst", f"Read, {KB}", "| KB unreachable | rule 7 |\n`probe_requests`\n")}
 
     def test_passing_case(self):
         self.assertEqual(self.errors(self.good()), [])
@@ -277,6 +283,49 @@ class SharedRuleTests(unittest.TestCase):
         self.assertTrue(any("lists the blocking statuses" in x for x in self.errors(self.good(), s(line))))
         self.assertEqual(self.errors(self.good(), s(line.rstrip() + " (\"What blocks\")\n")), [])
         self.assertEqual(self.errors(self.good(), s('"status": "ungrounded|stale|fabricated-citation|conflict|gate-failure"\n')), [])
+
+    def test_retired_unverified_field_names_fail(self):
+        for old in ("areas_not_reviewed", "coverage_gaps"):
+            a = self.good()
+            a["doc-writer"] = agent("doc-writer", f"Read, Bash, {KB}", f"| KB unreachable | rule 7 |\n\"{old}\": []\n")
+            self.assertTrue(any(f"retired field name `{old}`" in e for e in self.errors(a)), old)
+
+    def test_retired_names_and_phrase_fail_in_shared_file_too(self):
+        for bad in ("coverage_gaps", "areas_not_reviewed", "Coverage Gaps"):
+            e = self.errors(self.good(), shared=SHARED + f"\n{bad}\n")
+            self.assertTrue(any("retired" in x for x in e), bad)
+
+    def test_retired_phrase_fails_in_a_skill(self):
+        e = self.errors(self.good(), skills={"s": "---\nname: s\ndescription: reports coverage gaps\n---\n"})
+        self.assertTrue(any("coverage gaps" in x for x in e))
+
+    def test_shared_file_must_define_unverified(self):
+        e = self.errors(self.good(), shared=SHARED.replace("Field `unverified`", "Field x"))
+        self.assertTrue(any("does not define the field" in x for x in e))
+
+    def test_prose_mention_is_not_the_contract_form(self):
+        a = self.good()
+        a["doc-reviewer"] = agent("doc-reviewer", f"Read, Bash, {KB}", "| KB unreachable | rule 7 |\nthe `unverified` list\n")
+        self.assertTrue(any("lacks the `unverified` field" in e for e in self.errors(a)))
+
+    def test_table_row_is_the_contract_form(self):
+        a = self.good()
+        a["doc-reviewer"] = agent("doc-reviewer", f"Read, Bash, {KB}", "| KB unreachable | rule 7 |\n| unverified | optional list |\n")
+        self.assertEqual(self.errors(a), [])
+
+    def test_probe_agent_must_name_probe_requests(self):
+        a = self.good()
+        a["doc-analyst"] = agent("doc-analyst", f"Read, {KB}")
+        self.assertTrue(any("probe_requests" in e for e in self.errors(a)))
+
+    def test_shared_file_must_define_probe_requests(self):
+        e = self.errors(self.good(), shared=SHARED.replace("`probe_requests`", "x"))
+        self.assertTrue(any("does not define `probe_requests`" in x for x in e))
+
+    def test_reviewer_without_unverified_field_fails(self):
+        a = self.good()
+        a["doc-reviewer"] = agent("doc-reviewer", f"Read, Bash, {KB}")
+        self.assertTrue(any("lacks the `unverified` field" in e for e in self.errors(a)))
 
     def test_no_bash_agent_listing_bash(self):
         a = self.good()

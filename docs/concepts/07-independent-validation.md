@@ -50,15 +50,16 @@ A bare "looks fine" is not a result. A clean review states what was checked, so 
 
 ## Where unverified items go
 
-An unverified item is a finding the reviewer could not confirm (confidence 0.50 to 0.79) or a check it could not run (for example chunk verification while the KB is unreachable). A check that could not run has no would-be severity: every reviewer writes it as `unverified: <check>, <reason>`. It never blocks. Each reviewer lists it in a fixed place, and the session reads all of them:
+An unverified item is a finding the reviewer could not confirm (confidence 0.50 to 0.79) or a check it could not run (for example chunk verification while the KB is unreachable). Every reviewer contract has one optional field for them, named `unverified` and defined once in `.claude/agents/_SHARED-PATTERNS.md` ("Finding form"). It is a list of strings, one per item, and it never blocks. The session reads the list in every reviewer's output and gives each item a disposition.
 
-| Reviewer | Where | Label |
-|----------|-------|-------|
-| quality-guardian, regression-detective | the "unverified" list in the report | `unverified (would-be <severity>): ...`, one entry per item |
-| security-engineer | `areas_not_reviewed` | `unverified (would-be <severity>): ...` |
-| ux-usability-specialist | the optional `unverified` list | `unverified (would-be <severity>): ...` |
-| documentation-reviewer, and the `reviewing-kb-chunks` pass | `coverage_gaps` | `unverified (would-be <status>): ...` |
-| infrastructure-engineer (review mode) | `coverage_gaps` (optional) | `unverified: ...`; it has no severity scale |
+| Item | Entry label |
+|------|-------------|
+| A finding at confidence 0.50 to 0.79, severity scale reviewers (quality-guardian, regression-detective, security-engineer, ux-usability-specialist) | `unverified (would-be <severity>): what and why` |
+| The same, for documentation-reviewer and the `reviewing-kb-chunks` pass | `unverified (would-be <status>): what and why` |
+| A check that could not run, every reviewer | `unverified: <check>, <reason>`; no would-be severity |
+| infrastructure-engineer (review mode) | `unverified: <check>, <reason>` only; it has no severity scale |
+
+`framework_lint` enforces, on `*.md` files only (every file under `.claude/`, the shared file included; this page and other docs are not scanned): the retired field names `areas_not_reviewed` and `coverage_gaps` and the phrase "coverage gaps" (any case) appear nowhere; the shared file has a line starting "Field `unverified`" that defines the field; each of the six reviewer agents (`security-engineer`, `documentation-reviewer`, `infrastructure-engineer`, `quality-guardian`, `regression-detective`, `ux-usability-specialist`) has the contract form, either a JSON key `"unverified":` or a field-table row whose first cell is `unverified`. A prose mention does not count. It also requires the shared file and the two no-Bash agents (`requirements-analyst`, `solution-architect`) to name `probe_requests`. It does not check the label text of entries or that the `reviewing-kb-chunks` skill names the field. Undocumented public surface, which documentation-reviewer used to put in `coverage_gaps`, is now an `incomplete` finding whose `claim` is the surface name (for example the endpoint).
 
 ## Blocking, non-blocking, dispositions
 

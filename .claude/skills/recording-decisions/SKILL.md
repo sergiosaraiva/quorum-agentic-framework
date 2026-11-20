@@ -47,7 +47,7 @@ Status flow: `open` -> `answered` (a question answered) or `decided` (an owner d
 | 3 | Found and `decided` or `answered`: act on it, cite the id, no question |
 | 4 | Found, records conflict: flag both ids and ask once, batched |
 | 5 | Found, `open`: if it blocks you and is the user's, ask citing the id; otherwise proceed on its working assumption and flag the id |
-| 6 | Not found: check the Business KB (`business-kb`) for product behaviour. Still silent: record a new BQ or TQ with a decider and proceed only with unblocked work |
+| 6 | Not found: check the Business KB (`business-kb`) for product behaviour; pass `topic` to its `search` (a topic from `stats`) so framework `QF-*` chunks do not outrank domain chunks (unknown-topic behaviour: rule 7). Still silent: record a new BQ or TQ with a decider and proceed only with unblocked work |
 
 ## Record every answer (mandatory)
 

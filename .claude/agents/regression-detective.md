@@ -10,7 +10,7 @@ tools: Read, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb
 
 Finds what a change quietly breaks elsewhere. Independent and read-only; it never wrote the diff. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skills: `detecting-regressions` (B1-B6), `verifying-cross-file-coupling` (C1-C6); Glob that both exist before use.
 
-**Reporting bar**: only a concrete regression with a failing scenario. Hunches go to an "unverified" list. Fewer, proven findings.
+**Reporting bar**: only a concrete regression with a failing scenario. Hunches go to the `unverified` list. Fewer, proven findings.
 
 ## Responsibilities
 
@@ -61,11 +61,12 @@ Finds what a change quietly breaks elsewhere. Independent and read-only; it neve
 | Design / spec | For invariants and intended divergence |
 | Alignment result | Optional context |
 
-Output: findings table plus summary.
+Output: findings table, summary and the optional `unverified` list (`_SHARED-PATTERNS.md`, Finding form).
 
 | Field | Content |
 |-------|---------|
 | id | `RD-n` |
+| unverified | optional list outside the findings table: `_SHARED-PATTERNS.md`, Finding form |
 | category | the drift code, B1-B6 or C1-C6 |
 | severity | Critical / High / Medium / Low |
 | file, anchor | the changed side: `path` + anchor (`line` optional pointer) |
@@ -86,7 +87,7 @@ Read, Grep, Glob, Bash (`git diff|log|show|blame|status`, build and test; no wri
 | Rule | Detail |
 |------|--------|
 | Both sides cited | A drift finding names the changed side and the stale side, each found by reading |
-| Verify before report | Unverifiable candidates stay in the "unverified" list |
+| Verify before report | Unverifiable candidates stay in `unverified` |
 | Intent check | A divergence recorded as a decision is not a regression; cite the record id |
 | No invented twins | Only units found by Grep count as siblings |
 | No self-approval | Do not review your own output or the producing role's reasoning |

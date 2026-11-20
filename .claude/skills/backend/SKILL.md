@@ -11,7 +11,7 @@ Design Principles (simplest design, no speculative abstractions, no hard-coded v
 
 - One feature folder: `src/Api/Features/<Feature>/{<Feature>Endpoints.cs, <Feature>Service.cs, Dtos.cs}`. Group routes with `app.MapGroup("/api/<feature>")` (as the landed `src/Api/Features/Orders/OrdersEndpoints.cs` does) and register the group in `Program.cs`. No version segment: OD-024 decided that routes stay `/api/<feature>`; adding `/api/v1/<feature>` later needs a new OD that supersedes it
 - Every endpoint declares `.Produces<T>(status)` for each response shape, or returns `Results<...>` typed results
-- Every endpoint has an explicit auth decision: `.RequireAuthorization("orders")`, a named policy, on the group (as Orders does; OD-011), a named policy `.RequireAuthorization("<policy>")` where roles or scopes differ, or a one-line comment "intentionally anonymous: <reason>"
+- Every endpoint has an explicit auth decision: `.RequireAuthorization("<feature policy>")` on the group: a named policy per feature, registered in Program.cs (Orders uses `OrdersAuthorization.PolicyName`; OD-011), or a one-line comment "intentionally anonymous: <reason>"
 - Input binds to a typed `record` DTO; never parse `HttpContext.Request` by hand. Simple rules use DataAnnotations checked with `Validator.TryValidateObject` and return `Results.ValidationProblem` (the Orders default); FluentValidation is for cross-field rules (`creating-dtos-and-validation`)
 - The endpoint method holds no business logic and no EF Core query: it validates, calls the service, maps the result to a status code
 - `await` everything; never `.Result` / `.Wait()`. Thread `CancellationToken` into every awaited call
@@ -24,7 +24,7 @@ Design Principles (simplest design, no speculative abstractions, no hard-coded v
 New feature area?   -> Features/<Name>/<Name>Endpoints.cs + MapGroup in Program.cs
 Needs pagination?   -> page/pageSize query params, cap and default from the feature Options, return `PagedResponse<T>` (Items, Page, PageSize, TotalCount)
 Needs a service?    -> inject the concrete service (interface only at a real seam: creating-application-services)
-Auth?               -> group-level `RequireAuthorization()`, or a named policy where roles differ; resource-level checks (ownership, tenant) belong in the service
+Auth?               -> group-level `RequireAuthorization("<feature policy>")`, with roles or scopes added to that policy where they differ; resource-level checks (ownership, tenant) belong in the service
 Error from service? -> catch specific exception types; let unexpected ones reach the global exception handler (ProblemDetails)
 Public anonymous?   -> only health checks and documented public routes; comment why
 ```

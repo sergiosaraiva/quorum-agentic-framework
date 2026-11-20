@@ -30,7 +30,7 @@ Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-00
 | 6 | Given no credentials, then 401 (group auth inherited) | integration |
 | 7 | R1: given orders created on different dates, when a created-date range (from, to, both optional) is given, then only orders created in the range are returned, bounds inclusive | unit + integration |
 | 8 | R1: given a customer-name text, when searched, then orders whose name contains it, ignoring case, are returned (`OD-003`); special characters are matched literally; a name containing the NUL character is rejected with a 400 (see criterion 5) | unit + integration |
-| 9 | R2: given a status, when filtered, then only orders in that BC-001 state are returned; an unknown status gives 400 (needs `VS-005`) | unit + integration |
+| 9 | R2: given a status, when filtered, then only orders in that BC-001 state are returned. The filter is one exact value, as answered by `BQ-003` option 1 ("exact match, one value", decided in `OD-002`). Assumptions (KB silent, `TQ-011`): the value is lowercase and case-sensitive, as the API emits it, so `PAID` gives 400; surrounding whitespace is trimmed (`" paid "` matches `paid`); an empty or blank value means no status filter. A repeated or comma-joined value and the old values `open` and `cancelled` give 400 problem details keyed `status`, listing the allowed values and never echoing the input (needs `VS-005`) | unit + integration |
 
 ## Scope
 
@@ -45,6 +45,7 @@ See the readiness analysis S3 below; the R1 design is in "S3 Design: R1 (solutio
 | Data | no schema or model change, no migration; one constant `Order.CustomerNameMaxLength` added to `Order` |
 | API | `GET /api/orders` gains optional `createdFrom`, `createdTo`, `customerName`; 400 validation problem details; auth inherited from the group |
 | Frontend | none (out of scope) |
+| R2 | optional `status` parameter (one BC-001 state, exact, case-sensitive, from `OrderStatuses.All`); 400 `status` error `status must be one of: draft, placed, paid, shipped, closed.`; applied with AND and before the count; no migration, no index (deferred) |
 | Ops | none: no new configuration key, no new alarm |
 
 Simplest option chosen: filter the existing `IQueryable` in `OrdersService.ListAsync` before the count. Extra layers, abstractions or config: none beyond one parsed-filter record (`OrderListFilter`), which carries validated values from the endpoint to the service.
@@ -59,7 +60,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 |------|-------|----|
 | Docs | this file, `INDEX.md`, question records (spec and readiness, merged first) | - |
 | R1 | date-range and customer-name filters: `src/Api/Features/Orders/` (service, endpoint, DTO), `src/Infrastructure/Persistence` (constant only: `Order.CustomerNameMaxLength` and `OrderConfiguration`), tests | - |
-| R2 | status filter on the BC-001 states, after `VS-005` lands: same folder, tests | - |
+| R2 | status filter on the BC-001 states, stacked on `VS-005` (not `Done` yet): `src/Api/Features/Orders/` (`OrderListFilter`, endpoint, service), unit and integration tests in `OrderListFilterTests` and `OrdersSearchTests` | - |
 
 ## Revision log
 
@@ -71,12 +72,15 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-19 | `BQ-007` recorded and answered (`OD-005`, UTC days), so the date assumption is a recorded decision; `OD-006` records the pickup exception for R1 (requirements-analyst, trial) |
 | 2026-11-19 | R1 implemented (date-range and customer-name filters, unit and integration tests); status In progress in `INDEX.md`; rung and PR stay `-` until merge (code-engineer, trial) |
 | 2026-11-19 | Review round 1 findings recorded: `TQ-007`, `BQ-008`, `TQ-008`, `TQ-009` (non-blocking), `BQ-006` note and priority P1; R1 files row corrected (requirements-analyst, trial) |
+| 2026-11-20 | R2 implemented: `status` filter on the BC-001 states with criterion 9 made precise (exact, case-sensitive, one value, 400 for unknown); stacked on `VS-005`, which is `In progress` (code-engineer; independent review pending) |
+| 2026-11-20 | `TQ-011` recorded (non-blocking): input rules of the status filter (case, whitespace, blank), cited by criterion 9 (code-engineer) |
+| 2026-11-20 | `OD-008` recorded: the VS-001 dependency rule is waived for R2 and VS-005; R2 still merges after VS-005 (code-engineer) |
 
 ---
 
 # Readiness analysis: VS-004
 
-Baseline commit: `f1b0adc` (2026-11-19, branch `feat/pipeline-trial-slice`; the readiness analysis was written before the VS-004 records and spec were committed). Analyst: `requirements-analyst`. Result: `Ready` for R1 (date-range and customer-name filters); R2 (status filter) is `Blocked by VS-005`. Updated 2026-11-19 after the owner answers; the first analysis result was `Blocked by BQ-003, BQ-004, TQ-003`. Steps S1, S2, S3 (requirements-level), S4, S5 done; S2b not applicable. The KB MCP tools were unavailable in this session; the same sources were read from `kb/chunks` and `questions/records` and via `scripts/kb/search.py`.
+Baseline commit: `f1b0adc` (2026-11-19, branch `feat/pipeline-trial-slice`; the readiness analysis was written before the VS-004 records and spec were committed). Analyst: `requirements-analyst`. [Superseded 2026-11-20 for R2: VS-005 is `In progress`, the dependency rule is waived by `OD-008`, and R2 is built stacked on it, see the pickup delta log] Result: `Ready` for R1 (date-range and customer-name filters); R2 (status filter) is `Blocked by VS-005`. Updated 2026-11-19 after the owner answers; the first analysis result was `Blocked by BQ-003, BQ-004, TQ-003`. Steps S1, S2, S3 (requirements-level), S4, S5 done; S2b not applicable. The KB MCP tools were unavailable in this session; the same sources were read from `kb/chunks` and `questions/records` and via `scripts/kb/search.py`.
 
 ## S1 Ground
 
@@ -106,7 +110,7 @@ Designed 2026-11-19 against baseline `f1b0adc` plus the uncommitted VS-004 recor
 
 Pipeline: full lane (new query contract on an API) · requirements-analyst done (readiness above) · ux-usability-specialist skip (no UI) · code-engineer -> quality-guardian || regression-detective -> test-automator · security-engineer applies (user input reaches a query; see Security notes) · infrastructure-engineer skip (no resource) · docs: this spec and the `INDEX.md` row in the R1 PR · Alignment Gate: applies (`src/`, `tests/`).
 
-Pickup condition: `docs/slices/CLAUDE.md` says a slice cannot start while a hard dependency is below `Done`, and `VS-001` is `In progress` in `INDEX.md`. The owner granted an exception for R1 on the landed list endpoint (`OD-006`). It does not cover R2.
+Pickup condition: `docs/slices/CLAUDE.md` says a slice cannot start while a hard dependency is below `Done`, and `VS-001` is `In progress` in `INDEX.md`. The owner granted an exception for R1 on the landed list endpoint (`OD-006`). It does not cover R2; `OD-008` (2026-11-20) grants the same exception for R2 and VS-005.
 
 #### Alignment check (steps 1-5)
 
@@ -272,8 +276,8 @@ The trigger is an API contract change in which caller input reaches a database q
 
 | Depends on | Type (hard/soft) | Status | Conflict with open PR? |
 |------------|------------------|--------|------------------------|
-| VS-005 | hard, R2 only | Proposed (status vocabulary alignment) | none known |
-| VS-001 | hard | In progress (INDEX); list endpoint present in code; pickup exception for R1 by `OD-006` | none known; no open PR branches besides `chore/frontend-lockfile`, `docs/local-review-is-the-gate`, `docs/verify-model-prices` (not inspected for overlap: touch docs/frontend only by name) |
+| VS-005 | hard, R2 only | `In progress` (2026-11-20; R2 stacked on it, see the delta log) | none known |
+| VS-001 | hard | In progress (INDEX); list endpoint present in code; pickup exception for R1 by `OD-006`, for R2 by `OD-008` | none known; no open PR branches besides `chore/frontend-lockfile`, `docs/local-review-is-the-gate`, `docs/verify-model-prices` (not inspected for overlap: touch docs/frontend only by name) |
 
 ## S5 Decisions and blockers
 
@@ -293,12 +297,13 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | no, non-blocking (regression-detective review) |
 | TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | no, non-blocking (security-engineer review) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
+| OD-008 | OD | product-owner | R2 pickup (hard dependency VS-001 not `Done`) | yes, exception for R2 and VS-005 only |
 
 BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'; it must be answered before R1 reaches an environment where non-staff identities can obtain a token for the audience, and a named authorization policy is advised meanwhile.
 
 Open, non-blocking and not accepted by the owner: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
 
-Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking, open and not accepted by the owner; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`.
+Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking, open and not accepted by the owner; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`. [Superseded 2026-11-20: R2 is built stacked on VS-005 (`In progress`), the dependency rule is waived by `OD-008`, and R2 cannot merge before VS-005; see the pickup delta log.]
 
 ## Priority inputs
 
@@ -310,4 +315,5 @@ Value 3 (finding orders is useful, not core), Urgency 2 (no deadline), Unblocks 
 |------|---------------|-----------------------------|
 | 2026-11-19 | baseline `f1b0adc` (analysis written against it) | n/a, first analysis |
 | 2026-11-19 | `HEAD` `f1b0adc` (R1 design) | unchanged: no commit since the baseline; the working tree differs only by the uncommitted VS-004 docs and records |
-| 2026-11-19 | `OD-006` (pickup exception for R1); `HEAD` `f1b0adc` unchanged since the baseline | unchanged. The hard dependency VS-001 is `In progress` in the INDEX: R1 may start by `OD-006`, R2 may not (waits for VS-005) |
+| 2026-11-19 | `OD-006` (pickup exception for R1); `HEAD` `f1b0adc` unchanged since the baseline | unchanged. The hard dependency VS-001 is `In progress` in the INDEX: R1 may start by `OD-006`, R2 may not (waits for VS-005) [superseded 2026-11-20, see the next row] |
+| 2026-11-20 | `main` `2a74f27` (R2 pickup) | VS-005 is `In progress` on the same branch, not `Done`, and `OD-006` covers R1 only; `OD-008` (2026-11-20) waives the dependency rule for R2 and VS-005. R2 is built stacked on VS-005 and cannot merge before it. `BC-001`, `OD-002`, `OD-004` re-read: unchanged |

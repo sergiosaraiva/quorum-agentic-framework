@@ -12,10 +12,10 @@ public static class OrdersEndpoints
         // The filter values bind as strings and are parsed explicitly, so a malformed value gives
         // validation problem details (TQ-005) and a calendar date is exactly yyyy-MM-dd (OD-005).
         group.MapGet("/", async (
-            int? page, int? pageSize, string? createdFrom, string? createdTo, string? customerName,
+            int? page, int? pageSize, string? createdFrom, string? createdTo, string? customerName, string? status,
             OrdersService service, CancellationToken ct) =>
         {
-            var (filter, errors) = OrderListFilter.Parse(createdFrom, createdTo, customerName);
+            var (filter, errors) = OrderListFilter.Parse(createdFrom, createdTo, customerName, status);
             return errors.Count > 0
                 ? Results.ValidationProblem(errors)
                 : Results.Ok(await service.ListAsync(page, pageSize, filter, ct));

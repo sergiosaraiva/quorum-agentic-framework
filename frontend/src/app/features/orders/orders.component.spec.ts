@@ -25,7 +25,7 @@ describe('OrdersComponent', () => {
     const { fixture, http } = setup();
 
     http.expectOne((r) => r.url === '/api/orders').flush({
-      items: [{ id: '1', customerName: 'Acme Ltd', totalAmount: 10, status: 'open', createdAt: '2026-01-01T00:00:00Z' }],
+      items: [{ id: '1', customerName: 'Acme Ltd', totalAmount: 10, status: 'draft', createdAt: '2026-01-01T00:00:00Z' }],
       page: 1, pageSize: 20, totalCount: 1,
     });
     await fixture.whenStable();

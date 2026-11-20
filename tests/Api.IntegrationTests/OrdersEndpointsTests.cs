@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Api.Features.Orders;
+using Infrastructure.Persistence.Entities;
 
 namespace Api.IntegrationTests;
 
@@ -18,7 +19,7 @@ public class OrdersEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.NotNull(created);
         var fetched = await client.GetFromJsonAsync<OrderResponse>($"/api/orders/{created.Id}", TestContext.Current.CancellationToken);
         Assert.Equal("Acme Ltd", fetched?.CustomerName);
-        Assert.Equal("open", fetched?.Status);
+        Assert.Equal(OrderStatuses.Draft, fetched?.Status);
     }
 
     [Fact]

@@ -6,9 +6,13 @@ namespace Infrastructure.Persistence.Configurations;
 
 public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
+    /// <summary>BC-001 states (VS-005, OD-004), generated from <see cref="OrderStatuses.All"/>.</summary>
+    internal static readonly string StatusCheck =
+        $"status in ({string.Join(",", OrderStatuses.All.Select(s => $"'{s}'"))})";
+
     public void Configure(EntityTypeBuilder<Order> builder)
     {
-        builder.ToTable("order", t => t.HasCheckConstraint("ck_order_status", "status in ('open','paid','cancelled')"));
+        builder.ToTable("order", t => t.HasCheckConstraint("ck_order_status", StatusCheck));
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).ValueGeneratedNever();
         builder.Property(o => o.CustomerName).HasMaxLength(Order.CustomerNameMaxLength).IsRequired();

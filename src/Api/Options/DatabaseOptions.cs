@@ -13,4 +13,8 @@ public sealed class DatabaseOptions
     /// </summary>
     [Range(1, 600)]
     public int CommandTimeoutSeconds { get; init; } = 10;
+
+    /// <summary>Value of the <c>Retry-After</c> header, in seconds, on the 503 answered for a command timeout (OD-029). A chosen default.</summary>
+    [Range(1, 3600)]
+    public int RetryAfterSeconds { get; init; } = 5;
 }

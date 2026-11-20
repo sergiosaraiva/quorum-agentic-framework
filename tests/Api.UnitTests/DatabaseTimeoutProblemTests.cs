@@ -38,6 +38,20 @@ public class DatabaseTimeoutProblemTests
         new BadHttpRequestException("bad"),
     };
 
+    private static PostgresException QueryCanceled() =>
+        new("canceling statement", "ERROR", "ERROR", PostgresErrorCodes.QueryCanceled);
+
+    [Fact]
+    public void IsTimeout_ServerQueryCancellation57014_IsTrue() =>
+        Assert.True(DatabaseTimeoutProblem.IsTimeout(QueryCanceled()));
+
+    [Fact]
+    public void IsTimeout_CallerCancelWrapping57014_IsFalse()
+    {
+        Assert.False(DatabaseTimeoutProblem.IsTimeout(new OperationCanceledException("cancelled", QueryCanceled())));
+        Assert.False(DatabaseTimeoutProblem.IsTimeout(new TaskCanceledException("cancelled", new NpgsqlException("x", new TimeoutException()))));
+    }
+
     [Fact]
     public void IsTimeout_Null_IsFalse() =>
         Assert.False(DatabaseTimeoutProblem.IsTimeout(null));

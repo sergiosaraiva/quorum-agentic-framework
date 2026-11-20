@@ -37,6 +37,29 @@ public class OptionsValidationTests
     public void DatabaseOptions_CommandTimeoutSeconds_IsRangeChecked(int value, bool expected) =>
         Assert.Equal(expected, IsValid(new DatabaseOptions { CommandTimeoutSeconds = value }));
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(1000, true)]
+    [InlineData(0, false)]
+    [InlineData(1001, false)]
+    public void RateLimitingOptions_ConcurrentRequestsPerUser_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new RateLimitingOptions { ConcurrentRequestsPerUser = value }));
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(3600, true)]
+    [InlineData(0, false)]
+    [InlineData(3601, false)]
+    public void DatabaseOptions_RetryAfterSeconds_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new DatabaseOptions { RetryAfterSeconds = value }));
+
+    [Fact]
+    public void Defaults_ConcurrencyAndRetryAfter_AreTheChosenValues()
+    {
+        Assert.Equal(4, new RateLimitingOptions().ConcurrentRequestsPerUser);
+        Assert.Equal(5, new DatabaseOptions().RetryAfterSeconds);
+    }
+
     [Fact]
     public void Defaults_AreValid()
     {

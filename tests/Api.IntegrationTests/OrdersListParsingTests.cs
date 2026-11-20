@@ -119,9 +119,10 @@ public class OrdersListParsingTests(ApiFactory factory) : IClassFixture<ApiFacto
         using var doc = JsonDocument.Parse(text);
         var errors = doc.RootElement.GetProperty("errors");
         Assert.Equal(["page"], errors.EnumerateObject().Select(p => p.Name));
-        Assert.Equal($"page must be at most {MaxPageNumber}.", errors.GetProperty("page")[0].GetString());
-        // The message names the configured cap, never the caller's value.
-        Assert.DoesNotContain(page.ToString(System.Globalization.CultureInfo.InvariantCulture), text, StringComparison.Ordinal);
+        var message = errors.GetProperty("page")[0].GetString();
+        Assert.Equal($"page must be at most {MaxPageNumber}.", message);
+        // The message names the configured cap, never the caller's value (the whole body also holds a trace id, so assert on the message).
+        Assert.DoesNotContain(page.ToString(System.Globalization.CultureInfo.InvariantCulture), message, StringComparison.Ordinal);
     }
 
     [Theory]

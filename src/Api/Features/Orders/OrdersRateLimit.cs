@@ -34,6 +34,19 @@ public static class OrdersRateLimit
     public static void AddOrdersListPolicy(this RateLimiterOptions options, RateLimitingOptions limits)
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        // OD-029: a per-user cap on requests running at the same time, so one user cannot hold many slow queries open.
+        // The built-in limiter allows one limiter per policy, so this one is global and applies only to endpoints that
+        // carry the orders list policy; the fixed-window policy below still counts requests that pass it.
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            context.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName == PolicyName
+                ? RateLimitPartition.GetConcurrencyLimiter(PartitionKey(context.User), _ => new ConcurrencyLimiterOptions
+                {
+                    PermitLimit = limits.ConcurrentRequestsPerUser,
+                    QueueLimit = 0,
+                })
+                : RateLimitPartition.GetNoLimiter(AnonymousPartitionKey));
+
         options.AddPolicy(PolicyName, context =>
             RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context.User), _ => new FixedWindowRateLimiterOptions
             {

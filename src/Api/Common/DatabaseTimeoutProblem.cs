@@ -1,12 +1,16 @@
+using System.Globalization;
+using Api.Options;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Api.Common;
 
 /// <summary>
 /// Maps a database command timeout to a 503 problem response (TQ-015, decided in OD-025). Only a timeout is mapped;
-/// every other exception keeps the handler's default status. The response text is fixed and never carries exception text.
+/// every other exception keeps the handler's default status. The response text is fixed and never carries exception text;
+/// the <c>Retry-After</c> header comes from <see cref="DatabaseOptions.RetryAfterSeconds"/> (OD-029).
 /// </summary>
 public static class DatabaseTimeoutProblem
 {
@@ -21,12 +25,18 @@ public static class DatabaseTimeoutProblem
     private const int MaxChainDepth = 8;
 
     /// <summary>
-    /// True for a command or connection timeout: a <see cref="TimeoutException"/> anywhere in the inner chain (Npgsql reports a
-    /// client-side timeout as an <see cref="NpgsqlException"/> whose cause is one) or a server-side query cancellation (SQLSTATE 57014).
-    /// A caller-initiated cancel is an <see cref="OperationCanceledException"/> and is not a timeout.
+    /// True when a <see cref="TimeoutException"/> or a server-side query cancellation (SQLSTATE 57014) is found within
+    /// <see cref="MaxChainDepth"/> levels of the exception chain. Npgsql reports a client-side command or connection timeout as an
+    /// <see cref="NpgsqlException"/> whose cause is a <see cref="TimeoutException"/>. An exception whose outermost type is an
+    /// <see cref="OperationCanceledException"/> is a caller cancel, even when it wraps SQLSTATE 57014, and is not a timeout.
     /// </summary>
     public static bool IsTimeout(Exception? exception)
     {
+        if (exception is OperationCanceledException)
+        {
+            return false;
+        }
+
         var current = exception;
         for (var depth = 0; current is not null && depth < MaxChainDepth; depth++, current = current.InnerException)
         {
@@ -57,6 +67,8 @@ public static class DatabaseTimeoutProblem
             context.ProblemDetails.Title = Title;
             context.ProblemDetails.Detail = Detail;
             context.ProblemDetails.Type = Type;
+            var retryAfter = context.HttpContext.RequestServices.GetRequiredService<IOptions<DatabaseOptions>>().Value.RetryAfterSeconds;
+            context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

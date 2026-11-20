@@ -77,6 +77,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | `OD-008` recorded: the VS-001 dependency rule is waived for R2 and VS-005; R2 still merges after VS-005 (code-engineer) |
 | 2026-11-20 | Owner decisions recorded: `BQ-005`, `BQ-006`, `TQ-004` to `TQ-009`, `BQ-008` and `TQ-011` answered as `OD-010` to `OD-012` and `OD-015` to `OD-021` (documentation-curator); the slice code that follows from `OD-011`, `OD-016`, `OD-018`, `OD-019` and `OD-020` is tracked in the slice follow-up PR |
 | 2026-11-20 | Follow-up code landed for `OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`: Contract (named policy, string-parsed `page`/`pageSize`, 429 row, camelCase POST keys, NUL rejection), Deferred, Alignment table and the TQ-005, TQ-007, TQ-008, TQ-009 Resolved rows updated; `TQ-013` to `TQ-015` raised (non-blocking) (code-engineer) |
+| 2026-11-20 | Security review follow-up: per-user concurrency limit and `Retry-After` on the 503 (`OD-029`), `TQ-016` raised (open, non-blocking: pool size and load test) (code-engineer) |
 | 2026-11-20 | `TQ-013` to `TQ-015` answered (`OD-026`, `OD-027`, `OD-025`): Contract (page cap and 400 key, 503 row, new defaults), Deferred, S3 rate-limit row and S5 rows updated; open-question mentions removed (code-engineer, documentation-curator) |
 
 ---
@@ -153,7 +154,7 @@ Deferred: trigram index (measured need, `OD-018`); caller-selectable sort (`BQ-0
 
 #### Contract
 
-`GET /api/orders?page&pageSize&createdFrom&createdTo&customerName`. Auth: inherited from the `/api/orders` group, `RequireAuthorization("orders")` (Immutable Rule 7). The named policy `orders` requires an authenticated user and is the seam for staff and customer roles (`OD-011`, `BQ-006`). Rate limit: the list endpoint only, per user, from `RateLimiting` options (`OD-018`, `TQ-007`; default 60 requests per 60 seconds, confirmed by the owner); the partition is the `NameIdentifier` claim, then `sub`, and the identity provider must issue one of them (`OD-026`).
+`GET /api/orders?page&pageSize&createdFrom&createdTo&customerName`. Auth: inherited from the `/api/orders` group, `RequireAuthorization("orders")` (Immutable Rule 7). The named policy `orders` requires an authenticated user and is the seam for staff and customer roles (`OD-011`, `BQ-006`). Rate limit: the list endpoint only, per user, from `RateLimiting` options (`OD-018`, `TQ-007`; chosen default 60 requests per 60 seconds, `OD-018`; at most `RateLimiting:ConcurrentRequestsPerUser` (default 4) requests of one user at the same time, `OD-029`); the partition is the `NameIdentifier` claim, then `sub`, and the identity provider must issue one of them (`OD-026`).
 
 | Parameter | Type on the wire | Rule | Absent or empty |
 |-----------|------------------|------|-----------------|
@@ -169,8 +170,8 @@ Responses:
 | 200 | valid input | `PagedResponse<OrderResponse>` unchanged: `items`, `page`, `pageSize`, `totalCount` (the filtered count) |
 | 400 | any filter value invalid | `Results.ValidationProblem(errors)`: `application/problem+json`, `title` "One or more validation errors occurred.", `status` 400, `errors` keyed by parameter name. All errors are reported at once |
 | 401 | no credentials | from the group |
-| 503 | a database command exceeds `Database:CommandTimeoutSeconds` (default 10) | `application/problem+json`, `status` 503, fixed `title` "Service temporarily unavailable.", fixed `detail`, `type`, `traceId`; no exception text (`OD-025`, `TQ-015`) |
-| 429 | the per-user limit is exceeded (`RateLimiting:PermitLimit` per `WindowSeconds`) | `application/problem+json`, `status` 429, fixed `title` "Too many requests.", `type`, `traceId`; header `Retry-After` in seconds (`OD-018`, `TQ-007`) |
+| 503 | a database command exceeds `Database:CommandTimeoutSeconds` (default 10) | `application/problem+json`, `status` 503, fixed `title` "Service temporarily unavailable.", fixed `detail`, `type`, `traceId`; header `Retry-After` of `Database:RetryAfterSeconds` (default 5, `OD-029`); no exception text (`OD-025`, `TQ-015`) |
+| 429 | the per-user limit is exceeded (`RateLimiting:PermitLimit` per `WindowSeconds`), or more than `RateLimiting:ConcurrentRequestsPerUser` of the user's requests are in flight (`OD-029`; no `Retry-After` then) | `application/problem+json`, `status` 429, fixed `title` "Too many requests.", `type`, `traceId`; header `Retry-After` in seconds (`OD-018`, `TQ-007`) |
 
 Error keys and messages (messages never echo the input):
 
@@ -184,7 +185,7 @@ Error keys and messages (messages never echo the input):
 | `page`, `pageSize` | `page must be a whole number between -2147483648 and 2147483647.` (same for `pageSize`) | not an integer, contains U+0000, or outside the int range |
 | `page` | `page must be at most 10000.` (the number is the configured `Orders:MaxPageNumber`, never the input) | `page` above the cap |
 
-The POST `/api/orders` validation uses camelCase keys too (`customerName`, `totalAmount`; `OD-019`, `TQ-008`) and rejects U+0000 in `customerName` with a 400 (`OD-020`, `TQ-009`). A malformed request that the framework reports as a `BadHttpRequestException` (for example invalid JSON) is a 400 problem response in every environment, Development included (`OD-016`). A database command timeout of `Database:CommandTimeoutSeconds` (default 10, lowered from 30 in `OD-025`) applies to every command (`OD-018`); a timeout answers 503, any other exception keeps its status. A migration run sets its own larger value.
+The POST `/api/orders` validation uses camelCase keys too (`customerName`, `totalAmount`; `OD-019`, `TQ-008`) and rejects U+0000 in `customerName` with a 400 (`OD-020`, `TQ-009`). A malformed request that the framework reports as a `BadHttpRequestException` (for example invalid JSON) is a 400 problem response in every environment, Development included (`OD-016`). A database command timeout of `Database:CommandTimeoutSeconds` (default 10, lowered from 30 in `OD-025`) applies to every command (`OD-018`); a timeout answers 503 with `Retry-After`, any other exception keeps its status. A migration run sets its own larger value.
 
 Ordering: unchanged, `CreatedAt` descending, then `Id` ascending (`BQ-005` working assumption). Filters combine with AND.
 
@@ -309,6 +310,7 @@ The trigger is an API contract change in which caller input reaches a database q
 | TQ-011 | TQ | tech-lead | none (status filter input rules, criterion 9) | yes, `OD-021` (2026-11-20) |
 | TQ-013 | TQ | tech-lead | none (rate-limit partition claim) | yes, `OD-026` (2026-11-20); implemented as a documented requirement (`src/Api/CLAUDE.md`) |
 | TQ-014 | TQ | tech-lead | none (where log redaction is enforced) | yes, `OD-027` (2026-11-20); a required infrastructure checklist item, deployment follow-up until a target is chosen |
+| TQ-016 | TQ | tech-lead | none (open, non-blocking: pool size, load test at the largest page and table) | no |
 | TQ-015 | TQ | tech-lead | none (query cost bounds) | yes, `OD-025` (2026-11-20); implemented (page cap, timeout default 10 s, 503 on a timeout) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
 | OD-008 | OD | product-owner | R2 pickup (hard dependency VS-001 not `Done`) | yes, exception for R2 and VS-005 only |

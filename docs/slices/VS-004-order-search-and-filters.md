@@ -16,7 +16,7 @@ A user of the orders list can narrow it down by criteria and find an order witho
 
 Decided 2026-11-19: filters are status, created-date range and customer name, no amount filter (`BQ-003`, `OD-002`); customer name is a case-insensitive substring match (`BQ-004`, `OD-003`); order statuses are aligned to BC-001 in follow-up `VS-005` (`TQ-003`, `OD-004`).
 
-Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-006`, currency for a deferred amount filter `TQ-004`, typed-binding problem details for `page`/`pageSize` `TQ-005`, container locale for case folding `TQ-006`; from the R1 review: search cost `TQ-007`, customer name in URLs `BQ-008`, error-key casing `TQ-008`, NUL in create `TQ-009` (the S5 table lists all nine).
+Decided 2026-11-20 (the nine earlier non-blocking questions, now answered): sort order `BQ-005` (`OD-010`), visibility `BQ-006` (`OD-011`), the amount filter stays deferred `TQ-004` (`OD-015`), typed-binding problem details for `page`/`pageSize` `TQ-005` (`OD-016`), container locale for case folding `TQ-006` (`OD-017`); from the R1 review: search cost `TQ-007` (`OD-018`), customer name in URLs `BQ-008` (`OD-012`), error-key casing `TQ-008` (`OD-019`), NUL in create `TQ-009` (`OD-020`); the R2 input rules `TQ-011` (`OD-021`). The code that these decisions require beyond what is built (`OD-011`, `OD-016`, `OD-018`, `OD-019`, `OD-020`) is tracked in the slice follow-up PR and is not done here.
 
 ## Acceptance criteria
 
@@ -30,11 +30,11 @@ Open, non-blocking (working assumptions): sort order `BQ-005`, visibility `BQ-00
 | 6 | Given no credentials, then 401 (group auth inherited) | integration |
 | 7 | R1: given orders created on different dates, when a created-date range (from, to, both optional) is given, then only orders created in the range are returned, bounds inclusive | unit + integration |
 | 8 | R1: given a customer-name text, when searched, then orders whose name contains it, ignoring case, are returned (`OD-003`); special characters are matched literally; a name containing the NUL character is rejected with a 400 (see criterion 5) | unit + integration |
-| 9 | R2: given a status, when filtered, then only orders in that BC-001 state are returned. The filter is one exact value, as answered by `BQ-003` option 1 ("exact match, one value", decided in `OD-002`). Assumptions (KB silent, `TQ-011`): the value is lowercase and case-sensitive, as the API emits it, so `PAID` gives 400; surrounding whitespace is trimmed (`" paid "` matches `paid`); an empty or blank value means no status filter. A repeated or comma-joined value and the old values `open` and `cancelled` give 400 problem details keyed `status`, listing the allowed values and never echoing the input (needs `VS-005`) | unit + integration |
+| 9 | R2: given a status, when filtered, then only orders in that state, one of the five built BC-001 states, are returned. The filter is one exact value, as answered by `BQ-003` option 1 ("exact match, one value", decided in `OD-002`). Input rules, decided in `OD-021` (`TQ-011`; the KB is silent, behaviour as built): the value is lowercase and case-sensitive, as the API emits it, so `PAID` gives 400; surrounding whitespace is trimmed (`" paid "` matches `paid`); an empty or blank value means no status filter. A repeated or comma-joined value and the old values `open` and `cancelled` give 400 problem details keyed `status`, listing the allowed values and never echoing the input (needs `VS-005`) | unit + integration |
 
 ## Scope
 
-In: backend filtering of the existing order list (query parameters). Out: frontend, amount filter (`OD-002`, `TQ-004`), selectable sorting (until `BQ-005`), per-caller visibility changes (`BQ-006`). Deferred: database indexes for the chosen filters, until the filter set is decided and a query shows a need.
+In: backend filtering of the existing order list (query parameters). Out: frontend, amount filter (`OD-002`, `TQ-004`), selectable sorting (`BQ-005`, `OD-010`), per-caller visibility changes (`BQ-006`, `OD-011`). Deferred: database indexes for the chosen filters, until the filter set is decided and a query shows a need.
 
 ## Design
 
@@ -75,6 +75,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | R2 implemented: `status` filter on the BC-001 states with criterion 9 made precise (exact, case-sensitive, one value, 400 for unknown); stacked on `VS-005`, which is `In progress` (code-engineer; independent review pending) |
 | 2026-11-20 | `TQ-011` recorded (non-blocking): input rules of the status filter (case, whitespace, blank), cited by criterion 9 (code-engineer) |
 | 2026-11-20 | `OD-008` recorded: the VS-001 dependency rule is waived for R2 and VS-005; R2 still merges after VS-005 (code-engineer) |
+| 2026-11-20 | Owner decisions recorded: `BQ-005`, `BQ-006`, `TQ-004` to `TQ-009`, `BQ-008` and `TQ-011` answered as `OD-010` to `OD-012` and `OD-015` to `OD-021` (documentation-curator); the slice code that follows from `OD-011`, `OD-016`, `OD-018`, `OD-019` and `OD-020` is tracked in the slice follow-up PR |
 
 ---
 
@@ -86,7 +87,7 @@ Baseline commit: `f1b0adc` (2026-11-19, branch `feat/pipeline-trial-slice`; the 
 
 | Question | Finding | Source |
 |----------|---------|--------|
-| What must the product do? | Orders have five states (draft, placed, paid, shipped, closed); one currency per order; amounts have two decimals. No chunk mentions search, filtering, sorting or page size (searches: "order search filter", "list orders page size", "sort order", "text search customer"; `stats`: 39 chunks, none on listing) | `BC-001`, `BC-004`, `BC-005` |
+| What must the product do? | Orders have five states (draft, placed, paid, shipped, closed; `BC-001` added `cancelled` on 2026-11-20, `OD-013`); one currency per order; amounts have two decimals. No chunk mentions search, filtering, sorting or page size (searches: "order search filter", "list orders page size", "sort order", "text search customer"; `stats`: 39 chunks, none on listing) | `BC-001`, `BC-004`, `BC-005` |
 | Prior decisions that apply | Money type and rounding (`OD-001`). No record on search, filters or sorting (qa search "search filter orders"; open records: BQ-001, TQ-001) | `OD-001` |
 | Silent or conflicting | Silent: filterable fields, text semantics, sort order, visibility. Conflict: code statuses `open/paid/cancelled` vs `BC-001` states. Gap: no currency column vs `BC-005` | `BQ-003`, `BQ-004`, `BQ-005`, `BQ-006`, `TQ-003`, `TQ-004` |
 
@@ -121,8 +122,8 @@ Pickup condition: `docs/slices/CLAUDE.md` says a slice cannot start while a hard
 | Filters combine with AND; `totalCount` counts the filtered set | readiness S2 assumption | KB silent (searches "order search filter", "date range filter time zone"; `stats`: 39 chunks, none on listing) |
 | Special characters match literally | criterion 8 | KB silent |
 | A calendar date means a UTC day | `OD-005` (`BQ-007`) | Confirmed (was KB silent: search "created date time zone day boundary") |
-| Newest first, then `Id` | landed code `OrdersService.ListAsync` | KB silent, `BQ-005` open, non-blocking |
-| Any authenticated caller sees all orders | landed code, group `RequireAuthorization()` | KB silent, `BQ-006` open, non-blocking |
+| Newest first, then `Id` | landed code `OrdersService.ListAsync` | KB silent; decided in `OD-010` (`BQ-005`) |
+| Any authenticated caller sees all orders | landed code, group `RequireAuthorization()` | KB silent; decided in `OD-011` (`BQ-006`), with a named authorization policy to follow |
 
 No Contradicted or Missing item for R1. Chunks read: `BC-001`, `BC-005` (`BC-005` currency is untouched by R1, `TQ-004`). Records recalled: `OD-002`, `OD-003`, `OD-004`, `BQ-005`, `BQ-006`, `TQ-004`. Pass this table to the R1 PR under `Alignment check`.
 
@@ -146,7 +147,7 @@ No Contradicted or Missing item for R1. Chunks read: `BC-001`, `BC-005` (`BC-005
 | `Order.CustomerNameMaxLength` constant | The literal `200` already appears twice (`CreateOrderRequest` `StringLength`, `OrderConfiguration` `HasMaxLength`); the filter is the third use. The constant lives on the entity because `Infrastructure` cannot reference `Api`. The model does not change, so no migration |
 | New project, layer, interface, Options key, dependency | none |
 
-Deferred: trigram index (measured need); caller-selectable sort (`BQ-005`); per-caller visibility (`BQ-006`); status filter (R2, `VS-005`); typed-binding problem details for `page`/`pageSize` (`TQ-005`, a VS-001 follow-up); non-ASCII case folding independent of the database locale (`TQ-006`); frontend.
+Deferred: trigram index (measured need, `OD-018`); caller-selectable sort (`BQ-005`, `OD-010`); per-caller visibility (`BQ-006`, `OD-011`); status filter (R2, `VS-005`); typed-binding problem details for `page`/`pageSize` (`TQ-005`, `OD-016`, a VS-001 follow-up); non-ASCII case folding independent of the database locale (`TQ-006`, `OD-017` requires a UTF-8 `LC_CTYPE` instead); frontend.
 
 #### Contract
 
@@ -270,7 +271,7 @@ The trigger is an API contract change in which caller input reaches a database q
 | `TQ-005` | TQ | tech-lead | no | Problem details for malformed typed query parameters (VS-001 `page`/`pageSize` gap) |
 | `TQ-006` | TQ | tech-lead | no | Non-ASCII case-insensitivity depends on the database `LC_CTYPE` |
 | `BQ-007` | BQ | product-owner | no | Time zone of a calendar day for the created-date filter: answered, UTC days (`OD-005`) |
-| `BQ-005`, `BQ-006` | BQ | product-owner | no | unchanged working assumptions |
+| `BQ-005`, `BQ-006` | BQ | product-owner | no | answered 2026-11-20 (`OD-010`, `OD-011`) |
 
 ## S4 Dependencies
 
@@ -286,24 +287,25 @@ The trigger is an API contract change in which caller input reaches a database q
 | BQ-003 | BQ | product-owner | R1, R2 (filter set) | yes, `OD-002` |
 | BQ-004 | BQ | product-owner | R1 (text search) | yes, `OD-003` |
 | TQ-003 | TQ | tech-lead | R2 (status filter) | yes, `OD-004`; delivery tracked as `VS-005` |
-| BQ-005 | BQ | product-owner | none (assume newest first) | no, non-blocking, owner chose to leave open |
-| BQ-006 | BQ | product-owner | none (assume VS-001 visibility, flag to security-engineer) | no, non-blocking |
-| TQ-004 | TQ | tech-lead | none (amount filter excluded by `OD-002`) | no, non-blocking |
-| TQ-005 | TQ | tech-lead | none (R1 binds its new parameters as strings) | no, non-blocking (added by solution-architect) |
-| TQ-006 | TQ | tech-lead | none (ASCII folding is locale-independent; R1 tests the container locale) | no, non-blocking (added by solution-architect) |
+| BQ-005 | BQ | product-owner | none (assume newest first) | yes, `OD-010` (2026-11-20) |
+| BQ-006 | BQ | product-owner | none (assume VS-001 visibility, flag to security-engineer) | yes, `OD-011` (2026-11-20) |
+| TQ-004 | TQ | tech-lead | none (amount filter excluded by `OD-002`) | yes, `OD-015` (2026-11-20) |
+| TQ-005 | TQ | tech-lead | none (R1 binds its new parameters as strings) | yes, `OD-016` (2026-11-20) |
+| TQ-006 | TQ | tech-lead | none (ASCII folding is locale-independent; R1 tests the container locale) | yes, `OD-017` (2026-11-20) |
 | BQ-007 | BQ | product-owner | R1 (date semantics, was a working assumption) | yes, `OD-005` |
-| TQ-007 | TQ | tech-lead | none (open, non-blocking, not accepted: SEC-001, no rate limit or query timeout) | no, non-blocking (security-engineer review) |
-| BQ-008 | BQ | product-owner | none (open, non-blocking, not accepted: SEC-002, customer name in URL query strings) | no, non-blocking (security-engineer review) |
-| TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | no, non-blocking (regression-detective review) |
-| TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | no, non-blocking (security-engineer review) |
+| TQ-007 | TQ | tech-lead | none (open, non-blocking, not accepted: SEC-001, no rate limit or query timeout) | yes, `OD-018` (2026-11-20) |
+| BQ-008 | BQ | product-owner | none (open, non-blocking, not accepted: SEC-002, customer name in URL query strings) | yes, `OD-012` (2026-11-20) |
+| TQ-008 | TQ | tech-lead | none (ValidationProblem key casing differs GET vs POST, RD-1) | yes, `OD-019` (2026-11-20) |
+| TQ-009 | TQ | tech-lead | none (NUL in create customer name, pre-existing in VS-001, SEC-003 adjacent) | yes, `OD-020` (2026-11-20) |
+| TQ-011 | TQ | tech-lead | none (status filter input rules, criterion 9) | yes, `OD-021` (2026-11-20) |
 | OD-006 | OD | product-owner | R1 pickup (hard dependency VS-001 not `Done`) | yes, exception for R1 only |
 | OD-008 | OD | product-owner | R2 pickup (hard dependency VS-001 not `Done`) | yes, exception for R2 and VS-005 only |
 
-BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'; it must be answered before R1 reaches an environment where non-staff identities can obtain a token for the audience, and a named authorization policy is advised meanwhile.
+BQ-006 note (security-engineer review): severity is Low under the working assumption and becomes Critical if answered 'restricted'. Answered 2026-11-20 in `OD-011` (all orders visible to any authenticated caller, a named authorization policy now, revisit as Critical before customers can obtain tokens); the policy is follow-up code, not done here.
 
-Open, non-blocking and not accepted by the owner: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs). Both are Medium and do not block R1; the R1 PR may cite this paragraph.
+Both Medium findings are now decided, not accepted as risks: SEC-001 (`TQ-007`, no rate limit or query timeout; measured about 0.4-1.6 s per search at 1M rows) in `OD-018` (rate limiter and command timeout; the code is follow-up work), and SEC-002 (`BQ-008`, customer name in URL query strings and so in logs) in `OD-012` (personal data, GET kept, redaction requirements; the configuration is follow-up work). Until that follow-up lands the exposures described in the findings remain in the code. The R1 PR may cite this paragraph.
 
-Blockers (rows that block a rung) are all resolved for R1. The nine open rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) are non-blocking, open and not accepted by the owner; the folder rule says `Ready` needs zero open blockers, which these are not. R2 additionally waits for `VS-005` to be `Done`. [Superseded 2026-11-20: R2 is built stacked on VS-005 (`In progress`), the dependency rule is waived by `OD-008`, and R2 cannot merge before VS-005; see the pickup delta log.]
+Blockers (rows that block a rung) are all resolved for R1. The nine rows (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009) were non-blocking and are all answered (see the Resolved column). R2 additionally waits for `VS-005` to be `Done`. [Superseded 2026-11-20: R2 is built stacked on VS-005 (`In progress`), the dependency rule is waived by `OD-008`, and R2 cannot merge before VS-005; see the pickup delta log.]
 
 ## Priority inputs
 

@@ -9,7 +9,7 @@ Design Principles (simplest design, no speculative abstractions, no hard-coded v
 
 ## Quick Reference
 
-- One feature folder: `src/Api/Features/<Feature>/{<Feature>Endpoints.cs, <Feature>Service.cs, Dtos.cs}`. Group routes with `app.MapGroup("/api/<feature>")` (as the landed `src/Api/Features/Orders/OrdersEndpoints.cs` does) and register the group in `Program.cs`. Add a version segment (`/api/v1/<feature>`) only when an owner decision (OD) records API versioning; none does today
+- One feature folder: `src/Api/Features/<Feature>/{<Feature>Endpoints.cs, <Feature>Service.cs, Dtos.cs}`. Group routes with `app.MapGroup("/api/<feature>")` (as the landed `src/Api/Features/Orders/OrdersEndpoints.cs` does) and register the group in `Program.cs`. No version segment: OD-024 decided that routes stay `/api/<feature>`; adding `/api/v1/<feature>` later needs a new OD that supersedes it
 - Every endpoint declares `.Produces<T>(status)` for each response shape, or returns `Results<...>` typed results
 - Every endpoint has an explicit auth decision: `.RequireAuthorization()` on the group (as Orders does), a named policy `.RequireAuthorization("<policy>")` where roles or scopes differ, or a one-line comment "intentionally anonymous: <reason>"
 - Input binds to a typed `record` DTO; never parse `HttpContext.Request` by hand. Simple rules use DataAnnotations checked with `Validator.TryValidateObject` and return `Results.ValidationProblem` (the Orders default); FluentValidation is for cross-field rules (`creating-dtos-and-validation`)

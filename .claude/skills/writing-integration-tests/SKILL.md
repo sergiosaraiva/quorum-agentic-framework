@@ -17,7 +17,7 @@ description: Use when testing an endpoint end to end or anything that depends on
 | Overrides | Test-only service swaps via `ConfigureTestServices`; configuration via in-memory config, never edit `appsettings.json` |
 | Auth | Test authentication scheme in the factory instead of JWT bearer (`tests/CLAUDE.md`; `TestAuthHandler`, `X-Test-Anonymous` in `ApiFactory.cs`); test authenticated and anonymous calls |
 | Cancellation | Pass `TestContext.Current.CancellationToken` |
-| Error keys | camelCase everywhere (TQ-008): assert exact keys, case-sensitively, never `OrdinalIgnoreCase`, which hides a casing defect. Landed: `OrdersSearchTests.List_InvalidFilters_ErrorKeysAreExactlyTheCamelCaseParameterNames` |
+| Error keys | camelCase everywhere (OD-019, TQ-008): assert exact keys, case-sensitively, never `OrdinalIgnoreCase`, which hides a casing defect. Landed: `OrdersSearchTests.List_InvalidFilters_ErrorKeysAreExactlyTheCamelCaseParameterNames` |
 | Scope | Contract, validation, auth, persistence, status codes, Problem Details. Pure logic: `creating-xunit-tests` |
 
 ## Decision Tree

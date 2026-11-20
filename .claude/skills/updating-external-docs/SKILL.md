@@ -57,7 +57,7 @@ Adapted from Orwell's rules and Simplified Technical English (apply as guidance;
 **API reference entry**
 
 ```markdown
-### POST /api/v1/reports
+### POST /api/reports
 
 Creates a report. Requires the `reports.write` permission.
 

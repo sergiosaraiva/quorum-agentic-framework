@@ -21,7 +21,7 @@ Before the Entity step: ground behaviour in the KBs (`business-kb`, `qa-kb`), ci
 |-----|------------|
 | New feature touching database + API + Angular | Bug fix (touch only the broken layer) |
 | 3+ layer skills apply to the planned files | One field added to an existing slice (extend its files) |
-| | Backend-only or frontend-only change |
+| A feature whose slice delivers only some layers (for example backend only): use the rows it needs, see "Partial slices" | A change to existing files that adds no new feature (extend them) |
 
 ## The Sequence
 
@@ -32,13 +32,24 @@ Before the Entity step: ground behaviour in the KBs (`business-kb`, `qa-kb`), ci
 | 3 | `src/Api/Features/<Feature>/Dtos.cs` | `creating-dtos-and-validation` | The service needs request/response shapes |
 | 4 | `src/Api/Features/<Feature>/<Feature>Service.cs` | `creating-application-services` | The endpoint delegates to it |
 | 5 | `src/Api/Features/<Feature>/<Feature>Endpoints.cs` | `backend` | Route registration once the service exists |
-| 6 | `tests/Api.IntegrationTests/<Feature>EndpointTests.cs` (+ unit tests only for logic separable from the database) | `writing-integration-tests`, `creating-xunit-tests` | Backend proven before the frontend consumes it |
+| 6 | `tests/Api.IntegrationTests/<Feature>Endpoints*Tests.cs` (one or more files named for the behaviour, for example `OrdersEndpointsTests.cs`, `OrdersSearchTests.cs`; + unit tests only for logic separable from the database) | `writing-integration-tests`, `creating-xunit-tests` | Backend proven before the frontend consumes it |
 | 7 | `frontend/src/app/core/api/<resource>.api.ts` | `creating-angular-api-clients` | The component needs a typed client |
 | 8 | `frontend/src/app/features/<feature>/` (+ a signal store only if state is shared across unrelated components) | `frontend`, `managing-state-with-signals` | Built on the existing client |
 | 9 | `frontend/**/*.spec.ts` | `writing-angular-tests` | Tests the finished component |
 | 10 | Root or sub-`CLAUDE.md`, slice status | `updating-internal-docs` | Documents what was built |
 
 Invoke each named skill when you reach its step; the table is a routing pointer, not a substitute for its rules.
+
+## Partial slices
+
+A slice spec (`docs/slices/`) may deliver only some layers. Keep the order and drop the rows the spec does not deliver; do not add a layer to fill the table.
+
+| Slice delivers | Rows to run | Notes |
+|----------------|-------------|-------|
+| Backend only (for example VS-004 R1) | 1 to 6, 10 | Row 1 and 2 only if the schema changes. The API contract (DTOs, routes, error shape) is the hand-off to a later frontend slice; record it in the slice spec |
+| Frontend only | 7 to 10 | The backend contract must already exist; read its DTOs before the client (`verifying-cross-file-coupling`) |
+
+Whole-feature requests from the agents route here either way (`.claude/agents/code-engineer.md`).
 
 ## Example
 
@@ -48,7 +59,7 @@ Feature: "Team invites" - a user invites a teammate by email.
 2. TeamInviteConfiguration.cs + migration AddTeamInvite
 3. Dtos.cs: CreateInviteRequest(Email), InviteDto(Id, Email, Status, ExpiresAt)
 4. TeamInviteService (concrete): CreateAsync, ListPendingAsync
-5. TeamInviteEndpoints: POST / and GET / under /api/v1/invites, RequireAuthorization("invites:write")
+5. TeamInviteEndpoints: POST / and GET / under /api/invites, RequireAuthorization("invites:write")
 6. TeamInviteEndpointTests: create 201, invalid email 400, anonymous 401
 7. core/api/invites.api.ts
 8. features/invites/invite-list.ts + invite-form.ts (loading, error, empty and data states)

@@ -1,6 +1,6 @@
 ---
 name: creating-xunit-tests
-description: Use when writing unit tests for C# services and business logic in isolation from the database and network. xUnit v3 with built-in Assert only, AAA structure, Theory data, NSubstitute at I/O seams. The default for a service method unless a database or HTTP dependency is explicitly in scope.
+description: Use when writing unit tests for C# services and business logic in isolation from the database and network. xUnit v3 with built-in Assert only, AAA structure, Theory data, hand-written fakes at I/O seams. The default for a service method unless a database or HTTP dependency is explicitly in scope.
 ---
 
 # Creating xUnit Tests
@@ -14,7 +14,7 @@ description: Use when writing unit tests for C# services and business logic in i
 | Assertions | xUnit v3 built-in `Assert` only; no third-party assertion library. Expected first: `Assert.Equal(expected, actual)`. Exceptions: `Assert.Throws<T>` / `await Assert.ThrowsAsync<T>`. Explain with `Assert.True(cond, message)` / `Assert.Fail(message)` |
 | Cancellation | Pass `TestContext.Current.CancellationToken` to async calls (xUnit v3) |
 | Data | `[Theory]` with `[InlineData]` / `[MemberData]` for one rule over many inputs, not copied `[Fact]`s |
-| Doubles | NSubstitute only at I/O seams (HTTP client, clock, message bus). Pure classes and cheap in-memory collaborators are constructed for real |
+| Doubles | A hand-written fake class of the real seam (HTTP client, message bus), per `tests/CLAUDE.md`; no mocking library unless a recorded decision (OD) adopts one. Pure classes and cheap in-memory collaborators are constructed for real |
 | Time | Inject `TimeProvider`; use `FakeTimeProvider` in tests, never `DateTime.UtcNow` in logic |
 | Scope | Behaviour and branches that can break. Not getters, DI wiring, framework code or private methods |
 | Helpers | No custom assertion or test-base frameworks without 2+ current users |
@@ -23,7 +23,7 @@ description: Use when writing unit tests for C# services and business logic in i
 
 ```
 Pure logic or calculation?                 -> [Fact]/[Theory], no mocks
-Service with an external HTTP/bus seam?    -> NSubstitute the seam, assert on outcome and the call made
+Service with an external HTTP/bus seam?    -> hand-written fake of the seam, assert on outcome and the calls it recorded
 Depends on EF Core query behaviour, SQL, constraints, migrations? -> writing-integration-tests (Testcontainers); do not fake the DbContext
 Endpoint pipeline, auth, validation?       -> writing-integration-tests
 Asserting an exception?                    -> Assert.Throws and check the message or parameter name
@@ -72,7 +72,7 @@ public async Task SendReminder_InvoiceOverdue_CallsNotifierOnce()
 {
     // Arrange
     var clock = new FakeTimeProvider(new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
-    var notifier = Substitute.For<INotifier>();
+    var notifier = new FakeNotifier();   // hand-written class implementing INotifier; records its calls
     var sut = new InvoiceReminderService(notifier, clock);
     var invoice = new Invoice(Guid.NewGuid(), dueDate: new DateOnly(2026, 2, 1));
 
@@ -80,16 +80,29 @@ public async Task SendReminder_InvoiceOverdue_CallsNotifierOnce()
     await sut.SendReminderAsync(invoice, TestContext.Current.CancellationToken);
 
     // Assert
-    await notifier.Received(1).NotifyAsync(invoice.Id, Arg.Any<string>(), Arg.Any<CancellationToken>());
+    Assert.Equal([invoice.Id], notifier.NotifiedIds);
+}
+
+private sealed class FakeNotifier : INotifier
+{
+    public List<Guid> NotifiedIds { get; } = [];
+
+    public Task NotifyAsync(Guid invoiceId, string message, CancellationToken ct)
+    {
+        NotifiedIds.Add(invoiceId);
+        return Task.CompletedTask;
+    }
 }
 ```
+
+The names above are an example, not template code.
 
 ## Quality Checklist
 
 - [ ] AAA, descriptive name, one behaviour per test
 - [ ] Built-in `Assert` only, expected value first
 - [ ] Boundaries, null/empty and error paths covered, not just the happy path
-- [ ] Mocks only at I/O seams; no real database or network
+- [ ] Fakes only at I/O seams, hand-written; no mocking library; no real database or network
 - [ ] No `DateTime.UtcNow`, `Random` or `Thread.Sleep` in tests; tests are deterministic and order-independent
 - [ ] Each test would fail if the logic were wrong (not an always-true assertion)
 

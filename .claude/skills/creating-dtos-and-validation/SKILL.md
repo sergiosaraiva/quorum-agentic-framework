@@ -13,7 +13,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`.
 - One request type and one response type per use case. Never reuse one DTO for both directions (a request must not accept a response-only field)
 - Never return an EF Core entity from an endpoint; map to a response DTO with a static `FromEntity(...)` factory next to the DTO. No AutoMapper unless the team explicitly chooses it
 - No parallel domain/application/API DTO copies, no generic `Result<T>` envelope hierarchy, no validator for a type with no rules
-- Server-side validation is mandatory regardless of client-side checks
+- Server-side validation is mandatory regardless of client-side checks. DataAnnotations is the default for simple rules: call `Validator.TryValidateObject` in the endpoint, as the landed Orders code does (`OrdersEndpoints.cs`; `CreateOrderRequest` in `Dtos.cs` is the model). `AddValidation()` is not registered in `Program.cs`; an adopter who registers it gets automatic checking; add FluentValidation only for cross-field or conditional rules
 - A limit that mirrors a column length is one named `const` beside the DTO, reused by the validator and the EF configuration. The Angular form mirrors it as one named constant. Tunable business limits come from Options (`creating-configuration-options`)
 - Expose enums as strings (`JsonStringEnumConverter` or map to string), never raw ordinals
 - Response DTOs omit internal-only fields (soft-delete flags, audit principals the client should not see)
@@ -29,6 +29,8 @@ Two features need the same DTO?             -> duplicate until the third; share 
 ```
 
 ## Examples
+
+The first example below (FluentValidation, Reports) is illustrative, not template code; use it when a rule spans fields. The DataAnnotations example after it is the default; the landed `CreateOrderRequest` is the real one.
 
 ```csharp
 // Features/Reports/Dtos.cs
@@ -71,7 +73,7 @@ public sealed record UpdateProfileRequest(
 ## Quality Checklist
 
 - [ ] DTO is a `record`; request and response are separate types
-- [ ] The validator is actually invoked (DataAnnotations via `AddValidation()` is automatic; FluentValidation is not)
+- [ ] The validator is actually invoked: `Validator.TryValidateObject` for DataAnnotations as Orders does (automatic only if `AddValidation()` is registered); FluentValidation needs an explicit call
 - [ ] No entity exposed; no internal-only field in a response
 - [ ] Every string has a length limit; limits declared once
 - [ ] `FromEntity` lives with the DTO

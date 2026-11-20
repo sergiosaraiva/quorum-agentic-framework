@@ -36,7 +36,7 @@ Every product, business or behaviour claim rests on a record, not on recall.
 | Product owner | `{{PRODUCT_OWNER}}` | business behaviour, scope, priorities |
 | Privacy or compliance owner (optional; delete this row if none) | `{{PRIVACY_OWNER}}` | data classification, personal data in logs and URLs, retention |
 
-Technical questions go to the technical role, business questions to the business role, data-classification and privacy questions to the privacy role (the product owner if the row is deleted); record the question with the right `decider`. One person holding several roles still answers each record in the role it belongs to (proposed, pending owner confirmation). Business readers get outcome first in plain language, ids last in brackets; technical readers get ids, paths, commands, diffs.
+Technical questions go to the technical role, business questions to the business role, data-classification and privacy questions to the privacy role (the product owner if the row is deleted); record the question with the right `decider`. One person holding several roles still answers each record in the role it belongs to (OD-022). Business readers get outcome first in plain language, ids last in brackets; technical readers get ids, paths, commands, diffs.
 
 ## Tech Stack
 

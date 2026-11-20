@@ -21,6 +21,7 @@ This file exists because it is loaded when you work under `src/Infrastructure/`;
 | Time | `timestamptz`, UTC only (`DateTimeOffset`) |
 | Enums | stored as text with a check constraint, not as integers |
 | Audit columns | `created_at`, `updated_at` on every entity; soft delete (`deleted_at`) only when a requirement names it |
+| Database locale | every environment's database is created with a UTF-8 `LC_CTYPE` (for example `en_US.utf8`), written into the infrastructure code; case-insensitive text search uses `ILIKE` and depends on it for non-ASCII letters (OD-017) |
 | Nullability | entity properties follow nullable reference types; optional means `T?` and a nullable column |
 
 ## Migration workflow

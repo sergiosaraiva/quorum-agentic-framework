@@ -43,7 +43,7 @@ example: true
 | `id`, `kind`, `title` | `BQ-nnn` / `TQ-nnn` / `OD-nnn`; the prefix must match `kind` |
 | `status` | `open`, `answered`, `decided` or `closed` (no other value; lint and `schema.sql` reject it) |
 | `decider` | role that must answer (required) |
-| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; proposed definition, pending owner confirmation) to `P3`. A change edits the frontmatter and adds a `## History` line with the reason; the frontmatter is the current value |
+| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; confirmed in OD-022) to `P3`. A change edits the frontmatter and adds a `## History` line with the reason; the frontmatter is the current value |
 | `asked` | date the record was raised (`YYYY-MM-DD`) |
 | `answered` | optional date (`YYYY-MM-DD`) the answer or decision was recorded; lint uses it as the reference for `expires`. It is kept with the record but is not a database column and not a search filter |
 | `related` | other record ids; lint fails on an unknown id |

@@ -17,6 +17,8 @@ The Q&A KB (`questions/`, MCP server `qa-kb`) is the shared memory of every ques
 
 Ids are `BQ-001`, `TQ-001`, `OD-001` (zero padded, next free number, never reused). Files: `questions/records/<ID>.md`.
 
+Owner of the OD-versus-answer rule (proposed, pending owner confirmation; the owner has not decided it). An `OD` is mandatory for a waiver of a rule or gate (for example a slice pickup exception), a scope change and an accepted risk. An answered BQ/TQ settles a design choice by itself; it needs an `OD` only when the choice binds work beyond the question. The `decider` is the role that owns the subject of the decision, not the person present: one person holding both roles answers each record in the role it belongs to, and `## History` says so ("answered as technical lead"). When the subject has no clear owner role, record a TQ asking which role decides.
+
 ## Record fields (as shipped)
 
 Frontmatter:
@@ -26,7 +28,7 @@ Frontmatter:
 | `id`, `kind`, `title` | Prefix plus number; `kind` matches the prefix; one-line searchable title |
 | `status` | `open`, `answered`, `decided` or `closed` (no other value) |
 | `decider` | Role that owns the answer (a role, not a person); required |
-| `priority` | `P1` (blocks work) to `P3` |
+| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; proposed definition, pending owner confirmation) to `P3`. A change of priority edits the frontmatter and adds a History line with the reason in the same edit; the frontmatter is the current value |
 | `asked` | Date raised (`YYYY-MM-DD`) |
 | `answered` | Optional date the answer or decision was recorded |
 | `related` | Other record ids; lint fails on an unknown id |
@@ -54,11 +56,11 @@ Status flow: `open` -> `answered` (a question answered) or `decided` (an owner d
 | Rule | Detail |
 |------|--------|
 | When | In the session the answer is given |
-| Where | Update the existing record; else create one with the next free id. Before the first push run `python3 scripts/kb/check_chunks.py --against origin/main` (add `--against <branch>` per open sibling branch; offline, fetch first): it warns when an id carries a different title on that ref, which means a colliding new id; renumber yours and its citations. Merge order decides: the later branch renumbers |
+| Where | Update the existing record; else create one with the next free id. Before the first push run `python3 scripts/kb/check_chunks.py --against origin/main` (also `--against <branch>` per sibling branch; fetch first): a warning means a colliding id; the later branch renumbers its id and citations |
 | Who | An agent whose role includes records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself. Every other agent, and every read-only agent, returns `questions_to_record` (kind, question, decider, recommended option) in its final message; the calling session or `documentation-curator` writes the record |
 | Duplicates | Search first; update the record or close and supersede it, never silently overwrite |
 | Attribution | Decider role, date, who gave the answer |
-| Review ids | A review finding id (`SEC-001`, `RD-1`, `QG-1`) lives only in that review's output and is not stable. Cite the record id (`TQ-nnn`) everywhere; the id of the finding may appear once, in the record's History line, as origin. Never cite a review id alone |
+| Review ids | A review finding id (`SEC-001`, `RD-1`) is not stable. Cite the record id everywhere; the finding id may appear once, in History, as origin |
 | Then | Run `python3 scripts/kb/check_chunks.py`; re-ingest the Q&A KB if you use the pgvector backend (`questions/README.md`) |
 
 ## Flag is not ask

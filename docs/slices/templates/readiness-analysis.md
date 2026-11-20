@@ -1,6 +1,6 @@
 # Readiness analysis: VS-nnn
 
-Baseline commit: `<sha>` (date). Analyst: `<agent or person>`. Result: `Ready` / `Blocked by <ids>`.
+Baseline commit: `<sha>` (date). Analyst: `<agent or person>`. Result: `Ready` / `Ready for <rung>` / `Blocked by <ids>`.
 
 ## S1 Ground
 
@@ -20,7 +20,7 @@ Existing design or the `ux-usability-specialist` define output: flows, states (l
 
 ## S3 Design
 
-Simplest viable option; data model delta; API contract (routes, DTOs, status codes, auth); frontend components; risks; what is deferred. Rungs and files per rung.
+The design is written once, in the slice spec's `Design` and `Rungs` sections; do not copy it here. Link to them and list only the risks and deferred items this analysis found.
 
 ## S4 Dependencies
 
@@ -32,7 +32,7 @@ Simplest viable option; data model delta; API contract (routes, DTOs, status cod
 | Record | Type | Decider | Blocks which rung | Resolved? |
 |--------|------|---------|-------------------|-----------|
 
-The slice is `Ready` only when no row is unresolved.
+The slice is `Ready` only when no unresolved row blocks a rung; if unresolved rows block only some rungs, the result is `Ready for <rung>` for the others.
 
 ## Priority inputs
 

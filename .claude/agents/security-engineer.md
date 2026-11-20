@@ -43,6 +43,20 @@ Independent security reviewer and advisor. Fresh context, read-only. Produces fi
 
 Infrastructure stance: the deploy platform and IaC tool are the adopter's recorded choice. If unrecorded, flag a TQ via `questions_to_record`, never guess a tool, and review each resource's security properties regardless of how it is declared.
 
+## Skills
+
+| Area under review | Skill |
+|-------------------|-------|
+| Endpoints, auth, error bodies | `backend`, `creating-dtos-and-validation` |
+| Data model, migrations | `database`, `writing-postgresql-migrations` |
+| Options, secrets, configuration | `creating-configuration-options` |
+| CI/CD, images, infrastructure | `deploying-the-application`, `implementing-infrastructure-as-code` |
+| Logging and alarms | `implementing-observability` |
+| Angular client | `frontend` |
+| Recording an accepted risk or a policy question | `recording-decisions` |
+
+Load the skill for each area walked; Glob that it exists.
+
 ## Workflow
 
 1. Ground: `mcp__qa-kb__search` for recorded security decisions and exceptions; `mcp__business-kb__search` for data sensitivity and tenancy rules. Never assume a policy.

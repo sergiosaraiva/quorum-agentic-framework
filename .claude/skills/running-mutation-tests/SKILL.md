@@ -46,6 +46,8 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 
 The shipped `stryker-config.json` is the working form; the `mutate` paths above are an example. Patterns need a leading `**/` (a plain `src/...` path matched nothing when verified on 2026-11-20 with Stryker 5.1.0). Verify option names against the installed Stryker version.
 
+Which test projects run: in solution mode Stryker runs every test project of the solution (125 tests across both projects when verified). Behaviour that a unit test can observe alone (calculations, pure filters) needs only `Api.UnitTests`. Behaviour that shows only through the database or the HTTP pipeline (query ordering and tiebreaks, SQL translation, status codes) is killed only by `Api.IntegrationTests`, so each run starts containers and needs Docker. Keep `mutate` narrow and run it in the separate job, not the per-commit suite.
+
 ## Example: run and triage
 
 ```bash

@@ -14,6 +14,8 @@ Checks
   agents        `model` is opus, sonnet or haiku; `tools` never lists Agent or AskUserQuestion
                 (subagents cannot spawn subagents or ask the user; they return open items to the caller)
   index         skills/SKILL-INDEX.md lists every skill folder and nothing else
+  slices        (only when docs/slices/INDEX.md sits beside the lint root) each Mermaid `class` line matches
+                the slice's Status column; see check_slice_index
   size          agent file <= 16 KB, skill file <= 7 KB (warning; an error with --strict)
   coherence     (only when agents/_SHARED-PATTERNS.md exists, and it is itself checked as the owner) single
                 owner of two shared rules: rule 7 (KB unreachable fallback) and "What blocks"; see
@@ -315,6 +317,7 @@ def lint(root: Path, strict: bool = False, only: set[Path] | None = None, reader
     elif not index.exists() and skill_dirs:
         report.error(skills_dir, "SKILL-INDEX.md is missing")
     check_shared_rules(root, report)
+    check_slice_index(root, report)
     return report
 
 
@@ -426,6 +429,61 @@ def check_shared_rules(root: Path, report: Report) -> None:
         if has_kb and not any(re.search(KB_UNREACHABLE, ln, re.I) and re.search(r"rule 7", ln, re.I)
                               for ln in path.read_text(encoding="utf-8", errors="replace").splitlines()):
             report.error(path, "has KB MCP tools but no 'KB unreachable' line pointing to rule 7")
+
+
+SLICE_STATUS_CLASS = {"proposed": "proposed", "analysed": "proposed", "ready": "proposed",
+                      "in progress": "inprogress", "done": "done", "blocked": "blocked"}
+
+
+def check_slice_index(root: Path, report: Report) -> None:
+    """The Mermaid `class` lines in docs/slices/INDEX.md are hand edited; keep them equal to the Status column.
+    Skipped when the file is absent. Every table row `VS-nnn` needs a node `VSnnn` in the graph (opened by `[`, `(`
+    or `{`), a class that names it (`class A,B name`, trailing `;` optional, or `VSnnn:::name`) and the class
+    SLICE_STATUS_CLASS gives for its status. Errors: an unknown status, a row with a different cell count than
+    the header, and a file that has `VS-` rows but no header with an `Id` and a `Status` column (case-insensitive)."""
+    index = root.parent / "docs" / "slices" / "INDEX.md"
+    if not index.is_file():
+        return
+    text = index.read_text(encoding="utf-8")
+    status: dict[str, str] = {}
+    cols: list[str] = []
+    status_tables = 0
+    any_rows = False
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            cols = []
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if re.fullmatch(r"VS-\d+", cells[0]):
+            any_rows = True
+        if cells[0].lower() == "id":
+            cols = [c.lower() for c in cells]
+            status_tables += "status" in cols
+        elif cols and re.fullmatch(r"VS-\d+", cells[0]):
+            if len(cells) != len(cols):
+                report.error(index, f"{cells[0]}: {len(cells)} cells, the header has {len(cols)}")
+            elif "status" in cols:
+                status[cells[0].replace("-", "")] = cells[cols.index("status")]
+    if any_rows and not status_tables:
+        report.error(index, "slice rows found but no table header with an Id and a Status column")
+        return
+    block = re.search(r"```mermaid\n(.*?)```", text, re.S)
+    graph = block.group(1) if block else ""
+    nodes = set(re.findall(r"\b(VS\d+)\s*[\[({]", graph))
+    classed: dict[str, str] = {}
+    for m in re.finditer(r"^\s*class\s+([\w,\s]+?)\s+(\w+)\s*;?\s*(?:%%.*)?$", graph, re.M):
+        for n in re.split(r"[,\s]+", m.group(1).strip()):
+            classed[n] = m.group(2)
+    for m in re.finditer(r"\b(VS\d+)(?:\s*(?:\[[^\]\n]*\]|\([^)\n]*\)|\{[^}\n]*\}))?:::(\w+)", graph):
+        classed[m.group(1)] = m.group(2)
+    for node, st in sorted(status.items()):
+        want = SLICE_STATUS_CLASS.get(st.lower())
+        if want is None:
+            report.error(index, f"{node[:2]}-{node[2:]}: unknown Status {st!r}")
+        elif node not in nodes:
+            report.error(index, f"{node[:2]}-{node[2:]} has no node in the Mermaid graph")
+        elif classed.get(node) != want:
+            report.error(index, f"{node[:2]}-{node[2:]}: Status {st!r} needs Mermaid class {want!r}, found {classed.get(node)!r}")
 
 
 def main(argv: list[str] | None = None) -> int:

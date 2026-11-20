@@ -53,7 +53,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get(`${__ENV.API_BASE_URL}/api/v1/reports`, {
+  const res = http.get(`${__ENV.API_BASE_URL}/api/reports`, {
     headers: { Authorization: `Bearer ${__ENV.TEST_JWT}` },
   });
   check(res, { 'status is 200': (r) => r.status === 200 });
@@ -76,7 +76,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get(`${__ENV.API_BASE_URL}/api/v1/reports`, { tags: { endpoint: 'list' } });
+  const res = http.get(`${__ENV.API_BASE_URL}/api/reports`, { tags: { endpoint: 'list' } });
   check(res, { ok: (r) => r.status === 200 });
   sleep(1);   // think time
 }

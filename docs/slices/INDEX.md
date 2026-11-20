@@ -8,13 +8,13 @@ Status values: `Proposed`, `Analysed`, `Ready`, `In progress`, `Done`, `Blocked`
 
 | Id | Slice | Depends on (hard) | Value | Urgency | Unblocks | Effort | Priority | Readiness | Status | Rung | PR |
 |----|-------|-------------------|:-----:|:-------:|:--------:|:------:|:--------:|-----------|--------|------|----|
-| VS-001 | Orders: create and list (example) | none | 5 | 5 | 3 | 3 | 7.67 | Ready | In progress | R1 | #1 (example) |
+| VS-001 | Orders: create and list (example) | none | 5 | 5 | 3 | 3 | 7.67 | Ready | In progress | R1 | n/a (example) |
 | VS-002 | Invoices: generate from order (example) | VS-001 | 4 | 3 | 2 | 3 | 5.33 | Analysed, TQ-001 open | Analysed | - | - |
 | VS-003 | Refunds: partial refund (example) | VS-002 | 3 | 2 | 1 | 5 | 2.20 | Analysed, BQ-001 open | Analysed | - | - |
-| VS-004 | Order search and filters (example) | VS-001; R2 also VS-005 | 3 | 2 | 0 | 2 | 5.00 | Ready for R1; R2 built stacked on VS-005, which is not `Done` yet (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009 open, non-blocking) | In progress | - | - |
-| VS-005 | Orders: align statuses to BC-001 lifecycle (example) | VS-001 | 3 | 3 | 1 | 2 | 6.50 | Ready ([analysis](VS-005-order-status-alignment.md); OD-007, OD-008; BQ-009 open, non-blocking) | In progress | - | - |
+| VS-004 | Order search and filters (example) | VS-001; R2 also VS-005 | 3 | 2 | 0 | 2 | 5.00 | Ready for R1 (VS-001 waiver OD-006); R2: VS-001 waiver OD-008, stacked on VS-005, not merged before it (OD-004) (BQ-005, BQ-006, TQ-004, TQ-005, TQ-006, TQ-007, BQ-008, TQ-008, TQ-009 open, non-blocking) | In progress | - | - |
+| VS-005 | Orders: align statuses to BC-001 lifecycle (example) | VS-001 | 3 | 3 | 1 | 2 | 6.50 | Ready ([analysis](VS-005-order-status-alignment.md); OD-007; VS-001 waiver OD-008; BQ-009 open, non-blocking) | In progress | - | - |
 
-Columns: Value, Urgency, Unblocks and Effort are 1-5 scores (Unblocks may be 0); Priority is computed, not guessed; Rung is the last rung merged (see the guide, section 2). In the example, VS-001 has merged R1 (PR `#1`, an invented number); real rows link a real PR.
+Columns: Value, Urgency, Unblocks and Effort are 1-5 scores (Unblocks may be 0); Priority is computed, not guessed; Rung is the last rung merged (see the guide, section 2). In the example, VS-001 has merged R1 (PR shown as `n/a (example)`, never a number that could match a real PR); real rows link a real PR. Mermaid classes follow the Status column (`framework_lint` checks it): `Proposed`, `Analysed` and `Ready` use `proposed`, `In progress` uses `inprogress`, `Done` uses `done`, `Blocked` uses `blocked`.
 
 ## 2. Dependency graph
 
@@ -27,6 +27,8 @@ graph LR
   VS005 -. R2 only .-> VS004
   classDef inprogress fill:#fff3cd,stroke:#a67c00;
   classDef proposed fill:#eef,stroke:#669;
+  classDef done fill:#d4edda,stroke:#2e7d32;
+  classDef blocked fill:#f8d7da,stroke:#a71d2a;
   class VS001,VS004,VS005 inprogress;
   class VS002,VS003 proposed;
 ```

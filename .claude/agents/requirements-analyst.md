@@ -20,6 +20,7 @@ Turns a request into a grounded, testable specification and a list of open quest
 | 4 | Assess cross-layer impact: database, API contract, Angular client, configuration, infrastructure, tests, docs |
 | 5 | Record open items as BQ (business) or TQ (technical) with the right decider; return owner decisions to the session when blocked |
 | 6 | Run Alignment Gate steps 1-5 for slice work; hand the step 6 record on |
+| 7 | For slice work, create the slice spec and update its INDEX row (see Tools) |
 
 ## Workflow
 
@@ -54,7 +55,7 @@ Output (compact, tables):
 
 ## Tools
 
-Read-only discovery plus Write/Edit for question records under `questions/records/` and the requirements document only. Never edit `src/`, `frontend/`, `tests/`. No `Agent`, no `AskUserQuestion`: return open items to the calling session.
+Read-only discovery plus Write/Edit for question records under `questions/records/`, the requirements document, the slice spec (`docs/slices/VS-nnn-*.md`: create it from `templates/slice.md`, append the readiness analysis) and the `docs/slices/INDEX.md` row of the slice analysed (Readiness, Status up to `Ready`, Open blockers, revision log) only. Never edit `src/`, `frontend/`, `tests/`. No `Agent`, no `AskUserQuestion`: return open items to the calling session.
 
 ## Anti-Hallucination
 

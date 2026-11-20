@@ -12,7 +12,7 @@ The five records shipped here (`BQ-001`, `BQ-002`, `TQ-001`, `TQ-002`, `OD-001`)
 | `TQ` | Technical question: design, tooling, data model | tech lead | `open`, `answered`, `closed` |
 | `OD` | Owner decision: a recorded choice that binds later work, or an accepted risk (`accepted_risk: true`) | whoever owns it, or the role that owns the risk | `decided`, `closed` |
 
-An answered question that settles a design choice usually also produces an `OD` that cites it. An accepted risk is an `OD` too: the owner accepts a known, unfixed finding for a limited time (see `accepted_risk` and `expires` below).
+When a question also needs an `OD`, and which role decides, is in the `recording-decisions` skill ("Record types"). An accepted risk is an `OD` too: the owner accepts a known, unfixed finding for a limited time (see `accepted_risk` and `expires` below).
 
 ## Layout and format
 
@@ -43,7 +43,7 @@ example: true
 | `id`, `kind`, `title` | `BQ-nnn` / `TQ-nnn` / `OD-nnn`; the prefix must match `kind` |
 | `status` | `open`, `answered`, `decided` or `closed` (no other value; lint and `schema.sql` reject it) |
 | `decider` | role that must answer (required) |
-| `priority` | `P1` (blocks work) to `P3` |
+| `priority` | `P1` (blocks work, or must be answered before a milestone named in `## Question`; proposed definition, pending owner confirmation) to `P3`. A change edits the frontmatter and adds a `## History` line with the reason; the frontmatter is the current value |
 | `asked` | date the record was raised (`YYYY-MM-DD`) |
 | `answered` | optional date (`YYYY-MM-DD`) the answer or decision was recorded; lint uses it as the reference for `expires`. It is kept with the record but is not a database column and not a search filter |
 | `related` | other record ids; lint fails on an unknown id |

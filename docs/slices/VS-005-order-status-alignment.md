@@ -17,7 +17,7 @@ Orders carry the lifecycle states the business defines (draft, placed, paid, shi
 | Enums are stored as text with a check constraint | `src/Infrastructure/CLAUDE.md` (Enums convention; not a KB record) |
 | A destructive or narrowing schema change needs a recorded decision and a reviewed migration | `src/Infrastructure/CLAUDE.md`, root `CLAUDE.md` Immutable Rule 2 (not KB records) |
 
-Gaps (non-blocking, working assumptions below): how legacy rows and new orders map to BC-001 (`TQ-010`, tech lead); how a cancelled order is represented, since BC-001 has no such state (`BQ-009`, product owner).
+Gaps (non-blocking, working assumptions below): how legacy rows and new orders map to BC-001 (`TQ-010`, answered by `OD-007`); how a cancelled order is represented, since BC-001 has no such state (`BQ-009`, product owner).
 
 ## Acceptance criteria
 
@@ -44,9 +44,9 @@ In: the five-state vocabulary in `Infrastructure` (constants), the check constra
 | Frontend | none in code: the component renders `status` as text and models it as `string`; the unit-test fixture uses `draft` |
 | Ops | the migration is applied by the deploy job, not at API startup (Infrastructure guide); it needs review before a shared environment |
 
-Simplest option chosen: string constants beside the entity (Infrastructure cannot reference Api, and Api needs them for the default and for the R2 filter), one migration. Rejected: a C# enum with a value converter (a converter, a mapping table for the text values and no consumer needing more than strings); a transitional constraint accepting both vocabularies (a two-step rollout is only needed if old and new API versions share a database, see `TQ-010`); a `Domain` project (none exists, no logic to hold).
+Simplest option chosen: string constants beside the entity (Infrastructure cannot reference Api, and Api needs them for the default and for the R2 filter), one migration. Rejected: a C# enum with a value converter (a converter, a mapping table for the text values and no consumer needing more than strings); a transitional constraint accepting both vocabularies (a two-step rollout is only needed if old and new API versions share a database, see `TQ-010`, `OD-007`); a `Domain` project (none exists, no logic to hold).
 
-Mapping (working assumption, `TQ-010`, `BQ-009`):
+Mapping (decided in `OD-007`; `BQ-009` open):
 
 | Old | New | Reason |
 |-----|-----|--------|
@@ -59,7 +59,7 @@ Down: draft and placed -> `open`, paid, shipped and closed -> `paid`; informatio
 
 ## Dependencies
 
-Hard: `VS-001` (the orders entity and endpoints; still `In progress` in `INDEX.md`). Soft: none. Dependents: `VS-004` R2.
+Hard: `VS-001` (the orders entity and endpoints; still `In progress` in `INDEX.md`; waived by `OD-008`). Soft: none. Dependents: `VS-004` R2.
 
 ## Rungs
 
@@ -72,12 +72,13 @@ Hard: `VS-001` (the orders entity and endpoints; still `In progress` in `INDEX.m
 | Date | Change |
 |------|--------|
 | 2026-11-20 | Spec and readiness analysis created; implementation on branch `feat/vs005-vs004-r2`; `TQ-010`, `BQ-009` recorded (code-engineer and requirements-analyst; independent review pending) |
+| 2026-11-20 | Owner decisions: `TQ-010` answered (`OD-007`), dependency waiver (`OD-008`); `BQ-009` stays open, non-blocking (code-engineer) |
 
 ---
 
 # Readiness analysis: VS-005
 
-Baseline commit: `2a74f27` (2026-11-20, `main`, branch `feat/vs005-vs004-r2`). Analyst: `requirements-analyst` role (done in the same session as the build; independent reviewers run afterwards). Result: `Ready` (no blocking record; `TQ-010`, `BQ-009` are open and non-blocking). The KB MCP tools were not used; the same sources were read from `kb/chunks` and `questions/records`.
+Baseline commit: `2a74f27` (2026-11-20, `main`, branch `feat/vs005-vs004-r2`). Analyst: `requirements-analyst` role (done in the same session as the build; independent reviewers run afterwards). Result: `Ready` (no blocking record; `TQ-010` answered by `OD-007`, dependency waived by `OD-008`, `BQ-009` open and non-blocking). The KB MCP tools were not used; the same sources were read from `kb/chunks` and `questions/records`.
 
 ## S1 Ground
 
@@ -99,20 +100,21 @@ Not applicable: the component prints the status string; no new design.
 
 ## S3 Design
 
-See the spec above. Risks: an irreversible mapping (Down is lossy; take a backup before a shared environment); old API instances writing `open` after the migration would fail the constraint (a deploy-order concern, `TQ-010` option 4); an unexpected `cancelled` row stops the migration by design.
+See the spec above. Risks: an irreversible mapping (Down is lossy; take a backup before a shared environment); old API instances writing `open` after the migration would fail the constraint (a deploy-order concern: migrate first, then start the new API; side-by-side old and new instances need a two-step rollout, `OD-007`); an unexpected `cancelled` row stops the migration by design.
 
 ## S4 Dependencies
 
 | Depends on | Type (hard/soft) | Status | Conflict with open PR? |
 |------------|------------------|--------|------------------------|
-| VS-001 | hard | `In progress` in `INDEX.md`; the entity and endpoints exist in code; no owner exception recorded for VS-005 (see Pickup delta log) | none known; the branch `feat/trial-e11-f4-a4-vs004r2-vs005` was not inspected and may touch the same ids and files |
+| VS-001 | hard | `In progress` in `INDEX.md`; the entity and endpoints exist in code; waived for VS-005 by `OD-008` | none known; the branch `feat/trial-e11-f4-a4-vs004r2-vs005` was not inspected and may touch the same ids and files |
 
 ## S5 Decisions and blockers
 
 | Record | Type | Decider | Blocks which rung | Resolved? |
 |--------|------|---------|-------------------|-----------|
 | TQ-003 | TQ | tech-lead | the slice itself | yes, `OD-004` |
-| TQ-010 | TQ | tech-lead | none (working assumption: option 1) | no, non-blocking |
+| TQ-010 | TQ | tech-lead | none | yes, `OD-007` |
+| OD-008 | OD | product-owner | pickup (hard dependency VS-001 not `Done`) | yes, exception for VS-005 and VS-004 R2 only |
 | BQ-009 | BQ | product-owner | none (migration aborts on a cancelled row; no filter value for it) | no, non-blocking |
 
 ## Priority inputs
@@ -123,4 +125,4 @@ Value 3, Urgency 3, Unblocks 1, Effort 2, as scored in `INDEX.md` (priority 6.50
 
 | Date | Compared with | Result (unchanged / deltas) |
 |------|---------------|-----------------------------|
-| 2026-11-20 | `main` `2a74f27` (first analysis, written with the build) | n/a. Hard dependency VS-001 is `In progress`: the guide's rule (a slice cannot start while a hard dependency is below `Done`) is not met and no `OD` grants an exception for VS-005 (`OD-006` covers VS-004 R1 only). The owner decided VS-005 itself in `OD-004`; whether that also waives the dependency rule is for the owner to confirm |
+| 2026-11-20 | `main` `2a74f27` (first analysis, written with the build) | n/a. Hard dependency VS-001 is `In progress`: the guide's rule (a slice cannot start while a hard dependency is below `Done`) is not met by itself; the owner waived it for VS-005 and VS-004 R2 on 2026-11-20 (`OD-008`, pattern of `OD-006`). Mapping and deploy order decided in `OD-007` |

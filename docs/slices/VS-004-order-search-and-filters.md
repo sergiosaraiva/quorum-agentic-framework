@@ -75,7 +75,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | R2 implemented: `status` filter on the BC-001 states with criterion 9 made precise (exact, case-sensitive, one value, 400 for unknown); stacked on `VS-005`, which is `In progress` (code-engineer; independent review pending) |
 | 2026-11-20 | `TQ-011` recorded (non-blocking): input rules of the status filter (case, whitespace, blank), cited by criterion 9 (code-engineer) |
 | 2026-11-20 | `OD-008` recorded: the VS-001 dependency rule is waived for R2 and VS-005; R2 still merges after VS-005 (code-engineer) |
-| 2026-11-20 | Owner decisions recorded: `BQ-005`, `BQ-006`, `TQ-004` to `TQ-009`, `BQ-008` and `TQ-011` answered as `OD-010` to `OD-021` (documentation-curator); the slice code that follows from `OD-011`, `OD-016`, `OD-018`, `OD-019` and `OD-020` is tracked in the slice follow-up PR |
+| 2026-11-20 | Owner decisions recorded: `BQ-005`, `BQ-006`, `TQ-004` to `TQ-009`, `BQ-008` and `TQ-011` answered as `OD-010` to `OD-012` and `OD-015` to `OD-021` (documentation-curator); the slice code that follows from `OD-011`, `OD-016`, `OD-018`, `OD-019` and `OD-020` is tracked in the slice follow-up PR |
 
 ---
 

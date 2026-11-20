@@ -89,7 +89,7 @@ Baseline commit: `2a74f27` (2026-11-20, `main`, branch `feat/vs005-vs004-r2`). A
 | Prior decisions that apply | Align the code to BC-001 in a follow-up | `TQ-003`, `OD-004` |
 | Silent or conflicting | Silent: legacy-row mapping, the initial state, the representation of cancellation. Conflict (resolved by `OD-004`): code statuses vs BC-001 | `TQ-010`, `BQ-009` |
 
-Landed code facts (not KB; the five built BC-001 states, BC-001 now has six): status is a `varchar(20)` text column with `ck_order_status` (`open`, `paid`, `cancelled`); the only writer sets `open`; no code path sets `paid` or `cancelled`; the frontend shows the status as text.
+Landed code facts (not KB; the code at the baseline commit, before VS-005): status is a `varchar(20)` text column with `ck_order_status` (`open`, `paid`, `cancelled`); the only writer sets `open`; no code path sets `paid` or `cancelled`; the frontend shows the status as text.
 
 ## S2 Scope
 

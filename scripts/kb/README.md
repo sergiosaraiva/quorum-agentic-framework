@@ -9,7 +9,7 @@ Python 3.11+, standard library only for local mode. Run all commands from the re
 | `search.py` | CLI search, `--get`, `--graph`, `--open`, `--related`, `--stats` |
 | `mcp_server.py` | stdio MCP server, `--kb business` or `--kb qa` |
 | `ingest.py` | applies `kb/schema.sql` and `questions/schema.sql`, loads chunks and records with embeddings |
-| `check_chunks.py` | lint (unique ids, links resolve, word limits, frontmatter); `--write-toc` regenerates `kb/TOC.md` |
+| `check_chunks.py` | lint (unique ids, links resolve, word limits, frontmatter; warns on one-way `related`); `--against REF` warns on record ids whose title differs on another git ref (offline, fetched refs only); `--write-toc` regenerates `kb/TOC.md` |
 | `tests/` | `python3 -m unittest discover -s scripts/kb/tests` |
 
 ## What each backend actually does

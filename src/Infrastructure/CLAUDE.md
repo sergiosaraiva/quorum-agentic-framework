@@ -26,10 +26,11 @@ This file exists because it is loaded when you work under `src/Infrastructure/`;
 ## Migration workflow
 
 1. `dotnet ef migrations add <Name> --project src/Infrastructure --startup-project src/Api`.
-2. Read the generated SQL: `dotnet ef migrations script --idempotent`. Prefer additive changes; a destructive change (drop, rename, type narrowing) needs a recorded decision and a two-step rollout.
-3. Large tables: create indexes concurrently in a hand-edited migration with `suppressTransaction: true`.
-4. Never edit a migration already applied to a shared environment; add a new one.
-5. `EnsureCreated()` only in tests; apply migrations at deploy time through a job, not at API startup in production.
+2. `dotnet tool restore` first on a fresh checkout: `.config/dotnet-tools.json` pins `dotnet-ef` to the EF Core version in `Directory.Packages.props` (keep them equal when you bump one). After a model change, `dotnet ef migrations has-pending-model-changes --project src/Infrastructure --startup-project src/Api` must report no changes.
+3. Read the generated SQL: `dotnet ef migrations script --idempotent`. Prefer additive changes; a destructive change (drop, rename, type narrowing) needs a recorded decision and a two-step rollout.
+4. Large tables: create indexes concurrently in a hand-edited migration with `suppressTransaction: true`.
+5. Never edit a migration already applied to a shared environment; add a new one.
+6. `EnsureCreated()` only in tests; apply migrations at deploy time through a job, not at API startup in production.
 
 ## Do not
 

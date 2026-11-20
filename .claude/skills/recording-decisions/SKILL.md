@@ -56,10 +56,11 @@ Status flow: `open` -> `answered` (a question answered) or `decided` (an owner d
 | Rule | Detail |
 |------|--------|
 | When | In the session the answer is given |
-| Where | Update the existing record; else create one with the next free id (check open branches and PRs for id collisions) |
+| Where | Update the existing record; else create one with the next free id. Before the first push run `python3 scripts/kb/check_chunks.py --against origin/main` (also `--against <branch>` per sibling branch; fetch first): a warning means a colliding new id or a retitled record; renumber only a new record (the later branch) |
 | Who | An agent whose role includes records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself. Every other agent, and every read-only agent, returns `questions_to_record` (kind, question, decider, recommended option) in its final message; the calling session or `documentation-curator` writes the record |
 | Duplicates | Search first; update the record or close and supersede it, never silently overwrite |
 | Attribution | Decider role, date, who gave the answer |
+| Review ids | A review finding id (`SEC-001`, `RD-1`) is not stable. Cite the record id everywhere; the finding id may appear once, in History, as origin |
 | Then | Run `python3 scripts/kb/check_chunks.py`; re-ingest the Q&A KB if you use the pgvector backend (`questions/README.md`) |
 
 ## Flag is not ask

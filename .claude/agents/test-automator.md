@@ -26,7 +26,7 @@ Proves behaviour with tests that can fail. Writes only under `tests/` and `*.spe
 | Unit (services, pure logic) | `creating-xunit-tests` | `tests/Api.UnitTests/` |
 | Integration (real HTTP + PostgreSQL) | `writing-integration-tests` | `tests/Api.IntegrationTests/` |
 | Angular components, services | `writing-angular-tests` | `frontend/src/**/*.spec.ts` |
-| Mutation gate | `running-mutation-tests` | `stryker-config.json` (adopter-created at the repo root when the first hot path is gated) |
+| Mutation gate | `running-mutation-tests` | `stryker-config.json` at the repo root (shipped; the adopter sets `mutate` to the flagged hot-path files) |
 | E2E (explicit only) | `writing-playwright-e2e-tests` | `frontend/e2e/` |
 | Load (explicit only) | `load-and-performance-testing` | `tests/perf/` (created when first needed) |
 | DB performance (explicit only) | `tuning-postgresql-queries`, `scaling-performance-test-data` | lab dataset |
@@ -42,7 +42,7 @@ xUnit v3 built-in `Assert` only; Testcontainers for PostgreSQL; Vitest for Angul
 | 2 Integration | Per changed endpoint: authorized and unauthorized, validation failure, success shape, persistence effect, tenant or ownership isolation if present. Real database via Testcontainers; no mocked persistence |
 | 3 Angular | Per changed component or service: states (loading, error, empty, data), user interaction by role/label queries, API client with `provideHttpClientTesting` |
 | 4 Execute | Run each suite; capture output; on failure decide: test bug (fix it) or product bug (return to `code-engineer` with the failing test) |
-| 5 Mutation (hot path only) | Trigger: pricing, billing, auth or permission logic, or files listed in `stryker-config.json` (adopter-created). Run `dotnet stryker`; below the threshold, show survivors, add killing tests, escalate to a human if still short. A missing tool escalates, it does not silently pass |
+| 5 Mutation (hot path only) | Trigger: pricing, billing, auth or permission logic, or files listed in `stryker-config.json`. Run `scripts/run-mutation-tests.sh`; below the threshold, show survivors, add killing tests, escalate to a human if still short. A missing tool escalates, it does not silently pass |
 | 6 Output | Block below |
 
 ## Proportionality Limits
@@ -52,7 +52,7 @@ xUnit v3 built-in `Assert` only; Testcontainers for PostgreSQL; Vitest for Angul
 | Over-testing | Stop when every requirement, finding hint and branch with business effect is covered once |
 | Vacuous tests | Reject tests that assert only non-null, only that a mock was called, or restate the implementation |
 | Flakiness | No sleeps, wall-clock or ordering dependence; fixed seeds and injected time |
-| Coverage | A coverage figure is context, never the goal; list accepted gaps with a reason |
+| Coverage | A coverage figure is context, never the goal; list accepted gaps with a reason. Fill `coverage.changed_files_pct` from `scripts/coverage_changed.py` (commands in `tests/CLAUDE.md`, "Running"); files it lists as `not_measured` go in the accepted gaps |
 
 ## Output
 

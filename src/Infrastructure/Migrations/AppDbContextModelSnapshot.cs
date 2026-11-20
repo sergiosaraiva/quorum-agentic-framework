@@ -61,7 +61,7 @@ namespace Infrastructure.Migrations
 
                     b.ToTable("order", null, t =>
                         {
-                            t.HasCheckConstraint("ck_order_status", "status in ('open','paid','cancelled')");
+                            t.HasCheckConstraint("ck_order_status", "status in ('draft','placed','paid','shipped','closed')");
                         });
                 });
 #pragma warning restore 612, 618

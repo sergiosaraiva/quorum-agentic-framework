@@ -134,4 +134,63 @@ public class OrderListFilterTests
     {
         Assert.Equal(expected, OrdersService.EscapeLikePattern(term));
     }
+
+    [Theory]
+    [InlineData("draft")]
+    [InlineData("placed")]
+    [InlineData("paid")]
+    [InlineData("shipped")]
+    [InlineData("closed")]
+    [InlineData("  paid  ")]
+    public void Parse_Bc001Status_IsAcceptedAndTrimmed(string value)
+    {
+        var (filter, errors) = OrderListFilter.Parse(null, null, null, value);
+
+        Assert.Empty(errors);
+        Assert.Equal(value.Trim(), filter.Status);
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("PAID")]
+    [InlineData("Draft")]
+    [InlineData("open")]
+    [InlineData("cancelled")]
+    [InlineData("paid,shipped")]
+    [InlineData("pa\0id")]
+    public void Parse_UnknownStatus_ReturnsStatusErrorWithoutEchoingInput(string value)
+    {
+        var (filter, errors) = OrderListFilter.Parse(null, null, null, value);
+
+        var message = Assert.Single(Assert.Single(errors, e => e.Key == OrderListFilter.StatusKey).Value);
+        Assert.Equal("status must be one of: draft, placed, paid, shipped, closed.", message);
+        Assert.Null(filter.Status);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Parse_BlankStatus_MeansNoStatusFilter(string? blank)
+    {
+        var (filter, errors) = OrderListFilter.Parse(null, null, null, blank);
+
+        Assert.Empty(errors);
+        Assert.Null(filter.Status);
+    }
+
+    [Fact]
+    public void Parse_InvalidStatusAndInvalidDate_ReturnsBothErrors()
+    {
+        var (_, errors) = OrderListFilter.Parse("abc", null, null, "nope");
+
+        Assert.Contains(OrderListFilter.CreatedFromKey, errors.Keys);
+        Assert.Contains(OrderListFilter.StatusKey, errors.Keys);
+    }
+
+    [Fact]
+    public void OrderStatuses_All_IsTheFiveBc001StatesInLifecycleOrder()
+    {
+        Assert.Equal(["draft", "placed", "paid", "shipped", "closed"], OrderStatuses.All);
+    }
 }

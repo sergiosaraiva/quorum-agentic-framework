@@ -16,7 +16,8 @@ public sealed class OrdersService(AppDbContext db, IOptions<OrdersOptions> optio
             Id = Guid.CreateVersion7(),
             CustomerName = request.CustomerName.Trim(),
             TotalAmount = request.TotalAmount,
-            Status = "open",
+            // A new order starts as a draft: BC-001 lets the customer edit a draft freely (VS-005, TQ-010).
+            Status = OrderStatuses.Draft,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -75,6 +76,11 @@ public sealed class OrdersService(AppDbContext db, IOptions<OrdersOptions> optio
         {
             var pattern = "%" + EscapeLikePattern(name) + "%";
             query = query.Where(o => EF.Functions.ILike(o.CustomerName, pattern, LikeEscapeCharacter));
+        }
+
+        if (filter.Status is { } status)
+        {
+            query = query.Where(o => o.Status == status);
         }
 
         return query;

@@ -30,20 +30,22 @@ public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int Page
 
 /// <summary>
 /// Validated list filters (VS-004 R1, OD-002, OD-003, OD-005). Dates are UTC calendar days, both bounds inclusive;
-/// the name is a case-insensitive substring. Built only through <see cref="Parse"/>.
+/// the name is a case-insensitive substring. R2 (VS-004, OD-002, OD-004, TQ-010): the status is an exact,
+/// case-sensitive match on one BC-001 state. Built only through <see cref="Parse"/>.
 /// </summary>
-public sealed record OrderListFilter(DateOnly? CreatedFrom, DateOnly? CreatedTo, string? CustomerName)
+public sealed record OrderListFilter(DateOnly? CreatedFrom, DateOnly? CreatedTo, string? CustomerName, string? Status = null)
 {
     public const string DateFormat = "yyyy-MM-dd";
     public const string CreatedFromKey = "createdFrom";
     public const string CreatedToKey = "createdTo";
     public const string CustomerNameKey = "customerName";
+    public const string StatusKey = "status";
 
-    public static readonly OrderListFilter None = new(null, null, null);
+    public static readonly OrderListFilter None = new(null, null, null, null);
 
     /// <summary>Parses raw query values; Errors is empty when Filter is usable. Messages never echo input.</summary>
     internal static (OrderListFilter Filter, Dictionary<string, string[]> Errors) Parse(
-        string? createdFrom, string? createdTo, string? customerName)
+        string? createdFrom, string? createdTo, string? customerName, string? status = null)
     {
         var errors = new Dictionary<string, string[]>();
         var from = ParseDate(createdFrom, CreatedFromKey, errors);
@@ -70,7 +72,19 @@ public sealed record OrderListFilter(DateOnly? CreatedFrom, DateOnly? CreatedTo,
             }
         }
 
-        return (new OrderListFilter(from, to, name), errors);
+        string? validStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            validStatus = status.Trim();
+            if (!OrderStatuses.IsKnown(validStatus))
+            {
+                // Lists the allowed values, never the input. Repeated parameters arrive joined with a comma and land here too.
+                errors[StatusKey] = [$"{StatusKey} must be one of: {string.Join(", ", OrderStatuses.All)}."];
+                validStatus = null;
+            }
+        }
+
+        return (new OrderListFilter(from, to, name, validStatus), errors);
     }
 
     private static DateOnly? ParseDate(string? value, string key, Dictionary<string, string[]> errors)

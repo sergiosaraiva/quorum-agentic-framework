@@ -21,7 +21,7 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private static DateTimeOffset Utc(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int microsecond = 0) =>
         new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero).AddTicks(microsecond * 10L);
 
-    private async Task<Guid> SeedAsync(string customerName, DateTimeOffset createdAt, Guid? id = null)
+    private async Task<Guid> SeedAsync(string customerName, DateTimeOffset createdAt, Guid? id = null, string status = OrderStatuses.Draft)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -30,7 +30,7 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
             Id = id ?? Guid.CreateVersion7(),
             CustomerName = customerName,
             TotalAmount = 10m,
-            Status = "open",
+            Status = status,
             CreatedAt = createdAt,
             UpdatedAt = createdAt,
         };
@@ -140,6 +140,15 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [InlineData("createdFrom=2026-11-20&createdTo=2026-11-19", "createdTo")]
     [InlineData("customerName=%00", "customerName")]
     [InlineData("customerName=ac%00me", "customerName")]
+    // VS-004 R2, criterion 5: unknown status. Exact and case-sensitive (OD-002), one value only, old vocabulary rejected (OD-004).
+    [InlineData("status=unknown", "status")]
+    [InlineData("status=PAID", "status")]
+    [InlineData("status=Draft", "status")]
+    [InlineData("status=open", "status")]
+    [InlineData("status=cancelled", "status")]
+    [InlineData("status=paid&status=shipped", "status")]
+    [InlineData("status=paid,shipped", "status")]
+    [InlineData("status=pa%00id", "status")]
     public async Task List_InvalidFilter_ReturnsValidationProblem(string query, string expectedKey)
     {
         var response = await factory.CreateClient().GetAsync("/api/orders?" + query, Ct);
@@ -174,6 +183,26 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var errors = await AssertValidationProblemAsync(response, "createdFrom");
         var keys = errors.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToList();
         Assert.Equal(["createdFrom", "createdTo", "customerName"], keys);
+    }
+
+    [Fact]
+    public async Task List_InvalidStatus_ProblemDetailsNameTheAllowedValuesAndDoNotEchoInput()
+    {
+        var response = await factory.CreateClient().GetAsync("/api/orders?status=zzcancelledzz", Ct);
+
+        var errors = await AssertValidationProblemAsync(response, "status");
+        var message = errors.GetProperty("status")[0].GetString();
+        Assert.Equal("status must be one of: draft, placed, paid, shipped, closed.", message);
+        Assert.DoesNotContain("zzcancelledzz", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task List_InvalidStatusWithOtherInvalidFilters_ReportsAllKeys()
+    {
+        var response = await factory.CreateClient().GetAsync("/api/orders?createdFrom=abc&status=nope", Ct);
+
+        var errors = await AssertValidationProblemAsync(response, "createdFrom");
+        Assert.True(errors.TryGetProperty("status", out _));
     }
 
     private static async Task<JsonElement> AssertValidationProblemAsync(HttpResponseMessage response, string expectedKey)
@@ -313,5 +342,95 @@ public class OrdersSearchTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal([backslash], Ids(backslashPage));
         // "%" alone matches only names that contain a percent sign, not every name in range.
         Assert.Equal([percent], Ids(percentOnly));
+    }
+
+    [Theory]
+    [InlineData(OrderStatuses.Draft)]
+    [InlineData(OrderStatuses.Placed)]
+    [InlineData(OrderStatuses.Paid)]
+    [InlineData(OrderStatuses.Shipped)]
+    [InlineData(OrderStatuses.Closed)]
+    public async Task List_Status_ReturnsOnlyOrdersInThatState(string status)
+    {
+        var token = Token();
+        var ids = new Dictionary<string, Guid>();
+        foreach (var state in OrderStatuses.All)
+        {
+            ids[state] = await SeedAsync($"{token} {state}", Utc(1997, 1, 1), status: state);
+        }
+
+        var page = await ListAsync($"?customerName={token}&status={status}");
+
+        Assert.Equal([ids[status]], page.Items.Select(i => i.Id));
+        Assert.Equal(1, page.TotalCount);
+        Assert.All(page.Items, i => Assert.Equal(status, i.Status));
+    }
+
+    [Fact]
+    public async Task List_StatusAndOtherFilters_ReturnsOnlyOrdersMatchingAll()
+    {
+        var token = Token();
+        var hit = await SeedAsync($"{token} a", Utc(1998, 6, 15), status: OrderStatuses.Paid);
+        await SeedAsync($"{token} b", Utc(1998, 6, 15), status: OrderStatuses.Placed);
+        await SeedAsync($"{token} c", Utc(1998, 1, 1), status: OrderStatuses.Paid);
+
+        var page = await ListAsync($"?customerName={token}&createdFrom=1998-06-01&createdTo=1998-06-30&status=paid");
+
+        Assert.Equal([hit], page.Items.Select(i => i.Id));
+        Assert.Equal(1, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_StatusWithNoMatchingOrder_ReturnsEmptyItemsAndZeroTotal()
+    {
+        var token = Token();
+        await SeedAsync($"{token} a", Utc(1999, 1, 1), status: OrderStatuses.Draft);
+
+        var page = await ListAsync($"?customerName={token}&status=closed");
+
+        Assert.Empty(page.Items);
+        Assert.Equal(0, page.TotalCount);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("%20")]
+    public async Task List_BlankStatus_MeansNoStatusFilter(string blank)
+    {
+        var token = Token();
+        await SeedAsync($"{token} a", Utc(1999, 2, 1), status: OrderStatuses.Draft);
+        await SeedAsync($"{token} b", Utc(1999, 2, 2), status: OrderStatuses.Closed);
+
+        var page = await ListAsync($"?customerName={token}&status={blank}");
+
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_StatusFilteredSecondPage_TotalCountIsFilteredSet()
+    {
+        var token = Token();
+        for (var i = 0; i < 3; i++)
+        {
+            await SeedAsync($"{token} s{i}", Utc(2000, 1, 1 + i), status: OrderStatuses.Shipped);
+        }
+
+        await SeedAsync($"{token} other", Utc(2000, 1, 10), status: OrderStatuses.Paid);
+
+        var page = await ListAsync($"?customerName={token}&status=shipped&pageSize=2&page=2");
+
+        Assert.Single(page.Items);
+        Assert.Equal(3, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_StatusWithoutCredentials_ReturnsUnauthorized()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(ApiFactory.AnonymousHeader, "1");
+
+        var response = await client.GetAsync("/api/orders?status=paid", Ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

@@ -21,11 +21,16 @@ builder.Services.AddOptions<DatabaseOptions>()
 builder.Services.AddOptions<RateLimitingOptions>()
     .BindConfiguration(RateLimitingOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 
-builder.Services.AddDbContext<AppDbContext>((sp, o) => o
-    .UseNpgsql(
-        builder.Configuration.GetConnectionString("Default"),
-        npgsql => npgsql.CommandTimeout(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.CommandTimeoutSeconds))
-    .UseSnakeCaseNamingConvention());
+builder.Services.AddDbContext<AppDbContext>((sp, o) =>
+{
+    var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+    // TQ-016: the pool bound and the connection wait come from the validated Database options, never from a literal.
+    o.UseNpgsql(
+            DatabaseConnectionString.WithPoolSettings(
+                builder.Configuration.GetConnectionString("Default"), database.MaxPoolSize, database.ConnectionWaitTimeoutSeconds),
+            npgsql => npgsql.CommandTimeout(database.CommandTimeoutSeconds))
+        .UseSnakeCaseNamingConvention();
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<OrdersService>();
 

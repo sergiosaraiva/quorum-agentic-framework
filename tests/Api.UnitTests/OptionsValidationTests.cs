@@ -53,11 +53,31 @@ public class OptionsValidationTests
     public void DatabaseOptions_RetryAfterSeconds_IsRangeChecked(int value, bool expected) =>
         Assert.Equal(expected, IsValid(new DatabaseOptions { RetryAfterSeconds = value }));
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(1000, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(1001, false)]
+    public void DatabaseOptions_MaxPoolSize_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new DatabaseOptions { MaxPoolSize = value }));
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(300, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(301, false)]
+    public void DatabaseOptions_ConnectionWaitTimeoutSeconds_IsRangeChecked(int value, bool expected) =>
+        Assert.Equal(expected, IsValid(new DatabaseOptions { ConnectionWaitTimeoutSeconds = value }));
+
     [Fact]
     public void Defaults_ConcurrencyAndRetryAfter_AreTheChosenValues()
     {
         Assert.Equal(4, new RateLimitingOptions().ConcurrentRequestsPerUser);
         Assert.Equal(5, new DatabaseOptions().RetryAfterSeconds);
+        Assert.Equal(20, new DatabaseOptions().MaxPoolSize);
+        Assert.Equal(5, new DatabaseOptions().ConnectionWaitTimeoutSeconds);
     }
 
     [Fact]
@@ -160,7 +180,7 @@ public class OptionsValidationTests
         var options = new OrdersOptions();
 
         Assert.True(IsValid(options));
-        Assert.Equal(10_000, options.MaxPageNumber);
+        Assert.Equal(1000, options.MaxPageNumber);
         Assert.True((long)(options.MaxPageNumber - 1) * options.MaxPageSize < int.MaxValue);
     }
 

@@ -95,6 +95,10 @@ Use `scenarios` with `constant-arrival-rate` when the requirement is requests pe
 
 Pin the k6 image tag (verify the current one). Export results to your metrics backend (`--out`) to compare runs; alert on regression versus the last baseline.
 
+## Local single-machine measurement
+
+When no deployed target exists yet, an explicit (non-CI) test can seed a lab table and drive the real API in process: p50/p95/p99 over N repetitions per scenario, plus K users at the allowed concurrency to observe pool use, 503s and tail latency. Report it as one machine, no network, seeded data, never a production figure; re-measure on the deployment target. In this repo: `LoadMeasurementTests`, run command in `tests/CLAUDE.md` (Docker through the WSL engine), results in OD-030.
+
 ## Reading results
 
 Check the generator is not the bottleneck (k6 CPU), then correlate with server metrics: CPU, pool usage, database wait events, GC. A latency curve that bends upward before CPU saturates points at a lock, pool or downstream limit. Record findings and the tuning decision; rerun to confirm.

@@ -1,5 +1,6 @@
 """Unit tests. Run from the repo root: python3 -m unittest discover -s scripts/kb/tests"""
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -114,8 +115,10 @@ class IdCollisionTests(unittest.TestCase):
         self.repo = Path(self._tmp.name)
         self.qa = self.repo / "questions"
         (self.qa / "records").mkdir(parents=True)
-        self.git = lambda *a: subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=t", "-c", "user.email=t@t",
-                                              *a], check=True, capture_output=True)
+        env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+        self.git = lambda *a: subprocess.run(
+            ["git", "-C", str(self.repo), "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
+             "-c", "core.hooksPath=/dev/null", *a], check=True, capture_output=True, env=env)
         self.git("init", "-q", "-b", "main")
 
     def tearDown(self):
@@ -146,6 +149,11 @@ class IdCollisionTests(unittest.TestCase):
         self.git("checkout", "-q", "main")
         self.record("TQ-003", "Only here")
         self.assertEqual(check_chunks.id_collisions(["other"], self.qa, self.repo), [])
+
+    def test_ref_starting_with_dash_is_rejected(self):
+        out = check_chunks.id_collisions(["--output=x"], self.qa, self.repo)
+        self.assertEqual(len(out), 1)
+        self.assertIn("must not start with '-'", out[0])
 
     def test_unknown_ref_is_reported_not_raised(self):
         self.record("TQ-001", "Base")

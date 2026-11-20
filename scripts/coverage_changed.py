@@ -4,7 +4,9 @@
     dotnet test --solution Quorum.slnx --coverage --coverage-output-format cobertura --results-directory TestResults
     python3 scripts/coverage_changed.py --base origin/main TestResults/*.cobertura.xml
 
-Prints one JSON object: {"changed_files_pct": <float>, "files": {"<path>": <pct>}, "not_measured": ["<path>"]}.
+Prints one JSON object: {"changed_files_pct": <float or null>, "files": {"<path>": <pct>}, "not_measured": ["<path>"]}.
+`changed_files_pct` is null when no changed file was measured (never 0). Changed files are the committed range
+`<base>...HEAD` (added, modified or renamed); uncommitted edits are not included. Exit 2 on a bad input.
 Several Cobertura files (unit and integration projects) are merged: a line counts as covered if any file covers it.
 Changed `.cs` files under `src/` that no report mentions are listed in `not_measured`, not counted as 0 or 100.
 A figure is context, never the goal (`test-automator`, "Coverage").
@@ -49,12 +51,12 @@ def summarize(changed: list[str], lines: dict[str, dict[int, bool]]) -> dict:
         c = sum(data.values())
         covered, valid = covered + c, valid + len(data)
         files[f] = round(100 * c / len(data), 1)
-    return {"changed_files_pct": round(100 * covered / valid, 1) if valid else 0.0,
+    return {"changed_files_pct": round(100 * covered / valid, 1) if valid else None,
             "files": files, "not_measured": missing}
 
 
 def changed_cs_files(base: str, root: Path = REPO_ROOT) -> list[str]:
-    res = subprocess.run(["git", "-C", str(root), "diff", "--name-only", "--diff-filter=AM", f"{base}...HEAD"],
+    res = subprocess.run(["git", "-C", str(root), "diff", "--name-only", "--diff-filter=AMR", f"{base}...HEAD"],
                          capture_output=True, text=True, check=True)
     return [n for n in res.stdout.splitlines() if n.startswith("src/") and n.endswith(".cs")]
 
@@ -64,7 +66,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base", default="origin/main", help="git ref the change is measured against")
     ap.add_argument("reports", nargs="+", type=Path, help="Cobertura XML files")
     a = ap.parse_args(argv)
-    print(json.dumps(summarize(changed_cs_files(a.base), merged_lines(a.reports))))
+    if a.base.startswith("-"):
+        print(f"coverage_changed: invalid --base {a.base!r}", file=sys.stderr)
+        return 2
+    try:
+        print(json.dumps(summarize(changed_cs_files(a.base), merged_lines(a.reports))))
+    except (OSError, ET.ParseError, subprocess.CalledProcessError) as exc:
+        print(f"coverage_changed: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 

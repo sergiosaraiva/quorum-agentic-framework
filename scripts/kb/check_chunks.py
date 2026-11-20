@@ -182,6 +182,9 @@ def id_collisions(refs: list[str], qa_dir: Path = lib.QA_DIR, repo: Path | None 
         return res.stdout
 
     for ref in refs:
+        if ref.startswith("-"):
+            out.append(f"--against {ref}: a ref must not start with '-'")
+            continue
         try:
             names = [n for n in git("ls-tree", "-r", "--name-only", ref, "--", rel).splitlines() if n.endswith(".md")]
         except ValueError as exc:
@@ -195,7 +198,7 @@ def id_collisions(refs: list[str], qa_dir: Path = lib.QA_DIR, repo: Path | None 
             rid, title = other.get("id"), other.get("title")
             if rid in local and title is not None and title != local[rid].title:
                 out.append(f"{rid}: title differs on {ref} ({title!r} there, {local[rid].title!r} here); "
-                           "one of the two is a colliding new id, renumber it before merge")
+                           "either a colliding new id or a retitled record; renumber only if the record is new")
     return out
 
 

@@ -45,7 +45,20 @@ class CoverageTests(unittest.TestCase):
 
     def test_no_measured_files_is_zero_with_everything_listed(self):
         out = cc.summarize(["src/B.cs"], {})
-        self.assertEqual((out["changed_files_pct"], out["not_measured"]), (0.0, ["src/B.cs"]))
+        self.assertEqual((out["changed_files_pct"], out["not_measured"]), (None, ["src/B.cs"]))
+        self.assertIn('"changed_files_pct": null', cc.json.dumps(out))
+
+    def test_missing_report_exits_2(self):
+        self.assertEqual(cc.main(["--base", "main", "/nonexistent/report.xml"]), 2)
+
+    def test_malformed_report_exits_2(self):
+        with tempfile.TemporaryDirectory() as t:
+            bad = Path(t) / "bad.xml"
+            bad.write_text("<coverage")
+            self.assertEqual(cc.main(["--base", "main", str(bad)]), 2)
+
+    def test_base_starting_with_dash_is_rejected(self):
+        self.assertEqual(cc.main(["--base=--output=x", "r.xml"]), 2)
 
 
 if __name__ == "__main__":

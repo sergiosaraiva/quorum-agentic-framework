@@ -10,7 +10,7 @@ description: Use when proving that tests on hot-path business logic (pricing, ca
 | Topic | Rule |
 |-------|------|
 | Idea | Coverage shows a line ran; mutation testing breaks the line and checks a test fails |
-| Tool | `dotnet-stryker` as a pinned local tool in `.config/dotnet-tools.json`; run `scripts/run-mutation-tests.sh` (restores, then runs `stryker-config.json`). Changing the pin needs human approval. This repo's tests run on Microsoft.Testing.Platform, so the config sets `"test-runner": "mtp"` and `"solution"`; Stryker lists that runner as preview. A `test-projects` list is rejected in solution mode |
+| Tool | `dotnet-stryker` as a pinned local tool in `.config/dotnet-tools.json`; run `scripts/run-mutation-tests.sh` (restores, then runs `stryker-config.json`). Changing the pin needs human approval. This repo's tests run on Microsoft.Testing.Platform, so the config sets `"test-runner": "mtp"` and `"solution"`; Stryker lists that runner as preview. A `test-projects` list was rejected in solution mode (observed, not re-run in CI) |
 | Scope | Hot-path files only (money math, rules engines, authorization checks, anything the team flags). Not CRUD glue, not the whole solution |
 | Threshold | Set `thresholds.break` per maturity (start near 70, ratchet up). Below `break` the run fails |
 | Survivors | A survivor is a test gap until reasoned otherwise. Add one targeted test for the missed behaviour; do not expand the suite for its own sake |
@@ -44,9 +44,9 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 }
 ```
 
-The shipped `stryker-config.json` is the working form; the `mutate` paths above are an example. Patterns need a leading `**/` (a plain `src/...` path matched nothing when verified on 2026-11-20 with Stryker 5.1.0). Verify option names against the installed Stryker version.
+The shipped `stryker-config.json` is the working form; the `mutate` paths above are an example. Patterns need a leading `**/` (a plain `src/...` path matched nothing in the trial run on 2026-11-20 with Stryker 5.1.0, not re-run in CI). Verify option names against the installed Stryker version.
 
-Which test projects run: in solution mode Stryker runs every test project of the solution (125 tests across both projects when verified). Behaviour that a unit test can observe alone (calculations, pure filters) needs only `Api.UnitTests`. Behaviour that shows only through the database or the HTTP pipeline (query ordering and tiebreaks, SQL translation, status codes) is killed only by `Api.IntegrationTests`, so each run starts containers and needs Docker. Keep `mutate` narrow and run it in the separate job, not the per-commit suite.
+Which test projects run: in solution mode Stryker ran every test project of the solution (observed in the trial run on 2026-11-20, not re-run in CI; counts depend on the code and Stryker version). Behaviour that a unit test can observe alone (calculations, pure filters) needs only `Api.UnitTests`. Behaviour that shows only through the database or the HTTP pipeline (query ordering and tiebreaks, SQL translation, status codes) is killed only by `Api.IntegrationTests`, so each run starts containers and needs Docker. Keep `mutate` narrow and run it in the separate job, not the per-commit suite.
 
 ## Example: run and triage
 

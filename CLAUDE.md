@@ -123,7 +123,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 
 Before any coding or documentation task, state the pipeline in one line, with a few words of reason per skipped stage, for example: `Pipeline: full lane - requirements-analyst skip (small scope) - code-engineer -> QG||RD -> test-automator - docs: none - KB check: done (BC-001) - Alignment Gate: applies (src/)`.
 
-Loop-back rule: findings return to the producing agent; at most 3 rounds per gate, then escalate to a human. Reviewers report evidence (file:line plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
+Loop-back rule: findings return to the producing agent; at most 3 rounds per gate, then escalate to a human. Reviewers report evidence (file plus anchor, line optional and never in stored docs, plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
 
 ## Delegation Is Required
 
@@ -144,7 +144,7 @@ Run the local AI review before the first push: `python3 scripts/ai_review_local.
 ```bash
 dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format Quorum.slnx --verify-no-changes   # backend (tests run on Microsoft.Testing.Platform)
 (cd frontend && npm ci && npm run build && npm test)              # frontend
-python3 scripts/framework_lint.py                                 # agents and skills: frontmatter, names, sizes
+python3 scripts/framework_lint.py                                 # agents and skills: frontmatter, names, sizes, shared rules
 python3 scripts/kb/check_chunks.py                                # KB chunks and Q&A records
 python3 -m unittest discover -s scripts/kb/tests                  # KB tooling tests
 python3 -m unittest discover -s scripts/tests                     # framework lint and local review tests

@@ -44,15 +44,15 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 {
   "claims_reviewed": 12,
   "findings": [
-    {"claim": "string", "location": "doc:section", "status": "ungrounded|stale|incomplete|fabricated-citation|conflict|gate-failure", "evidence": "path#anchor, tool result, gate output, or 'not found'", "confidence": 0.85}
+    {"id": "DR-1", "category": "grounding|completeness|gate|consistency|style", "status": "ungrounded|stale|incomplete|fabricated-citation|conflict|gate-failure", "file": "docs/x.md", "anchor": "section heading", "claim": "string", "scenario": "why it fails: path#anchor, tool result, gate output, or 'not found'", "fix": "string", "confidence": 0.85}
   ],
   "coverage_gaps": ["undocumented surface or review dimension not performed"],
-  "style_findings": [{"issue": "string", "location": "doc:section"}],
-  "unaudited": [{"claim": "string", "location": "doc:section", "reason": "referent not supplied"}]
+  "style_findings": [{"issue": "string", "file": "docs/x.md", "anchor": "section heading"}],
+  "unaudited": [{"claim": "string", "file": "docs/x.md", "anchor": "section heading", "reason": "referent not supplied"}]
 }
 ```
 
-The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `coverage_gaps` as unverified; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
+The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Finding form: `_SHARED-PATTERNS.md`; `status` replaces `severity` and maps through "What blocks" (`claim` is agent-specific). Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `coverage_gaps` as unverified; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
 
 ## Tools
 

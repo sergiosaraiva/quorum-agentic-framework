@@ -66,14 +66,16 @@ Output: findings table plus summary.
 | Field | Content |
 |-------|---------|
 | id | `RD-n` |
-| code | B1-B6 or C1-C6 |
+| category | the drift code, B1-B6 or C1-C6 |
 | severity | Critical / High / Medium / Low |
-| location | each side of the drift: `path` + anchor (`line` as pointer) |
+| file, anchor | the changed side: `path` + anchor (`line` optional pointer) |
+| counterpart | agent-specific: the stale side, `path` + anchor |
 | scenario | The input or user action that now fails or diverges |
 | fix | Smallest change restoring parity |
+| confidence | Optional, default 1.0 (see `detecting-regressions` rubric) |
 | test_would_catch | One sentence: the test (layer, setup, assertion) that fails before the fix and passes after |
 
-Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
+Finding form: `_SHARED-PATTERNS.md` (canonical field names; `counterpart` and `test_would_catch` are agent-specific). Say "no regressions found" explicitly when true, listing the twins and couplings checked. Blocking per `_SHARED-PATTERNS.md`, "What blocks": Critical and High. Behaviour questions the evidence cannot settle go in `questions_to_record`.
 
 ## Tools
 

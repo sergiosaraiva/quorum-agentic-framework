@@ -41,7 +41,7 @@ Edges point from a prerequisite to the slice that depends on it.
 | VS-003 | BQ-001 (example) | product owner | Does the 30-day refund window of BC-003 apply to digital goods? The KB is silent |
 | VS-004 | VS-005 (example) | tech lead | R2 (status filter) waits for the status alignment decided in OD-004; R1 is not blocked |
 | VS-004 | BQ-005, BQ-006, TQ-004, TQ-005, TQ-006 (example) | product owner / tech lead | Non-blocking: sort order, result visibility, currency for a deferred amount filter, typed-binding problem details for `page`/`pageSize` (TQ-005), container locale for case folding (TQ-006); working assumptions in the readiness analysis. BQ-006 is P1: answer it before R1 reaches any environment where non-staff identities can get a token |
-| VS-004 | TQ-007, BQ-008, TQ-008, TQ-009 (example) | tech lead / product owner | Non-blocking, from the R1 review: rate limit and query timeout for search, customer name as personal data in URLs, error-key casing, NUL in create. TQ-007 and BQ-008 are accepted until answered |
+| VS-004 | TQ-007, BQ-008, TQ-008, TQ-009 (example) | tech lead / product owner | Non-blocking, from the R1 review: rate limit and query timeout for search, customer name as personal data in URLs, error-key casing, NUL in create. TQ-007 and BQ-008 stay open and are not accepted (an acceptance is an OD with `accepted_risk` and `expires`, recorded only once the owner accepts) |
 
 ## 4. Revision log
 

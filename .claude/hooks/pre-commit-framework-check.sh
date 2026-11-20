@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Pre-commit hook: lint staged agent and skill frontmatter.
-# Scope: .claude/agents/*.md (names starting with "_" are skipped) and .claude/skills/<name>/SKILL.md.
+# Scope: .claude/agents/*.md (names starting with "_" are not linted as agents) and .claude/skills/<name>/SKILL.md
+# for frontmatter; any staged .md under .claude/agents or .claude/skills, or scripts/framework_lint.py, triggers the
+# run because the shared-rule checks read every such file.
 # When scripts/framework_lint.py exists it lints a temp copy of the staged index (git checkout-index),
 # so partial staging and staged deletions are judged correctly; otherwise the inline check below runs:
 #   - frontmatter block present and valid YAML (PyYAML if installed, else a simple key: value parser)
@@ -19,7 +21,7 @@ CHANGED=()
 while IFS= read -r line; do
   [ -n "$line" ] && CHANGED+=("$line")
 done < <(git diff --cached --name-only --diff-filter=ACMD \
-  | grep -E '^\.claude/(agents/[^/]+\.md|skills/[^/]+/SKILL\.md|skills/SKILL-INDEX\.md)$' || true)
+  | grep -E '^(\.claude/(agents|skills)/.+\.md|scripts/framework_lint\.py)$' || true)
 
 if [ "${#CHANGED[@]}" -eq 0 ]; then
   echo "No agent or skill files staged, skipping framework check."

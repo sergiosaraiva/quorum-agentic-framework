@@ -65,7 +65,7 @@ Check: only a synchronous `ExportService.ExportAsync` exists; no queue or worker
 
 ## Output
 
-Per finding: location in the doc, quoted claim, status, confidence, evidence (file:anchor or "not found, searched X, Y"), suggested fix. Then `coverage_gaps` and `format_notes`.
+Per finding (form in `_SHARED-PATTERNS.md`): `id`, `category`, `status`, `file` + `anchor` of the doc, quoted `claim`, `scenario` (evidence: file:anchor or "not found, searched X, Y"), `fix`, `confidence`. Then `coverage_gaps` and `format_notes`.
 
 ## Quality Checklist
 

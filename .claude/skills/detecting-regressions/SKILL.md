@@ -33,7 +33,7 @@ Not B6: a documented expected-status recovery (404 to `null`) that rethrows or l
 3. **Score** each candidate with the rubric.
 4. **Verifier sub-pass**: for findings at 0.80 or above, re-read both sides once more; this removes false positives from renames completed everywhere.
 5. **Write `test_would_catch`** for every confirmed finding: the concrete test that would have failed.
-6. Report each finding with file:line on both sides, the failing scenario and the fix direction.
+6. Report each finding with file + anchor on both sides (line optional in review output), the failing scenario and the fix.
 
 ## Examples
 

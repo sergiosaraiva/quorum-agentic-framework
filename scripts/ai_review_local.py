@@ -12,6 +12,9 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 --require is not set; 1 blocking findings; 2 usage or environment error;
 3 round cap reached (hand the branch to a human).
 
+Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
+Critical, High, Blocker -> blocking, Medium -> warning, Low or Info -> info; anything else -> warning.
+
 Standard library only. Use --dry-run to print the prompt without calling the model.
 """
 from __future__ import annotations
@@ -133,9 +136,28 @@ def split_diff(diff: str, limit: int) -> list[str]:
 MAX_PRIOR_FINDINGS = 30
 
 
+def _first(f: dict, *keys: str, default=""):
+    """First non-empty value among `keys`: OUTPUT_CONTRACT names (evidence, failing_scenario, suggestion, line)
+    or the canonical Finding form of the agent files (scenario, fix, file + anchor)."""
+    for k in keys:
+        if f.get(k) not in (None, ""):
+            return f[k]
+    return default
+
+
+def _with_aliases(f: dict) -> dict:
+    """Copy of a finding with the contract names filled from the canonical names when missing."""
+    g = dict(f)
+    for want, alts in (("evidence", ("scenario",)), ("failing_scenario", ("scenario",)),
+                       ("suggestion", ("fix",)), ("line", ("anchor",))):
+        if g.get(want) in (None, "") and _first(f, *alts) != "":
+            g[want] = _first(f, *alts)
+    return g
+
+
 def _prior_text(prior: list[dict]) -> str:
     """Previous findings as JSON, capped by item count so the JSON is never cut mid-structure."""
-    shown = prior[:MAX_PRIOR_FINDINGS]
+    shown = [_with_aliases(f) for f in prior[:MAX_PRIOR_FINDINGS]]
     text = json.dumps(shown, indent=1)
     if len(prior) > len(shown):
         text += f"\n({len(prior) - len(shown)} more earlier findings omitted)"
@@ -178,14 +200,18 @@ def _extract_json_object(text: str) -> dict:
     raise ValueError("no JSON object in model output")
 
 
+SEVERITY_MAP = {"blocking": "blocking", "warning": "warning", "info": "info",
+                "critical": "blocking", "high": "blocking", "blocker": "blocking",
+                "medium": "warning", "low": "info"}
+
+
 def normalize_severity(raw, index: int = 0) -> str:
-    """blocking|warning|info (`blocker` is accepted). Anything else becomes `warning` with a printed notice,
-    so a malformed severity can neither hide a finding as info nor block a merge by accident."""
-    if isinstance(raw, str):
-        sev = raw.strip().lower()
-        sev = "blocking" if sev == "blocker" else sev
-        if sev in SEVERITIES:
-            return sev
+    """Map a severity onto blocking|warning|info (case-insensitive), per "What blocks" in
+    `.claude/agents/_SHARED-PATTERNS.md`: Critical, High, Blocker -> blocking; Medium -> warning; Low -> info;
+    blocking, warning and info pass through. Anything else becomes `warning` with a printed notice, so a
+    malformed severity can neither hide a finding as info nor block a merge by accident."""
+    if isinstance(raw, str) and raw.strip().lower() in SEVERITY_MAP:
+        return SEVERITY_MAP[raw.strip().lower()]
     print(f"notice: findings[{index}] has unknown severity {raw!r}; treated as warning", file=sys.stderr)
     return "warning"
 
@@ -218,7 +244,7 @@ def call_model(prompt: str, model: str, claude_bin: str, timeout: int) -> str:
 def merge(findings: list[dict]) -> list[dict]:
     seen: dict[tuple, dict] = {}
     for f in findings:
-        key = (f.get("file"), f.get("line"), f.get("title"))
+        key = (f.get("file"), _first(f, "line", "anchor", default=None), _first(f, "title", "scenario", default=None))
         if key not in seen or SEVERITIES.index(f["severity"]) < SEVERITIES.index(seen[key]["severity"]):
             seen[key] = f
     return sorted(seen.values(), key=lambda f: (SEVERITIES.index(f["severity"]), str(f.get("file"))))
@@ -231,10 +257,10 @@ def render_markdown(findings: list[dict], rnd: int, model: str, base: str) -> st
         lines.append("No findings.")
     for f in findings:
         lines += [f"## [{f['severity']}] {f.get('title', '')}",
-                  f"`{f.get('file')}:{f.get('line')}` ({f.get('agent', 'reviewer')})", "",
-                  f"Evidence: {f.get('evidence', '')}", "",
-                  f"Failing scenario: {f.get('failing_scenario', '')}", "",
-                  f"Suggestion: {f.get('suggestion', '')}", ""]
+                  f"`{f.get('file')}:{_first(f, 'line', 'anchor', default='')}` ({f.get('agent', 'reviewer')})", "",
+                  f"Evidence: {_first(f, 'evidence', 'scenario')}", "",
+                  f"Failing scenario: {_first(f, 'failing_scenario', 'scenario')}", "",
+                  f"Suggestion: {_first(f, 'suggestion', 'fix')}", ""]
     return "\n".join(lines)
 
 

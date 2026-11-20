@@ -70,9 +70,9 @@ Rate by frequency x impact x persistence. Accessibility failures that block keyb
 ## 8. Finding format
 
 ```
-UX-01  Major  Orders table, "Refund" action
-Evidence: Walkthrough of "refund an invoice": the button label is "Process"; no confirmation; success shows nothing.
-Heuristic: visibility of status, error prevention
+UX-1  Major  Orders table, "Refund" action (file + anchor)
+Scenario: Walkthrough of "refund an invoice": the button label is "Process"; no confirmation; success shows nothing.
+Category: visibility of status, error prevention
 Fix: label "Refund invoice", confirm dialog stating amount, success message with a link to the refund.
 ```
 

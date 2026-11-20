@@ -3,6 +3,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -81,6 +82,111 @@ class LintTests(unittest.TestCase):
             errors = check_chunks.lint(kb, qa)
             self.assertTrue(any("does not resolve" in e for e in errors))
             self.assertTrue(any("duplicate" in e for e in errors))
+
+
+class AcceptedRiskTests(unittest.TestCase):
+    """OD records with `accepted_risk: true` and `expires`."""
+    TODAY = date(2026, 6, 1)
+
+    def lint(self, od_front="accepted_risk: true\nexpires: 2026-12-31", od_body="## Decision\n\nAccepted until the owner answers.\n",
+             od_extra="answered: 2026-03-01", related="[TQ-001]", kind="OD", today=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            kb, qa = Path(tmp) / "kb", Path(tmp) / "qa"
+            (kb / "chunks").mkdir(parents=True)
+            (qa / "records").mkdir(parents=True)
+            (qa / "records" / "TQ-001.md").write_text(
+                "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n---\nbody\n")
+            (qa / "records" / f"{kind}-002.md").write_text(
+                f"---\nid: {kind}-002\nkind: {kind}\ntitle: D\nstatus: decided\ndecider: tech-lead\nasked: 2026-02-01\n"
+                f"{od_extra}\nrelated: {related}\n{od_front}\n---\n{od_body}")
+            warnings: list[str] = []
+            errors = check_chunks.lint(kb, qa, today=today or self.TODAY, warnings=warnings)
+            return errors, warnings
+
+    def test_valid_accepted_risk_is_clean(self):
+        self.assertEqual(self.lint(), ([], []))
+
+    def test_loader_keeps_fields_in_extra(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "OD-002.md"
+            p.write_text("---\nid: OD-002\nkind: OD\ntitle: D\nstatus: decided\ndecider: x\nasked: 2026-02-01\n"
+                         "accepted_risk: true\nexpires: 2026-12-31\n---\n## Decision\nx\n")
+            r = lib.record_from_file(p)
+            self.assertIs(r.extra["accepted_risk"], True)
+            self.assertEqual(r.extra["expires"], "2026-12-31")
+
+    def test_only_on_od(self):
+        errors, _ = self.lint(kind="TQ", od_front="accepted_risk: false")
+        self.assertIn("TQ-002.md: accepted_risk is allowed only on kind OD", errors)
+
+    def test_must_be_boolean(self):
+        errors, _ = self.lint(od_front="accepted_risk: yes\nexpires: 2026-12-31")
+        self.assertIn("OD-002.md: accepted_risk must be true or false, got 'yes'", errors)
+
+    def test_requires_expires(self):
+        errors, _ = self.lint(od_front="accepted_risk: true")
+        self.assertIn("OD-002.md: accepted_risk true requires expires: YYYY-MM-DD", errors)
+
+    def test_expires_without_accepted_risk(self):
+        for front in ("expires: 2026-12-31", "accepted_risk: false\nexpires: 2026-12-31"):
+            errors, _ = self.lint(od_front=front)
+            self.assertIn("OD-002.md: expires requires accepted_risk: true", errors)
+
+    def test_expires_must_be_a_valid_date_after_answered(self):
+        errors, _ = self.lint(od_front="accepted_risk: true\nexpires: 2026-13-45")
+        self.assertIn("OD-002.md: expires '2026-13-45' is not a valid YYYY-MM-DD date", errors)
+        errors, _ = self.lint(od_front="accepted_risk: true\nexpires: 2026-03-01")
+        self.assertIn("OD-002.md: expires 2026-03-01 must be after answered 2026-03-01", errors)
+
+    def test_expires_falls_back_to_asked(self):
+        errors, _ = self.lint(od_front="accepted_risk: true\nexpires: 2026-01-15", od_extra="")
+        self.assertIn("OD-002.md: expires 2026-01-15 must be after asked 2026-02-01", errors)
+
+    def test_needs_related_bq_or_tq(self):
+        errors, _ = self.lint(related="[]")
+        self.assertIn("OD-002.md: accepted_risk needs a related BQ/TQ record (the question that raised it)", errors)
+
+    def test_related_must_include_a_bq_or_tq_not_just_any_record(self):
+        errors, _ = self.lint(related="[OD-003]")  # OD-003 does not resolve either, but the prefix rule must fire
+        self.assertIn("OD-002.md: accepted_risk needs a related BQ/TQ record (the question that raised it)", errors)
+
+    def test_needs_non_empty_decision(self):
+        for body in ("No section here\n", "## Decision\n\n## History\n\nx\n"):
+            errors, _ = self.lint(od_body=body)
+            self.assertIn("OD-002.md: accepted_risk needs a non-empty '## Decision' section", errors)
+
+    def test_expired_is_a_warning_not_an_error(self):
+        errors, warnings = self.lint(today=date(2027, 1, 1))
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, ["OD-002.md: accepted risk expired on 2026-12-31; re-decide or close it"])
+
+    def test_closed_record_past_expiry_does_not_warn(self):
+        for status, expect in (("closed", []), ("decided", 1)):
+            with tempfile.TemporaryDirectory() as tmp:
+                kb, qa = Path(tmp) / "kb", Path(tmp) / "qa"
+                (kb / "chunks").mkdir(parents=True)
+                (qa / "records").mkdir(parents=True)
+                (qa / "records" / "TQ-001.md").write_text(
+                    "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: t\nasked: 2026-01-01\n---\nb\n")
+                (qa / "records" / "OD-002.md").write_text(
+                    f"---\nid: OD-002\nkind: OD\ntitle: D\nstatus: {status}\ndecider: t\nasked: 2026-02-01\n"
+                    "related: [TQ-001]\naccepted_risk: true\nexpires: 2026-12-31\n---\n## Decision\n\nx\n")
+                w: list[str] = []
+                self.assertEqual(check_chunks.lint(kb, qa, today=date(2027, 1, 1), warnings=w), [])
+                self.assertEqual(w if expect == [] else len(w), expect)
+
+    def test_empty_answered_falls_back_to_asked(self):
+        errors, _ = self.lint(od_front="accepted_risk: true\nexpires: 2026-01-15", od_extra="answered:")
+        self.assertIn("OD-002.md: expires 2026-01-15 must be after asked 2026-02-01", errors)
+
+    def test_quoted_boolean_and_trailing_comment_hints(self):
+        errors, _ = self.lint(od_front='accepted_risk: "true"\nexpires: 2026-12-31')
+        self.assertTrue(any("got 'true' (unquote the value" in e for e in errors), errors)
+        errors, _ = self.lint(od_front="accepted_risk: true\nexpires: 2026-12-31 # note")
+        self.assertTrue(any("no trailing comment" in e for e in errors), errors)
+
+    def test_expiry_day_itself_is_not_expired(self):
+        self.assertEqual(self.lint(today=date(2026, 12, 31)), ([], []))
 
 
 class McpTests(unittest.TestCase):

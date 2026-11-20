@@ -8,12 +8,16 @@ Chunk rules: frontmatter has chunk_id/title/topics/links/sources; ids unique and
 every link resolves; body within WORD_MIN..WORD_MAX words; no self-link.
 Record rules: id/kind/title/status unique and valid; id prefix matches kind; related ids and chunk ids resolve;
 answered/decided records contain an Answer or Decision section.
+Accepted-risk rules (kind OD only): `accepted_risk` is true/false and allowed only on OD; true requires `expires`
+(YYYY-MM-DD, after the `answered`, else `asked`, date), a `related` BQ/TQ record and a non-empty `## Decision`;
+`expires` without `accepted_risk: true` is an error. An accepted risk past `expires` is a WARNING (exit code unchanged).
 """
 from __future__ import annotations
 
 import argparse
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 import lib
@@ -22,7 +26,67 @@ WORD_MIN, WORD_MAX = 40, 350
 ID_RE = re.compile(r"^[A-Z]{2,4}-\d{3,}$")
 
 
-def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR) -> list[str]:
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _date(value) -> date | None:
+    if not isinstance(value, str) or not DATE_RE.match(value):
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _decision_text(body: str) -> str:
+    m = re.search(r"^## Decision\b[^\n]*\n(.*?)(?=^## |\Z)", body, re.M | re.S)
+    return m.group(1).strip() if m else ""
+
+
+def check_accepted_risk(r: lib.Record, name: str, errors: list[str], warnings: list[str], today: date) -> None:
+    """Rules for the optional `accepted_risk` / `expires` fields (kept in Record.extra by the loader)."""
+    has_flag, has_expires = "accepted_risk" in r.extra, "expires" in r.extra
+    if not has_flag and not has_expires:
+        return
+    flag, expires = r.extra.get("accepted_risk"), r.extra.get("expires")
+    if has_flag:
+        if r.kind != "OD":
+            errors.append(f"{name}: accepted_risk is allowed only on kind OD")
+        if not isinstance(flag, bool):
+            hint = " (unquote the value: accepted_risk: true)" if isinstance(flag, str) and flag.lower() in ("true", "false") else ""
+            errors.append(f"{name}: accepted_risk must be true or false, got {flag!r}{hint}")
+    if has_expires and flag is not True:
+        errors.append(f"{name}: expires requires accepted_risk: true")
+    if flag is not True or r.kind != "OD":
+        return
+    exp = _date(expires)
+    if not has_expires or expires in ("", []):
+        errors.append(f"{name}: accepted_risk true requires expires: YYYY-MM-DD")
+    elif exp is None:
+        hint = " (no trailing comment: expires: 2026-12-31)" if isinstance(expires, str) and re.match(
+            r"^\d{4}-\d{2}-\d{2}\s+#", expires) else ""
+        errors.append(f"{name}: expires {expires!r} is not a valid YYYY-MM-DD date{hint}")
+    else:
+        ref_field = "answered" if r.extra.get("answered") not in (None, "", []) else "asked"
+        ref = _date(r.extra.get("answered")) if ref_field == "answered" else _date(r.asked)
+        if ref is None:
+            errors.append(f"{name}: accepted_risk needs a valid {ref_field} date (YYYY-MM-DD) to check expires against")
+        elif exp <= ref:
+            errors.append(f"{name}: expires {expires} must be after {ref_field} {ref.isoformat()}")
+        if exp < today and r.status != "closed":
+            warnings.append(f"{name}: accepted risk expired on {expires}; re-decide or close it")
+    if not any(o.startswith(("BQ-", "TQ-")) for o in r.related):
+        errors.append(f"{name}: accepted_risk needs a related BQ/TQ record (the question that raised it)")
+    if not _decision_text(r.body):
+        errors.append(f"{name}: accepted_risk needs a non-empty '## Decision' section")
+
+
+def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | None = None,
+         warnings: list[str] | None = None) -> list[str]:
+    """Return the errors. Warnings (which never fail the run) are appended to `warnings` when a list is given;
+    `today` defaults to date.today()."""
+    today = today or date.today()
+    warnings = warnings if warnings is not None else []
     errors: list[str] = []
     chunks, records = [], []
     for p in sorted((kb_dir / "chunks").glob("*.md")):
@@ -85,6 +149,7 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR) -> list[str]:
         for c in r.chunks:
             if c not in chunk_ids:
                 errors.append(f"{name}: chunk {c} does not resolve")
+        check_accepted_risk(r, name, errors, warnings, today)
     rec_ids = set(rids)
     for r in records:
         for o in r.related:
@@ -112,14 +177,17 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write-toc", action="store_true")
     a = ap.parse_args(argv)
-    errors = lint()
+    warnings: list[str] = []
+    errors = lint(warnings=warnings)
+    for w in warnings:
+        print(f"WARN  {w}")
     for e in errors:
         print(f"ERROR {e}")
     if a.write_toc and not errors:
         (lib.KB_DIR / "TOC.md").write_text(toc_markdown(lib.load_chunks()), encoding="utf-8")
         print("wrote kb/TOC.md")
     n_c, n_r = len(lib.load_chunks()), len(lib.load_records())
-    print(f"checked {n_c} chunks, {n_r} records: {len(errors)} error(s)")
+    print(f"checked {n_c} chunks, {n_r} records: {len(errors)} error(s), {len(warnings)} warning(s)")
     return 1 if errors else 0
 
 

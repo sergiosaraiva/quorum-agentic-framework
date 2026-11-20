@@ -25,7 +25,7 @@ For each category the diff touches:
 1. Identify File A and File B.
 2. Read both; never infer B from A's name.
 3. Diff the shapes: field names, types, nullability, casing. Verify the real JSON casing (default `System.Text.Json` web policy is camelCase) against what the TypeScript side expects.
-4. Report drift with both file:line citations and the runtime consequence.
+4. Report drift with both file + anchor citations (line optional in review output) and the runtime consequence.
 
 ## Examples
 

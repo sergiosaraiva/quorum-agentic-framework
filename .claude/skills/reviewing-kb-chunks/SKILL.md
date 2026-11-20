@@ -21,14 +21,16 @@ Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, 
 
 ## Output
 
+Finding form: `_SHARED-PATTERNS.md` (canonical field names; `status` replaces `severity`).
+
 ```json
 {
   "chunk_id": "BC-003",
   "claims_reviewed": 8,
   "findings": [
-    {"claim": "string", "pass": "grounding|citation|style|shape|cross-chunk",
+    {"id": "KC-1", "claim": "string", "category": "grounding|citation|style|shape|cross-chunk", "file": "kb/chunks/BC-003-x.md", "anchor": "heading or quoted literal",
      "status": "ungrounded|fabricated-citation|stale|conflict|gate-failure|slop|redundant|not-self-contained|too-long|too-short",
-     "evidence": "file:line, tool result, or 'not found'",
+     "scenario": "evidence: file:anchor, tool result, or 'not found'", "fix": "string",
      "confidence": 0.85}
   ],
   "coverage_gaps": ["unverified (would-be <status>): what and why"]
@@ -37,7 +39,7 @@ Blocking is decided only by `_SHARED-PATTERNS.md`, "What blocks": `ungrounded`, 
 
 ## Rules
 
-- Evidence is a file:line or tool result, never a bare verdict.
+- Evidence is a file + anchor or tool result, never a bare verdict.
 - Re-check load-bearing claims against the live source, not a cached summary.
 - Zero findings is valid; state what you checked.
 - If a source is silent on something the chunk asserts, return a BQ in `questions_to_record` (`recording-decisions`) rather than a rewrite.

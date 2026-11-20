@@ -8,7 +8,7 @@ Single owner of the cross-agent rules. Agent files and the root `CLAUDE.md` rest
 |---|-----------|-------------|
 | 1 | Never invent | Every behaviour claim is grounded in a KB chunk or a recorded decision; silence or conflict becomes a recorded question |
 | 2 | No single point of failure | The agent that produced work never approves it. A different role with fresh context and an equal or stronger model reviews it |
-| 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity; "passed" without command output is not a result |
+| 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity |
 | 4 | Vertical slices | One feature end to end, planned with ids in `docs/slices/` |
 | 5 | Delegate | Product code goes through the pipeline; a direct edit skips the review pair |
 
@@ -80,7 +80,7 @@ Owner: the `## Design Principles` section of the root `CLAUDE.md`. Reviewers fla
 
 ## Mandatory Parallel Review Block
 
-After `code-engineer` finishes, the orchestrating session spawns `quality-guardian` and `regression-detective` in one message (UI paths touched: also `ux-usability-specialist`). No overlap: `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6 (`detecting-regressions`, `verifying-cross-file-coupling`); `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned, for code artifacts, and consumes `test_would_catch` from `regression-detective`.
+After `code-engineer` finishes, the orchestrating session spawns `quality-guardian` and `regression-detective` in one message (UI paths touched: also `ux-usability-specialist`). `quality-guardian` owns pattern compliance, security, EF Core query safety, resource safety and all design findings; `regression-detective` owns B1-B6 and C1-C6; `ux-usability-specialist` owns usability of UI changes. `test-automator` runs after every reviewer in that message has returned, for code artifacts, and consumes `test_would_catch` from `regression-detective`.
 
 ## Loop-Back Rule (Mandatory)
 
@@ -92,7 +92,7 @@ A blocking finding at a review gate returns to the artifact's writer, not forwar
 | `test-automator` (code) | Re-invoke `code-engineer` with failing tests or gap; re-run the pair before re-running `test-automator` | Code pipeline complete; docs stage if docs change |
 | `documentation-reviewer` (docs, `.claude/**`, KB chunks) | Re-invoke `documentation-curator`; re-run the reviewer | Done |
 
-What blocks. This table is the only place that decides blocking; other files define severity labels and map them here. Among reported findings, severity alone decides, never confidence: 0.50-0.79 goes in the "unverified" list with its would-be severity (below 0.50: not reported). Unverified items never block; the report states each, and the session dispositions it like a non-blocking finding. A Medium security finding (from `security-engineer` or `quality-guardian`) does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD.
+What blocks. This table is the only place that decides blocking; other files define severity labels and map them here. Among reported findings, severity alone decides, never confidence: 0.50-0.79 goes in the "unverified" list with its would-be severity (below 0.50: not reported). Unverified items never block; the report states each, and the session dispositions it like a non-blocking finding. A Medium security finding (from `security-engineer` or `quality-guardian`) does not block; if not fixed before merge, the session records it as an open BQ/TQ and, once the owner accepts the risk, as an OD with `accepted_risk` and `expires`.
 
 | Reviewer | Blocks | Does not block |
 |----------|--------|----------------|
@@ -116,7 +116,7 @@ Counters (Loop-Back cap, local `--max-rounds`, GitHub `MAX_ROUNDS`) share no sta
 | Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. They return findings in the structured form below |
 | No anchoring | A prompt that hands over a hypothesis ("confirm X is fine") is rewritten as a neutral task |
 
-Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`, `file` + anchor (and `line` as a pointer in the review output only), `scenario` (concrete input that fails), `fix`. A finding without a failing scenario is dropped.
+Finding form (every reviewer agent; contracts add only agent-specific fields): `id`, `category`, `severity` (Critical/High/Medium/Low/Info; ux scale and documentation-reviewer `status` map via "What blocks"), `file` + `anchor` (symbol or heading; `line` optional in review output, never in stored docs), `scenario` (evidence and failing input), `fix` (minimal), `confidence` (optional, default 1.0). A finding without a failing scenario is dropped.
 
 | Severity | Meaning |
 |----------|---------|
@@ -124,6 +124,7 @@ Finding form (every reviewer): `severity` (Critical/High/Medium/Low), `category`
 | High | Wrong behaviour on a normal path, contract break, unbounded resource growth, a missing required control (no alignment result, no endpoint auth decision) |
 | Medium | Wrong on an edge path, design violation |
 | Low | Maintainability with a concrete cost; nothing else is reported |
+| Info | Optional, non-blocking; security-engineer only |
 
 ## Pre-Push Branch Gate (Mandatory)
 
@@ -162,9 +163,9 @@ Facts reviewers must not flag. Keep this list short; each entry needs a reason a
 
 | Item | Why it is not an issue |
 |------|------------------------|
-| Runner label `${{ vars.RUNNER_LABEL \|\| 'ubuntu-latest' }}` in workflows | Intentional: adopters set the repository variable `RUNNER_LABEL` to their own runner pool (Immutable Rule 8); the default is the hosted runner |
-| `{{PLACEHOLDER}}` tokens in templates (`CLAUDE.md`, docs) | Intentional: adopters replace them when they adopt the template |
-| KB chunks and Q&A records with `example: true` | Intentional: the Acme sample domain demonstrates the format and is deleted or replaced by the adopter |
+| Runner label `${{ vars.RUNNER_LABEL \|\| 'ubuntu-latest' }}` in workflows | Intentional: adopters set the variable `RUNNER_LABEL` to their own runner pool (Immutable Rule 8) |
+| `{{PLACEHOLDER}}` tokens in templates (`CLAUDE.md`, docs) | Intentional: adopters replace them |
+| KB chunks and Q&A records with `example: true` | Intentional: the Acme sample domain; the adopter replaces it |
 
 ## Verification Commands
 

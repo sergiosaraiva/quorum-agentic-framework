@@ -182,7 +182,7 @@ A critical system must never rely on one checker, and the author is never the ch
 | Independent context | Reviewers start fresh, with no Write or Edit tools, so they cannot be anchored by the author's reasoning or patch what they find |
 | Equal or stronger model | Reviewer model is equal or stronger than the producer's: judgement-heavy reviewers run Opus, documentation-reviewer runs Sonnet (mechanical grounding check) |
 | Different lenses | Quality asks "is it right?", regression asks "what did it break?" |
-| Evidence, not verdicts | Each finding has a location, a failing scenario and a severity (Critical and High block; Medium and Low do not) |
+| Evidence, not verdicts | Each finding has a file and anchor, a failing scenario and a severity (Critical and High block; Medium and Low do not) |
 | Bounded loops | Findings return to the producer, 3 rounds at most, then a human |
 
 ---

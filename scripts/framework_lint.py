@@ -15,6 +15,11 @@ Checks
                 (subagents cannot spawn subagents or ask the user; they return open items to the caller)
   index         skills/SKILL-INDEX.md lists every skill folder and nothing else
   size          agent file <= 16 KB, skill file <= 7 KB (warning; an error with --strict)
+  coherence     (only when agents/_SHARED-PATTERNS.md exists, and it is itself checked as the owner) single
+                owner of two shared rules: rule 7 (KB unreachable fallback) and "What blocks"; see
+                check_shared_rules. It reads the working tree under the lint root, so it does not honour
+                --staged's per-file reader; the pre-commit hook instead runs --root on a temp copy of the
+                staged index (git checkout-index), which is how the staged content is coherence-checked.
 
 Agents and skills live in `.claude/`. A fresh template checkout keeps them in `claude-staging/` until you
 move them; the default root falls back to that folder with a notice. Files starting with `_` (for
@@ -34,6 +39,14 @@ FORBIDDEN_TOOLS = ("Agent", "AskUserQuestion")
 MAX_DESCRIPTION = 1024
 MAX_AGENT_BYTES = 16 * 1024
 MAX_SKILL_BYTES = 7 * 1024
+SHARED_FILE = "_SHARED-PATTERNS.md"
+KB_TOOL_PREFIXES = ("mcp__business-kb", "mcp__qa-kb")
+# Agents without Bash by design. rule 7 names them as authoring agents but does not state that they have no Bash; the shared file's "Common Tool Permissions" table does
+# (Analysts and prompt-engineer rows), and check_shared_rules cross-checks the constant against that table.
+NO_BASH_AGENTS = ("requirements-analyst", "solution-architect", "prompt-engineer")
+KB_UNREACHABLE = r"\bKB\b.{0,20}?unreachable"
+BLOCK_WORD = r"\bblock(?:s|ing|ed)?\b"
+BLOCKING_STATUSES = ("ungrounded", "fabricated-citation", "stale", "conflict", "gate-failure")
 
 
 # ------------------------------------------------------------------ frontmatter
@@ -290,7 +303,89 @@ def lint(root: Path, strict: bool = False, only: set[Path] | None = None, reader
             report.error(index, f"SKILL-INDEX.md lists {ghost!r} but skills/{ghost}/SKILL.md does not exist")
     elif not index.exists() and skill_dirs:
         report.error(skills_dir, "SKILL-INDEX.md is missing")
+    check_shared_rules(root, report)
     return report
+
+
+def _rule7(shared: str) -> str | None:
+    m = re.search(r"^7\. KB MCP unreachable.*(?:\n[ \t]+.*)*", shared, re.M)
+    return m.group(0) if m else None
+
+
+def check_shared_rules(root: Path, report: Report) -> None:
+    """Keep two rules in one place: Never Invent rule 7 and "What blocks" (both in agents/_SHARED-PATTERNS.md).
+    Skipped when the shared file is absent. All checks read the working tree under `root`.
+
+    rule 7   outside the shared file no .md file under root has `python3 scripts/kb/search.py`, the phrase
+             a list bullet starting "Neither works", or `scripts/kb/search.py` in an agent file; any line saying "KB unreachable" /
+             "KB MCP unreachable" must say "rule 7"; every agent with KB MCP tools has such a line.
+    blocks   outside the shared file no .md file has "still blocking" or a table header cell "Blocking when"; a line with
+             at least 3 of the five blocking statuses and the word "block" must name "What blocks"
+             (a line merely enumerating statuses, e.g. an output enum, has no "block" and passes).
+    tools    agents in NO_BASH_AGENTS (checked against Common Tool Permissions) must not list Bash; every other
+             agent with KB MCP tools must list Bash; every agent named in rule 7 has a file."""
+    shared_path = root / "agents" / SHARED_FILE
+    if not shared_path.is_file():
+        return
+    shared = shared_path.read_text(encoding="utf-8")
+    rule7 = _rule7(shared)
+    if rule7 is None:
+        report.error(shared_path, "Never Invent rule 7 ('7. KB MCP unreachable ...') not found")
+        return
+    agents_dir = root / "agents"
+    agent_files = {f.stem: f for f in sorted(agents_dir.glob("*.md")) if not f.name.startswith("_")}
+
+    for path in sorted(root.rglob("*.md")):
+        if path == shared_path:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        is_agent = path.parent == agents_dir
+        if re.search(r"python3?\s+scripts/kb/search\.py", text):
+            report.error(path, "restates the rule 7 CLI fallback (`python3 scripts/kb/search.py`); "
+                               f"point to {SHARED_FILE} Never Invent rule 7 instead")
+        elif is_agent and "scripts/kb/search.py" in text:
+            report.error(path, f"mentions scripts/kb/search.py; the KB fallback lives only in {SHARED_FILE} rule 7")
+        if re.search(r"^[ \t]*[-*][ \t]+neither\s+works", text, re.I | re.M):
+            report.error(path, f"restates the rule 7 branches ('Neither works'); point to {SHARED_FILE} rule 7")
+        if re.search(r"still blocking", text, re.I):
+            report.error(path, f"contains 'still blocking'; blocking is decided only by {SHARED_FILE} 'What blocks'")
+        if any(ln.lstrip().startswith("|") and any(c.strip().lower() == "blocking when" for c in ln.split("|"))
+               for ln in text.splitlines()):
+            report.error(path, f"has a 'Blocking when' column; blocking is decided only by {SHARED_FILE} 'What blocks'")
+        for n, line in enumerate(text.splitlines(), 1):
+            if re.search(KB_UNREACHABLE, line, re.I) and not re.search(r"rule 7", line, re.I):
+                report.error(path, f"line {n}: 'KB unreachable' must point to Never Invent 'rule 7'")
+            if re.search(BLOCK_WORD, line, re.I) and "What blocks" not in line \
+                    and sum(s in line for s in BLOCKING_STATUSES) >= 3:
+                report.error(path, f"line {n}: lists the blocking statuses as a decision; "
+                                   f"blocking is decided only by {SHARED_FILE} 'What blocks'; name it instead of copying it")
+
+    for name in sorted(set(re.findall(r"`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`", rule7))):
+        if not name.endswith("-kb") and name not in agent_files:
+            report.error(shared_path, f"rule 7 names agent {name!r} but agents/{name}.md does not exist")
+
+    section = re.search(r"^## Common Tool Permissions[ \t]*\n(.*?)(?=^## |\Z)", shared, re.M | re.S)
+    perm_rows = [ln for ln in section.group(1).splitlines() if ln.startswith("|")] if section else []
+    if section is None:
+        report.error(shared_path, "section '## Common Tool Permissions' not found; NO_BASH_AGENTS cannot be verified")
+    for name in NO_BASH_AGENTS if section else ():
+        rows = [ln for ln in perm_rows if f"`{name}`" in ln]
+        if not rows or any("Bash" in ln for ln in rows):
+            report.error(shared_path, f"NO_BASH_AGENTS lists {name!r} but the Common Tool Permissions table "
+                                      "has no Bash-free row for it; update the table or NO_BASH_AGENTS in framework_lint.py")
+
+    for name, path in agent_files.items():
+        block, _ = split_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
+        data = parse_frontmatter(block)[0] if block is not None else {}
+        tools = tool_names(data.get("tools"))
+        has_kb = any(t.startswith(KB_TOOL_PREFIXES) for t in tools)
+        if name in NO_BASH_AGENTS and "Bash" in tools:
+            report.error(path, "tools lists Bash but this agent has none by design (rule 7 fallback is Read/Grep only)")
+        if has_kb and name not in NO_BASH_AGENTS and "Bash" not in tools:
+            report.error(path, "has KB MCP tools but no Bash: rule 7 sends it to the CLI fallback, which needs Bash")
+        if has_kb and not any(re.search(KB_UNREACHABLE, ln, re.I) and re.search(r"rule 7", ln, re.I)
+                              for ln in path.read_text(encoding="utf-8", errors="replace").splitlines()):
+            report.error(path, "has KB MCP tools but no 'KB unreachable' line pointing to rule 7")
 
 
 def main(argv: list[str] | None = None) -> int:

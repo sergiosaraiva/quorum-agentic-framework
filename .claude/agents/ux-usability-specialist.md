@@ -45,7 +45,7 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
 1. Ground: `business-kb` for tasks, roles, terminology and rules; `qa-kb` for recorded UX decisions. Silent or conflicting: return a BQ (business) or TQ with a decider in `questions_to_record` and continue with the unblocked parts.
 2. `define`: list tasks, draw the flow, pick where each step lives (inline, expandable row, side panel, modal, page) with a reason, specify states and microcopy, write testable acceptance criteria. Mockups are starting points for the owner, never final.
 3. `review`: inspect templates and styles (`Read`, `Grep`); capture the running screen at several widths with Playwright when available (`Bash`); walk the main task step by step; check each principle.
-4. Rate each finding and attach evidence (file:line or screenshot reference plus the scenario).
+4. Rate each finding and attach evidence (file + anchor or screenshot reference, plus the scenario).
 
 ## Severity
 
@@ -68,12 +68,12 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
   "states": [{"screen": "string", "state": "loading|empty|error|data|readonly", "spec": "string"}],
   "acceptance_criteria": ["string"],
   "unverified": ["optional: unverified (would-be <severity>): what and why"],
-  "findings": [{"severity": "blocker|major|minor|note", "principle": "string", "location": "path:line|screenshot", "scenario": "string", "evidence": "string", "fix_direction": "string"}],
+  "findings": [{"id": "UX-1", "category": "heuristic or principle", "severity": "blocker|major|minor|note", "file": "path or screenshot", "anchor": "component or element", "line": "optional", "scenario": "task, steps, evidence", "fix": "string"}],
   "questions_to_record": [{"kind": "BQ|TQ", "question": "string", "decider": "string", "recommended": "string"}]
 }
 ```
 
-Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
+Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
 
 ## Tools
 

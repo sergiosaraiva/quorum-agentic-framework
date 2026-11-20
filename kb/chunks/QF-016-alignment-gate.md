@@ -14,7 +14,7 @@ The pre-development alignment gate checks the specification against the current 
 | 3 Recall | Search the Q&A knowledge base for recorded decisions and answers on the topic |
 | 4 Classify | Confirmed, Contradicted, KB silent or Missing |
 | 5 Resolve | Contradicted or Missing: stop the affected change and return all items to the session, which routes a spec fix or asks the owner in one batch. A recorded owner decision settles it. KB silent: proceed and mark "unverified in KB". Never implement against a known conflict |
-| 6 Record | The pull request description carries an `Alignment check` section with chunk ids, conflicts, silences and recalled record ids, or `none found` with the queries |
+| 6 Record | The alignment result lists chunk ids, conflicts, silences and recalled record ids, or `none found` with the queries. Until a pull request exists it travels in each review prompt and is kept in the slice spec or the session hand-off; the pull request description then carries it in an `Alignment check` section |
 
 The gate does not apply to changes that touch only `.github/`, `scripts/`, `.claude/`, `docs/`, build files, Dockerfiles or generated output; those state "Not applicable" with a reason.
 

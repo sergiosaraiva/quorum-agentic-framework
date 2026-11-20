@@ -26,6 +26,8 @@ In: ... Out: ... Deferred (and why): ...
 
 ## Design
 
+The single copy of the design; the readiness analysis links here.
+
 | Layer | Change |
 |-------|--------|
 | Data | entities, migration |

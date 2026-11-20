@@ -18,7 +18,7 @@ Each slice is built as a ladder of small PRs. A rung is independently mergeable 
 | R3 | Angular client and component with loading, error, empty, data states | frontend tests green |
 | R4 | end-to-end journey, observability, docs | slice `Done` |
 
-Fewer rungs are fine for a small slice; never skip the order of dependencies.
+Fewer rungs are fine for a small slice; never skip the order of dependencies. R0 to R4 are the default ladder. A slice whose increments are not layers (example: VS-004 R1 date and name filters, R2 status filter) defines its own ladder in the `Rungs` table of its spec; the INDEX `Rung` column and PR titles then use that ladder, and the spec says so.
 
 ## 3. Branching model
 
@@ -33,16 +33,31 @@ Rules: one rung per PR; the PR title starts with the slice id and rung (`VS-001 
 
 ## 4. Readiness analysis (steps S1..S5)
 
-Done by `requirements-analyst` then `solution-architect`, recorded with [`templates/readiness-analysis.md`](templates/readiness-analysis.md).
+Done by `requirements-analyst` then `solution-architect`, recorded with [`templates/readiness-analysis.md`](templates/readiness-analysis.md) and appended to the slice spec (not a separate file).
 
 | Step | Question | Output |
 |------|----------|--------|
 | S1 Ground | what does the business KB say; what do prior decisions say | cited chunk and record ids, gaps listed |
 | S2 Scope | what is in, what is out, what is deferred | acceptance criteria, one per behaviour |
 | S2b UX (UI slices) | does a design exist | flows and states, or a `ux-usability-specialist` define pass |
-| S3 Design | simplest design, data model delta, API contract, risks | rungs and files per rung |
+| S3 Design | simplest design, data model delta, API contract, risks | rungs and files per rung, written once in the spec's `Design` and `Rungs` sections; the analysis links to them |
 | S4 Dependencies | hard and soft dependencies, conflicts with open PRs | `Depends on` column, graph updated |
-| S5 Decide | open BQ/TQ blockers | each recorded with a decider; slice is `Ready` only at zero blockers |
+| S5 Decide | open BQ/TQ records and which rung each blocks | each recorded with a decider; `Ready` (or `Ready for <rung>`) per `docs/slices/CLAUDE.md`, rule "Readiness before build" |
+
+### 4b. Status triggers
+
+| Move | Trigger |
+|------|---------|
+| `Proposed -> Analysed` | the readiness analysis is written (S1..S5) with every gap recorded |
+| `Analysed -> Ready` | zero open blockers (`docs/slices/CLAUDE.md`, rule "Readiness before build"), per rung when the analysis says so |
+| `Ready -> In progress` | the first code PR of the slice carries the INDEX update; a docs-only R0 PR does not move it |
+| `In progress -> Done` | the last rung is merged and the definition of done (section 7) holds |
+| back to `Analysed` | a material delta in the pickup check (section 6) |
+| any -> `Blocked` (proposed, pending owner confirmation) | work cannot continue; the INDEX Readiness cell names the blocking record or slice; the slice returns to its earlier status when that is resolved |
+
+### 4c. Splitting a slice
+
+Proposed guidance, pending owner confirmation. Split when one increment cannot ship until something else does, or the slice outgrows a few days. Take the next `VS-nnn` for the new part, never reuse the old id. In the INDEX, give the new row its own scores and a hard dependency edge from the part it waits on, and add the edge to the Mermaid graph (a rung-only dependency is written `R2 also VS-nnn` in the `Depends on` column, with a dotted edge). The original slice keeps the rungs that can ship alone; its spec says which rung moved and links the new spec, and the new spec links back. Record the split in both revision logs and in the INDEX log; move the open blockers to the slice that now owns the work.
 
 ## 5. Priority scoring
 

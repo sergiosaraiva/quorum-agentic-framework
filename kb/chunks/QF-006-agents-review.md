@@ -9,7 +9,7 @@ Code in Quorum is reviewed by two core reviewer agents, quality-guardian and reg
 
 quality-guardian protects correctness, security and design. It owns pattern compliance for endpoints, services, DTOs and Angular components, security, EF Core query safety such as N+1 and unbounded queries, resource and memory safety, and all findings against the design principles. It also verifies the `chunk_id` claims in an alignment result against the knowledge base; a missing alignment result for an in-scope change is a High finding, which blocks.
 
-regression-detective finds what a change quietly breaks elsewhere. It uses the skill `detecting-regressions` for the B1 to B6 patterns (contract drift, sibling-branch parity, config coupling breaks, formula duplication drift, required-invariant violations, silent exception swallowing) and `verifying-cross-file-coupling` for the C1 to C6 coupling series. Each finding carries a `test_would_catch` hint that test-automator turns into a test.
+regression-detective finds what a change quietly breaks elsewhere. It uses the skill `detecting-regressions` for the B1 to B6 patterns (contract drift, sibling-branch parity, config coupling breaks, formula duplication drift, required-invariant violations, silent exception swallowing), the X1 pattern (docs and index drift) and `verifying-cross-file-coupling` for the C1 to C6 coupling series. Each finding carries a `test_would_catch` hint that test-automator turns into a test.
 
 ux-usability-specialist reviews usability and rendered behaviour of UI changes.
 

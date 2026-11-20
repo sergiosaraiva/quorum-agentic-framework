@@ -21,6 +21,7 @@ Finds what a change quietly breaks elsewhere. Independent and read-only; it neve
 | 3 | Verify cross-file coupling (C1-C6) for each changed contract, key or pin |
 | 4 | Verify each candidate finding before reporting it (verifier pass) |
 | 5 | Emit `test_would_catch` for every confirmed finding so `test-automator` can encode it |
+| 6 | Check docs and index drift (X1) when the change touches `docs/slices/` or a record a slice cites |
 
 ## Regression Taxonomy (B1-B6)
 
@@ -44,13 +45,19 @@ Finds what a change quietly breaks elsewhere. Independent and read-only; it neve
 | C5 | Dependency and image-tag pins across files |
 | C6 | Formula duplicated across files |
 
+## Docs and Index Drift (X1)
+
+| Code | Pattern |
+|------|---------|
+| X1 | Docs and index drift, defined in `detecting-regressions` (INDEX row, Mermaid class, spec, revision log, cited records). `framework_lint` checks only the Mermaid class; the rest is read by hand, and its `test_would_catch` is `none (read by hand)` |
+
 ## Workflow (parallel streams, then verifier)
 
 | Stream | Action |
 |--------|--------|
 | 1 Branch-scoped scan | `git diff` against the base (read-only git). For each changed symbol, Grep every consumer and producer; compare against B1-B6 |
 | 2 Sibling parity | Find units with the same shape (`*Endpoints.cs`, services, components, handlers); diff the changed unit against its twins on validation, authorization, audit, error handling, paging |
-| 3 Coupling | Run the C1-C6 checks that the changed files touch |
+| 3 Coupling | Run the C1-C6 checks that the changed files touch, and X1 when `docs/slices/` changed |
 | Verifier pass | Re-read each candidate in its current head: does the failing scenario really occur? Does a test, a guard or a documented decision already cover it? Check the Q&A KB for a recorded decision that makes the divergence intentional. Drop what fails |
 
 ## Context Contract
@@ -67,7 +74,7 @@ Output: findings table, summary and the optional `unverified` list (`_SHARED-PAT
 |-------|---------|
 | id | `RD-n` |
 | unverified | optional list outside the findings table: `_SHARED-PATTERNS.md`, Finding form |
-| category | the drift code, B1-B6 or C1-C6 |
+| category | the drift code, B1-B6, C1-C6 or X1 |
 | severity | Critical / High / Medium / Low |
 | file, anchor | the changed side: `path` + anchor (`line` optional pointer) |
 | counterpart | agent-specific: the stale side, `path` + anchor |

@@ -12,12 +12,12 @@ Before a Quorum slice is built it gets a readiness analysis, done by requirement
 | S1 Ground | What do the knowledge bases say and what was already decided | Cited chunk and record ids, gaps listed |
 | S2 Scope | What is in, out and deferred | One acceptance criterion per behaviour |
 | S2b UX | Does a design exist (UI slices only) | Flows and states, or a define pass by ux-usability-specialist |
-| S3 Design | Simplest design, data-model delta, API contract, risks | Rungs and files per rung |
+| S3 Design | Simplest design, data-model delta, API contract, risks | Rungs and files per rung, written once in the slice spec; the analysis links to it |
 | S4 Dependencies | Hard and soft dependencies, conflicts with open pull requests | `Depends on` column and graph updated |
-| S5 Decide | Open BQ or TQ blockers | Each recorded with a decider; the slice is `Ready` only at zero blockers |
+| S5 Decide | Open BQ or TQ records and the rung each blocks | Each recorded with a decider; `Ready`, or `Ready for <rung>`, when no unresolved record blocks that rung |
 
 Status moves `Proposed`, `Analysed`, `Ready`, `In progress`, `Done`. Each analysis records a baseline stamp, the commit it was written against.
 
 The pickup delta check runs before starting a slice or rung analysed earlier. It compares the baseline with `HEAD`: new commits touching the slice's paths, open or merged pull requests for the same slice id or files (a sibling session may already have built it), and changes to the knowledge-base chunks and records the slice cites. The result, `unchanged` or a list of deltas, goes in the revision log, and a material delta moves the slice back to `Analysed`. The revision log is append-only: earlier rows are never edited.
 
-An open blocker need not stop everything: a question can block one rung only, such as the service rung, while the entity and migration rung proceeds.
+A blocker is an open question with no recorded working assumption that the slice cannot proceed without (proposed definition, pending owner confirmation). A question can block one rung only, such as the service rung, while the entity and migration rung proceeds; the result is then `Ready for <rung>`.

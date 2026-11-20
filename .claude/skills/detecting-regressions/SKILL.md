@@ -1,6 +1,6 @@
 ---
 name: detecting-regressions
-description: Use when scanning a diff for regressions. Regression taxonomy B1-B6 (contract drift, sibling-branch parity, config coupling breaks, formula duplication drift, required-invariant violations, silent exception swallowing), a confidence rubric and a test_would_catch field. Used by regression-detective.
+description: Use when scanning a diff for regressions. Regression taxonomy B1-B6 (contract drift, sibling-branch parity, config coupling breaks, formula duplication drift, required-invariant violations, silent exception swallowing), X1 docs and index drift, a confidence rubric and a test_would_catch field. Used by regression-detective.
 ---
 
 # Detecting Regressions
@@ -15,6 +15,12 @@ description: Use when scanning a diff for regressions. Regression taxonomy B1-B6
 | B4 | Formula or logic duplication drift | The same calculation in 2+ places, only one updated |
 | B5 | Required-invariant violation | A field required or non-null on one side becomes optional on the other, with no migration plan |
 | B6 | Silent exception swallow | Empty `catch`, `catch { return null; }`, `catch { return default; }`, or a client `catchError(() => of([]))` that turns an error into a value with no log or surfacing |
+
+Docs and index drift:
+
+| Code | Pattern | Signal |
+|------|---------|--------|
+| X1 | Slice `INDEX.md` row, Mermaid class line, slice spec, revision log and cited records disagree | Status or Rung column against the PRs and spec; blockers table against the records' `status`; spec revision log against the change. `test_would_catch`: the `framework_lint` slice-index check for the Mermaid class, otherwise `none (read by hand)` |
 
 Not B6: a documented expected-status recovery (404 to `null`) that rethrows or logs everything else. A `catchError` that re-maps to another error which still propagates is a pattern finding for `quality-guardian`, not B6.
 

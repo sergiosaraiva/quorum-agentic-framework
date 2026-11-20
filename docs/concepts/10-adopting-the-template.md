@@ -36,6 +36,7 @@ Search for `{{` across the repo and replace each one.
 | `{{PRODUCT_NAME}}` | Your product's name; used in `CLAUDE.md`, `kb/README.md` and the page `<title>` in `frontend/src/index.html` |
 | `{{OBJECTIVE}}` | One paragraph: what, for whom, which phase, what gate ends it |
 | `{{TECH_LEAD}}`, `{{PRODUCT_OWNER}}` | The people who answer technical and business questions |
+| `{{PRIVACY_OWNER}}` | Optional: whoever answers data-classification and privacy questions. With no such person, delete the whole row from the Team table in `CLAUDE.md` (privacy questions then go to the product owner) so the `{{` search finds nothing |
 | `{{RUNNER_LABEL}}` | CI runner label; set the `RUNNER_LABEL` repository variable too |
 | `{{REALM}}` | Identity-provider realm in the example issuer URL in the doc comment of `src/Api/Options/AuthOptions.cs` |
 | `{{PLACEHOLDER}}` | Generic wording in `CLAUDE.md`, `README.md`, the slides and two QF chunks; not a real token to replace |

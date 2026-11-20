@@ -105,7 +105,7 @@ See the spec above. Risks: an irreversible mapping (Down is lossy; take a backup
 
 | Depends on | Type (hard/soft) | Status | Conflict with open PR? |
 |------------|------------------|--------|------------------------|
-| VS-001 | hard | `In progress` in `INDEX.md`; the entity and endpoints exist in code; no owner exception recorded for VS-005 (see Pickup delta log) | none known; the sibling worktree `/home/ssaraiva/quorum-agentic-framework` on branch `feat/trial-e11-f4-a4-vs004r2-vs005` was not inspected and may touch the same ids and files |
+| VS-001 | hard | `In progress` in `INDEX.md`; the entity and endpoints exist in code; no owner exception recorded for VS-005 (see Pickup delta log) | none known; the branch `feat/trial-e11-f4-a4-vs004r2-vs005` was not inspected and may touch the same ids and files |
 
 ## S5 Decisions and blockers
 

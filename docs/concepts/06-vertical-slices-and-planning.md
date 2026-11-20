@@ -33,9 +33,9 @@ Before implementation a slice is analysed, usually by requirements-analyst and t
 | S1 Ground | What do the KBs say, what was already decided? | Cited chunk and record ids, gaps listed |
 | S2 Scope | What is in, out, deferred? | One acceptance criterion per behaviour |
 | S2b UX | Does a design exist? (UI slices only) | Flows and states, or a define pass by ux-usability-specialist |
-| S3 Design | Simplest design, data-model delta, API contract, risks | Rungs and files per rung |
+| S3 Design | Simplest design, data-model delta, API contract, risks | Rungs and files per rung, written once in the slice spec (`Design`, `Rungs`); the analysis links to it |
 | S4 Dependencies | Hard and soft dependencies, conflicts with open PRs | `Depends on` column, graph updated |
-| S5 Decide | Open BQ or TQ blockers | Each recorded with a decider; slice is `Ready` only at zero blockers |
+| S5 Decide | Open BQ or TQ records and the rung each blocks | Each recorded with a decider; `Ready`, or `Ready for <rung>`, per `docs/slices/CLAUDE.md` ("Readiness before build") |
 
 The analysis ends with a baseline stamp (the commit it was done against). Before pickup, a delta check compares that stamp with the current branch: new commits touching the slice's paths, open or merged PRs for the same slice (a sibling session may have built it already), and changed KB chunks it cites. A material delta moves the slice back to `Analysed`.
 
@@ -59,6 +59,8 @@ A slice is built as a ladder of small, independently mergeable PRs, each leaving
 | R3 | Angular client and component with loading, error, empty and data states | Frontend tests green |
 | R4 | End-to-end journey, observability, docs | Slice `Done` |
 
+R0 to R4 are the default ladder. A slice whose increments are not layers defines its own ladder in the `Rungs` table of its spec (VS-004: R1 date and name filters, R2 status filter), and the INDEX and PR titles then use it. Status triggers and splitting a slice: `docs/slices/IMPLEMENTATION-GUIDE.md`, sections 4b and 4c.
+
 A small slice may need fewer rungs. Branches: `main` for releases and an optional `integration` branch where rung PRs land (`docs/slices/IMPLEMENTATION-GUIDE.md`, section 3). Small PRs matter for agents as much as for people: AI review quality and the size limits of review tooling both degrade on large diffs.
 
 ## Worked example: Acme Orders (all ids and scores are examples)
@@ -81,7 +83,7 @@ graph LR
 
 Reading it. VS-001 is picked first: highest priority and nothing before it. Once it is `Done`, VS-002 (5.33) and VS-004 (5.00) are both startable and VS-002 goes first. VS-003 scores lowest and waits for VS-002. The critical path is the longest dependency chain: VS-001, VS-002, VS-003. Slip anywhere on it and the end date slips; VS-004 has slack and can be built in parallel with VS-002 or VS-003.
 
-Before VS-003 starts, its readiness analysis finds that `BC-003` (refund window) is silent on digital goods. The analyst records `BQ-001` (the shipped example record), sets the product owner as decider and marks the answer as blocking rung R2 only. R1 (entity and migration) proceeds; VS-003 stays `Analysed` until `BQ-001` is answered, then becomes `Ready`.
+Before VS-003 starts, its readiness analysis finds that `BC-003` (refund window) is silent on digital goods. The analyst records `BQ-001` (the shipped example record), sets the product owner as decider and marks the answer as blocking rung R2 only. The analysis can then say `Ready for R1`: R1 (entity and migration) proceeds, and VS-003 stays `Analysed` for R2 until `BQ-001` is answered.
 
 ## Who does what
 

@@ -415,5 +415,104 @@ class SharedRuleTests(unittest.TestCase):
         self.assertTrue(any("rule 7" in e for e in self.errors(self.good(), shared="# Shared\n")))
 
 
+SLICE_INDEX = """| Id | Slice | Status | Rung |
+|----|-------|--------|------|
+| VS-001 | A | {s1} | - |
+| VS-002 | B | {s2} | - |
+
+```mermaid
+graph LR
+  VS001["A"] --> VS002["B"]
+  classDef inprogress fill:#fff;
+  classDef proposed fill:#eef;
+  class VS001 {c1};
+  class VS002 {c2};
+```
+"""
+
+
+class SliceIndexTests(unittest.TestCase):
+    def run_index(self, s1="In progress", s2="Analysed", c1="inprogress", c2="proposed", text=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            root = build(tmp / ".claude", {"a": GOOD_AGENT.format(n="a")}, {"s": GOOD_SKILL.format(n="s")})
+            (tmp / "docs" / "slices").mkdir(parents=True)
+            (tmp / "docs" / "slices" / "INDEX.md").write_text(
+                text if text is not None else SLICE_INDEX.format(s1=s1, s2=s2, c1=c1, c2=c2), encoding="utf-8")
+            return fl.lint(root).errors
+
+    def test_matching_classes_pass(self):
+        self.assertEqual(self.run_index(), [])
+
+    def test_status_change_without_class_change_fails(self):
+        errs = self.run_index(s2="In progress")
+        self.assertEqual(len(errs), 1)
+        self.assertIn("VS-002", errs[0])
+        self.assertIn("'inprogress'", errs[0])
+
+    def test_ready_and_proposed_share_a_class(self):
+        self.assertEqual(self.run_index(s2="Ready"), [])
+
+    def test_unknown_status_fails(self):
+        self.assertTrue(any("unknown Status" in e for e in self.run_index(s1="Started")))
+
+    def test_slice_missing_from_graph_fails(self):
+        text = SLICE_INDEX.format(s1="In progress", s2="Analysed", c1="inprogress", c2="proposed").replace(
+            '  class VS002 proposed;\n', "").replace('VS002["B"]', "X")
+        self.assertTrue(any("no node" in e for e in self.run_index(text=text)))
+
+    def test_missing_class_line_fails(self):
+        text = SLICE_INDEX.format(s1="In progress", s2="Analysed", c1="inprogress", c2="proposed").replace(
+            "  class VS002 proposed;\n", "")
+        self.assertTrue(any("found None" in e for e in self.run_index(text=text)))
+
+    def test_grouped_class_line_is_read(self):
+        text = SLICE_INDEX.format(s1="Analysed", s2="Analysed", c1="x", c2="x").replace(
+            "  class VS001 x;\n  class VS002 x;\n", "  class VS001,VS002 proposed;\n")
+        self.assertEqual(self.run_index(text=text), [])
+
+    def base(self, **kw):
+        return SLICE_INDEX.format(**{"s1": "In progress", "s2": "Analysed", "c1": "inprogress", "c2": "proposed", **kw})
+
+    def test_header_is_case_insensitive(self):
+        text = self.base().replace("| Id |", "| ID |").replace("| Status |", "| STATUS |")
+        self.assertEqual(self.run_index(text=text), [])
+
+    def test_missing_status_column_is_an_error(self):
+        text = self.base().replace("| Status ", "| State ")
+        self.assertTrue(any("no table header" in e for e in self.run_index(text=text)))
+
+    def test_row_with_wrong_cell_count_is_an_error(self):
+        text = self.base().replace("| VS-002 | B | Analysed | - |", "| VS-002 | B | x | Analysed | - |")
+        self.assertTrue(any("5 cells" in e for e in self.run_index(text=text)))
+
+    def test_node_openers_round_and_curly(self):
+        text = self.base().replace('VS001["A"]', "VS001(A)").replace('VS002["B"]', "VS002{B}")
+        self.assertEqual(self.run_index(text=text), [])
+
+    def test_class_line_without_semicolon(self):
+        text = self.base().replace("class VS001 inprogress;", "class VS001 inprogress")
+        self.assertEqual(self.run_index(text=text), [])
+
+    def test_triple_colon_shorthand(self):
+        text = self.base().replace("  class VS001 inprogress;\n", "").replace('VS001["A"]', 'VS001["A"]:::inprogress')
+        self.assertEqual(self.run_index(text=text), [])
+        wrong = text.replace(":::inprogress", ":::proposed")
+        self.assertTrue(any("found 'proposed'" in e for e in self.run_index(text=wrong)))
+
+    def test_done_and_blocked_have_their_own_classes(self):
+        self.assertEqual(self.run_index(s1="Done", s2="Blocked", c1="done", c2="blocked"), [])
+        self.assertTrue(self.run_index(s1="Done", c1="inprogress"))
+
+    def test_other_tables_with_slice_ids_are_not_status_rows(self):  # kills the table-end reset
+        text = self.base() + "\n## Blockers\n\n| Slice | Record |\n|---|---|\n| VS-001 | TQ-001 |\n"
+        self.assertEqual(self.run_index(text=text), [])
+
+    def test_no_index_file_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build(Path(tmp) / ".claude", {"a": GOOD_AGENT.format(n="a")}, {"s": GOOD_SKILL.format(n="s")})
+            self.assertEqual(fl.lint(root).errors, [])
+
+
 if __name__ == "__main__":
     unittest.main()

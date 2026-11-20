@@ -36,7 +36,7 @@ A finding without evidence cannot be acted on or disputed. Every reviewer agent 
 
 | Field | Content |
 |-------|---------|
-| `id` | A short id such as `QG-1` or `SEC-001` |
+| `id` | A short id such as `QG-1` or `SEC-001`, unique within one review output only. A finding that outlives the review is recorded and cited by its record id (`recording-decisions`, "Review ids") |
 | `category` | What kind of finding: pattern, security, drift code B1 to B6, a usability heuristic, an area |
 | `severity` | Critical, High, Medium or Low, plus the optional Info (non-blocking, used by security-engineer). Critical and High block; Medium, Low and Info do not. The ux scale and the documentation-reviewer `status` map through "What blocks" |
 | `file` and `anchor` | The path and a symbol or heading; `line` is optional for any finding in review output (a ux finding may attach a screenshot file instead), never in stored docs |

@@ -11,11 +11,16 @@ answered/decided records contain an Answer or Decision section.
 Accepted-risk rules (kind OD only): `accepted_risk` is true/false and allowed only on OD; true requires `expires`
 (YYYY-MM-DD, after the `answered`, else `asked`, date), a `related` BQ/TQ record and a non-empty `## Decision`;
 `expires` without `accepted_risk: true` is an error. An accepted risk past `expires` is a WARNING (exit code unchanged).
+Symmetry (WARNING): a record that lists `related: X` while X does not list it back.
+Id collisions (WARNING, opt-in, offline): `--against REF` compares record ids with the records on another git ref
+(a local branch, or a remote-tracking branch from your last fetch) and warns when the same id carries a different title.
+It cannot see ids that exist only on a branch you have not fetched; fetch first.
 """
 from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -155,7 +160,43 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | Non
         for o in r.related:
             if o not in rec_ids:
                 errors.append(f"{Path(r.path).name}: related {o} does not resolve")
+    by_id = {r.id: r for r in records}
+    for r in records:
+        for o in r.related:
+            if o in by_id and o != r.id and r.id not in by_id[o].related:
+                warnings.append(f"{Path(r.path).name}: related {o} is one-way ({o} does not list {r.id})")
     return errors
+
+
+def id_collisions(refs: list[str], qa_dir: Path = lib.QA_DIR, repo: Path | None = None) -> list[str]:
+    """Warnings for record ids whose title differs on another git ref. Reads git objects only (no network)."""
+    repo = repo or lib.REPO_ROOT
+    local = {r.id: r for r in lib.load_records(qa_dir)}
+    out: list[str] = []
+    rel = (qa_dir / "records").resolve().relative_to(repo.resolve()).as_posix()
+
+    def git(*args: str) -> str:
+        res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=False)
+        if res.returncode != 0:
+            raise ValueError(res.stderr.strip() or f"git {' '.join(args)} failed")
+        return res.stdout
+
+    for ref in refs:
+        try:
+            names = [n for n in git("ls-tree", "-r", "--name-only", ref, "--", rel).splitlines() if n.endswith(".md")]
+        except ValueError as exc:
+            out.append(f"--against {ref}: {exc}")
+            continue
+        for n in names:
+            try:
+                other, _ = lib.parse_frontmatter(git("show", f"{ref}:{n}"))
+            except ValueError:
+                continue
+            rid, title = other.get("id"), other.get("title")
+            if rid in local and title is not None and title != local[rid].title:
+                out.append(f"{rid}: title differs on {ref} ({title!r} there, {local[rid].title!r} here); "
+                           "one of the two is a colliding new id, renumber it before merge")
+    return out
 
 
 def toc_markdown(chunks: list[lib.Chunk]) -> str:
@@ -176,9 +217,12 @@ def toc_markdown(chunks: list[lib.Chunk]) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write-toc", action="store_true")
+    ap.add_argument("--against", action="append", default=[], metavar="REF",
+                    help="git ref to compare record ids with (repeatable; offline, uses fetched refs only)")
     a = ap.parse_args(argv)
     warnings: list[str] = []
     errors = lint(warnings=warnings)
+    warnings += id_collisions(a.against)
     for w in warnings:
         print(f"WARN  {w}")
     for e in errors:

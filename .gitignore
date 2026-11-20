@@ -34,3 +34,4 @@ __pycache__/
 # Adopter machine configs can hold private registry URLs or tokens; never commit them
 .npmrc
 nuget.config
+StrykerOutput/

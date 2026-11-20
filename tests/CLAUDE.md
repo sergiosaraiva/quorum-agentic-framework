@@ -26,7 +26,7 @@ This file exists because it is loaded when you work under `tests/`; the nearest 
 
 | Gate | Tool | When |
 |------|------|------|
-| Mutation testing | Stryker.NET | hot-path business logic only |
+| Mutation testing | Stryker.NET (`stryker-config.json`, run by `scripts/run-mutation-tests.sh`) | hot-path business logic only |
 | Load | k6 | before a release, thresholds on p95 and error rate |
 | End to end | Playwright | critical user journeys |
 
@@ -36,3 +36,12 @@ This file exists because it is loaded when you work under `tests/`; the nearest 
 dotnet test --project tests/Api.UnitTests/Api.UnitTests.csproj
 dotnet test --project tests/Api.IntegrationTests/Api.IntegrationTests.csproj   # requires Docker
 ```
+
+Coverage (Microsoft code coverage extension, referenced by both test projects) and the figure for the test-automator `coverage` object:
+
+```bash
+dotnet test --solution Quorum.slnx --coverage --coverage-output-format cobertura --results-directory TestResults   # integration tests need Docker
+python3 scripts/coverage_changed.py --base origin/main TestResults/*.cobertura.xml   # JSON: changed_files_pct, per file, not_measured
+```
+
+Mutation: `scripts/run-mutation-tests.sh` (needs Docker, takes minutes; Stryker runs on the Microsoft.Testing.Platform runner, which it marks as preview, so confirm a surprising result by hand). Edit `mutate` in `stryker-config.json` to the flagged hot-path files; it ships pointing at `OrdersService.cs` as the sample.

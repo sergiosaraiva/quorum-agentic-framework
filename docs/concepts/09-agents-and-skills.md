@@ -116,6 +116,8 @@ The "Used by" column of `.claude/skills/SKILL-INDEX.md` is the source; the same 
 
 Defaults are in `docs/reference/model-selection-and-costs.md`: the reviewer model is equal to or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux) run `opus` at high effort; `documentation-reviewer` runs `sonnet` because it checks grounding mechanically against sources; code, tests, requirements and docs run `sonnet`; prompt sharpening runs `haiku`. Change them with evidence (review quality, cost per round), one agent at a time.
 
+Limit, observed in the VS-004 trial (trial log, not verified in the repo): agents run as general-purpose subagents from a session outside the repo, told to read the agent file, did not take the frontmatter `model` and `effort`, so the tables above were not enforced in that mode. Registered agent types at the repo root were not exercised. When you launch an agent that way, set the model in the launch call and record the model each reviewer actually ran on (finding F5 in `docs/reference/pipeline-trial-findings.md`).
+
 ## Common mistakes
 
 | Mistake | Effect | Fix |

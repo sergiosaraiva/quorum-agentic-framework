@@ -84,6 +84,77 @@ class LintTests(unittest.TestCase):
             self.assertTrue(any("duplicate" in e for e in errors))
 
 
+class RelatedSymmetryTests(unittest.TestCase):
+    def lint(self, a_related, b_related):
+        with tempfile.TemporaryDirectory() as tmp:
+            kb, qa = Path(tmp) / "kb", Path(tmp) / "qa"
+            (kb / "chunks").mkdir(parents=True)
+            (qa / "records").mkdir(parents=True)
+            for rid, rel in (("TQ-001", a_related), ("TQ-002", b_related)):
+                (qa / "records" / f"{rid}.md").write_text(
+                    f"---\nid: {rid}\nkind: TQ\ntitle: {rid}\nstatus: open\ndecider: tech-lead\n"
+                    f"asked: 2026-01-01\nrelated: {rel}\n---\nbody\n")
+            warnings: list[str] = []
+            errors = check_chunks.lint(kb, qa, warnings=warnings)
+            return errors, warnings
+
+    def test_symmetric_links_are_clean(self):
+        self.assertEqual(self.lint("[TQ-002]", "[TQ-001]"), ([], []))
+
+    def test_one_way_link_warns_without_failing(self):
+        errors, warnings = self.lint("[TQ-002]", "[]")
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, ["TQ-001.md: related TQ-002 is one-way (TQ-002 does not list TQ-001)"])
+
+
+class IdCollisionTests(unittest.TestCase):
+    def setUp(self):
+        import subprocess
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self._tmp.name)
+        self.qa = self.repo / "questions"
+        (self.qa / "records").mkdir(parents=True)
+        self.git = lambda *a: subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=t", "-c", "user.email=t@t",
+                                              *a], check=True, capture_output=True)
+        self.git("init", "-q", "-b", "main")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def record(self, rid, title):
+        (self.qa / "records" / f"{rid}.md").write_text(
+            f"---\nid: {rid}\nkind: TQ\ntitle: {title}\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n---\nb\n")
+
+    def test_same_id_different_title_on_other_branch_warns(self):
+        self.record("TQ-001", "Base")
+        self.git("add", "-A"); self.git("commit", "-qm", "base")
+        self.git("checkout", "-qb", "other")
+        self.record("TQ-002", "Other branch question")
+        self.git("add", "-A"); self.git("commit", "-qm", "other")
+        self.git("checkout", "-q", "main")
+        self.record("TQ-002", "Main branch question")
+        out = check_chunks.id_collisions(["other"], self.qa, self.repo)
+        self.assertEqual(len(out), 1)
+        self.assertIn("TQ-002: title differs on other", out[0])
+
+    def test_same_title_and_unique_ids_are_clean(self):
+        self.record("TQ-001", "Base")
+        self.git("add", "-A"); self.git("commit", "-qm", "base")
+        self.git("checkout", "-qb", "other")
+        self.record("TQ-002", "Only there")
+        self.git("add", "-A"); self.git("commit", "-qm", "other")
+        self.git("checkout", "-q", "main")
+        self.record("TQ-003", "Only here")
+        self.assertEqual(check_chunks.id_collisions(["other"], self.qa, self.repo), [])
+
+    def test_unknown_ref_is_reported_not_raised(self):
+        self.record("TQ-001", "Base")
+        self.git("add", "-A"); self.git("commit", "-qm", "base")
+        out = check_chunks.id_collisions(["nope"], self.qa, self.repo)
+        self.assertEqual(len(out), 1)
+        self.assertIn("--against nope", out[0])
+
+
 class AcceptedRiskTests(unittest.TestCase):
     """OD records with `accepted_risk: true` and `expires`."""
     TODAY = date(2026, 6, 1)
@@ -95,7 +166,8 @@ class AcceptedRiskTests(unittest.TestCase):
             (kb / "chunks").mkdir(parents=True)
             (qa / "records").mkdir(parents=True)
             (qa / "records" / "TQ-001.md").write_text(
-                "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n---\nbody\n")
+                "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n"
+                f"related: [{kind}-002]\n---\nbody\n")
             (qa / "records" / f"{kind}-002.md").write_text(
                 f"---\nid: {kind}-002\nkind: {kind}\ntitle: D\nstatus: decided\ndecider: tech-lead\nasked: 2026-02-01\n"
                 f"{od_extra}\nrelated: {related}\n{od_front}\n---\n{od_body}")
@@ -167,7 +239,7 @@ class AcceptedRiskTests(unittest.TestCase):
                 (kb / "chunks").mkdir(parents=True)
                 (qa / "records").mkdir(parents=True)
                 (qa / "records" / "TQ-001.md").write_text(
-                    "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: t\nasked: 2026-01-01\n---\nb\n")
+                    "---\nid: TQ-001\nkind: TQ\ntitle: Q\nstatus: open\ndecider: t\nasked: 2026-01-01\nrelated: [OD-002]\n---\nb\n")
                 (qa / "records" / "OD-002.md").write_text(
                     f"---\nid: OD-002\nkind: OD\ntitle: D\nstatus: {status}\ndecider: t\nasked: 2026-02-01\n"
                     "related: [TQ-001]\naccepted_risk: true\nexpires: 2026-12-31\n---\n## Decision\n\nx\n")

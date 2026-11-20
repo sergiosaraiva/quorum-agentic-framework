@@ -1,0 +1,19 @@
+{
+  "stryker-config": {
+    "project": "src/Api/Api.csproj",
+    "mutate": [
+      "**/Features/Orders/OrdersService.cs"
+    ],
+    "thresholds": {
+      "high": 90,
+      "low": 70,
+      "break": 70
+    },
+    "reporters": [
+      "progress",
+      "json"
+    ],
+    "test-runner": "mtp",
+    "solution": "Quorum.slnx"
+  }
+}

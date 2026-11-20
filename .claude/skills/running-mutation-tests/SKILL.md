@@ -10,7 +10,7 @@ description: Use when proving that tests on hot-path business logic (pricing, ca
 | Topic | Rule |
 |-------|------|
 | Idea | Coverage shows a line ran; mutation testing breaks the line and checks a test fails |
-| Tool | `dotnet-stryker` as a pinned local tool. The manifest `.config/dotnet-tools.json` and `stryker-config.json` are not shipped: the adopter creates them (`dotnet new tool-manifest`, `dotnet tool install dotnet-stryker`) when the first hot path is gated; installing a tool needs human approval |
+| Tool | `dotnet-stryker` as a pinned local tool in `.config/dotnet-tools.json`; run `scripts/run-mutation-tests.sh` (restores, then runs `stryker-config.json`). Changing the pin needs human approval. This repo's tests run on Microsoft.Testing.Platform, so the config sets `"test-runner": "mtp"` and `"solution"`; Stryker lists that runner as preview. A `test-projects` list is rejected in solution mode |
 | Scope | Hot-path files only (money math, rules engines, authorization checks, anything the team flags). Not CRUD glue, not the whole solution |
 | Threshold | Set `thresholds.break` per maturity (start near 70, ratchet up). Below `break` the run fails |
 | Survivors | A survivor is a test gap until reasoned otherwise. Add one targeted test for the missed behaviour; do not expand the suite for its own sake |
@@ -32,10 +32,11 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 {
   "stryker-config": {
     "project": "src/Api/Api.csproj",
-    "test-projects": ["tests/Api.UnitTests/Api.UnitTests.csproj"],
+    "solution": "Quorum.slnx",
+    "test-runner": "mtp",
     "mutate": [
-      "src/Api/Features/Billing/Pricing/**/*.cs",
-      "src/Api/Common/PermissionEvaluator.cs"
+      "**/Features/Billing/Pricing/**/*.cs",
+      "**/Common/PermissionEvaluator.cs"
     ],
     "thresholds": { "high": 90, "low": 70, "break": 70 },
     "reporters": ["html", "progress", "json"]
@@ -43,14 +44,13 @@ Run too slow?                            -> narrow `mutate`, use --since:<branch
 }
 ```
 
-Match project paths to your solution (the paths above are an example, not files in the template). Verify option names against the installed Stryker version.
+The shipped `stryker-config.json` is the working form; the `mutate` paths above are an example. Patterns need a leading `**/` (a plain `src/...` path matched nothing when verified on 2026-11-20 with Stryker 5.1.0). Verify option names against the installed Stryker version.
 
 ## Example: run and triage
 
 ```bash
-dotnet tool restore
-dotnet stryker --config-file stryker-config.json
-dotnet stryker --config-file stryker-config.json --since:origin/main   # changed files only
+scripts/run-mutation-tests.sh
+scripts/run-mutation-tests.sh --since:origin/main   # changed files only
 ```
 
 ```

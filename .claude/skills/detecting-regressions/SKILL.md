@@ -46,7 +46,7 @@ Not B6: a documented expected-status recovery (404 to `null`) that rethrows or l
 **B1**
 ```
 Changed: OrderDto field OrderTotal renamed TotalAmount (C#)
-Check:   frontend/src/app/features/orders/order.model.ts still has orderTotal: number
+Check:   frontend/src/app/features/orders/models.ts (or a `*.model.ts`) still has orderTotal: number
 Finding: B1, 0.95. test_would_catch: contract test asserting OrderDto JSON keys equal the TS model keys
 ```
 

@@ -15,7 +15,7 @@ description: Use when writing unit tests for C# services and business logic in i
 | Cancellation | Pass `TestContext.Current.CancellationToken` to async calls (xUnit v3) |
 | Data | `[Theory]` with `[InlineData]` / `[MemberData]` for one rule over many inputs, not copied `[Fact]`s |
 | Doubles | A hand-written fake class of the real seam (HTTP client, message bus), per `tests/CLAUDE.md`; no mocking library unless a recorded decision (OD) adopts one. Pure classes and cheap in-memory collaborators are constructed for real |
-| Time | Inject `TimeProvider`; use `FakeTimeProvider` in tests, never `DateTime.UtcNow` in logic |
+| Time | Inject `TimeProvider`; use `FakeTimeProvider` in tests (package `Microsoft.Extensions.TimeProvider.Testing`, not yet in `Directory.Packages.props`: add it there, central package management, when first needed), never `DateTime.UtcNow` in logic |
 | Scope | Behaviour and branches that can break. Not getters, DI wiring, framework code or private methods |
 | Helpers | No custom assertion or test-base frameworks without 2+ current users |
 

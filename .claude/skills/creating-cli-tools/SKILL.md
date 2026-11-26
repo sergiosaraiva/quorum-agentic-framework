@@ -29,7 +29,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. Tooling code goes throu
 ```
 Admin task needing the EF model (optional or environment-specific data, backfill)? -> scripts/<tool>/Program.cs
 Runs on a schedule?  -> not a CLI tool: scheduled job, or a BackgroundService if safe per replica
-Needs DB access?     -> reference src/Infrastructure and reuse the DbContext configuration helper
+Needs DB access?     -> reference src/Infrastructure and build the `DbContextOptions` the way `src/Infrastructure/Persistence/AppDbContextFactory.cs` and `src/Api/Program.cs` do (Npgsql plus `UseSnakeCaseNamingConvention()`; no shared helper, the call sites must agree)
 ```
 
 ## Examples

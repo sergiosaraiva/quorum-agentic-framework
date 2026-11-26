@@ -10,7 +10,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. Observability is a requ
 ## Proportionality
 
 - Baseline for every service: structured `ILogger` logging with scopes plus the `/health/*` endpoints (`managing-application-lifecycle`). A new endpoint needs nothing more by default
-- Use OpenTelemetry's built-in instrumentations (ASP.NET Core, EF Core, `HttpClient`, runtime) once. Hand-write an `ActivitySource` or `Meter` only when a named SLO or a recurring incident cannot be answered by the built-ins
+- Use OpenTelemetry's built-in instrumentations (ASP.NET Core, Npgsql, `HttpClient`, runtime) once. Hand-write an `ActivitySource` or `Meter` only when a named SLO or a recurring incident cannot be answered by the built-ins
 - Alarm only on user-impact signals you would act on at 3am (error rate, p99 latency, queue depth). Each alarm has an owner and a runbook line
 - No logging or telemetry abstraction over `ILogger`/OpenTelemetry. Pick the right level (no chatty `Information` in loops). Never log PII, secrets or tokens
 - Sampling rate, exporter endpoint, service name and thresholds are configuration (`OTEL_*` env vars, Options, deployment configuration), not literals
@@ -49,19 +49,20 @@ builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService(builder.Configuration["OTEL_SERVICE_NAME"] ?? "app-api"))
     .WithTracing(t => t
         .AddAspNetCoreInstrumentation()
-        .AddEntityFrameworkCoreInstrumentation()
+        .AddNpgsql()                     // Npgsql.OpenTelemetry, documented by Npgsql
         .AddHttpClientInstrumentation()
         .AddOtlpExporter())              // endpoint/sampling from OTEL_* env vars
     .WithMetrics(m => m
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
-        .AddOtlpExporter());
+        .AddOtlpExporter())
+    .WithLogging(l => l.AddOtlpExporter());   // OTLP logs; drop this line and the console JSON logs are the only log output
 
 // In a service: structured fields, no tenant parameter (the middleware scope carries it)
 logger.LogInformation("Report {ReportId} exported in {DurationMs}ms", reportId, elapsedMs);
 ```
 
-Verify current package names and versions before pinning `OpenTelemetry.*` in `Directory.Packages.props`; add them with the first real use.
+`.AddEntityFrameworkCoreInstrumentation()` (`OpenTelemetry.Instrumentation.EntityFrameworkCore`) is still prerelease: prefer `AddNpgsql()`, and pin the EF one only by an explicit decision. Redact `url.query`, `url.full`, `db.query.text` and `db.statement` before export: the log-redaction row in `src/Infrastructure/CLAUDE.md` (OD-012, OD-027 in the example domain) is required before the first deployment. Verify current package names and versions before pinning `OpenTelemetry.*` in `Directory.Packages.props`; add them with the first real use.
 
 Alarm sketch (user-impact signals):
 

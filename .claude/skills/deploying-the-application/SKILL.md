@@ -56,6 +56,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     environment: staging
     steps:
+      - uses: actions/checkout@<pinned-sha>    # the script lives in the repo (or download the migration bundle artifact)
       - run: ./scripts/migrate.sh              # applies the efbundle; fails the run on first error
   deploy:
     needs: [build, migrate]

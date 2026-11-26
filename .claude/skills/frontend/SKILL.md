@@ -11,8 +11,8 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md` `## Design Principles` (
 
 | Topic | Rule |
 |-------|------|
-| Components | Standalone only; no `NgModule` for new features. Omit `standalone: true` if your Angular major defaults to it (verify) |
-| Change detection | `ChangeDetectionStrategy.OnPush` on every component unless your Angular major already defaults to it (verify) |
+| Components | Standalone only; no `NgModule` for new features. Omit `standalone: true` (the default since Angular 19) |
+| Change detection | OnPush is the default from Angular 22 (the pinned major, `frontend/package.json`); write `ChangeDetectionStrategy.OnPush` explicitly anyway (`frontend/CLAUDE.md`), never `Eager` without a reason |
 | State | `signal()` / `computed()`; inputs `input()` / `input.required()`; outputs `output()`. No `@Input()`/`@Output()` decorators in new code |
 | Templates | `@if` / `@for` / `@switch`. `track <stable id>` on every `@for`; never `$index` on a reorderable list |
 | Async data | Every component or page that loads data renders 4 states: loading, error, empty, data |

@@ -44,21 +44,21 @@ Status flow: `open` -> `answered` (a question answered) or `decided` (an owner d
 
 | Step | Action |
 |------|--------|
-| 1 | Search `qa-kb` first: `mcp__qa-kb__search` (filters `query`, `k`, `kind`, `status`) with the topic, synonyms and the slice id; then `mcp__qa-kb__get` for the id. Without MCP: `_SHARED-PATTERNS.md` Never Invent rule 7 |
-| 2 | Re-read the record; a `closed` record's History may point to its replacement. Never quote an id from memory |
+| 1 | Search `qa-kb`: `mcp__qa-kb__search` (filters `query`, `k`, `kind`, `status`) with the topic, synonyms and the slice id; then `mcp__qa-kb__get` for the id. Without MCP: `_SHARED-PATTERNS.md` Never Invent rule 7 |
+| 2 | Re-read the record; a `closed` record's History may point to its replacement. Never cite an id from memory |
 | 3 | Found and `decided` or `answered`: act on it, cite the id, no question |
-| 4 | Found, records conflict: flag both ids and ask once, batched |
+| 4 | Found, records conflict: flag both ids; ask once, batched |
 | 5 | Found, `open`: if it blocks you and is the user's, ask citing the id; otherwise proceed on its working assumption and flag the id |
-| 6 | Not found: check the Business KB (`business-kb`) for product behaviour; pass `topic` to its `search` (a topic from `stats`) so framework `QF-*` chunks do not outrank domain chunks (unknown-topic behaviour: rule 7). Still silent: record a new BQ or TQ with a decider and proceed only with unblocked work |
+| 6 | Not found: check the Business KB (`business-kb`) for product behaviour; pass `topic` to its `search` (a topic from `stats`) so `QF-*` chunks do not outrank domain ones (unknown-topic behaviour: rule 7). Still silent: record a BQ or TQ with a decider; proceed with unblocked work only |
 
 ## Record every answer (mandatory)
 
 | Rule | Detail |
 |------|--------|
 | When | In the session the answer is given |
-| Where | Update the existing record; else create one with the next free id. Before the first push run `python3 scripts/kb/check_chunks.py --against origin/main` (also `--against <branch>` per sibling branch; fetch first): a warning means a colliding new id or a retitled record; renumber only a new record (the later branch) |
+| Where | Update the existing record; else create one with the next free id. Before the first push run `python3 scripts/kb/check_chunks.py --against origin/main` (and per sibling branch; fetch first): a warning means a colliding new id or a retitled record; renumber only a new record (the later branch). Without Bash (`requirements-analyst`, `solution-architect`) list both runs as `probe_requests` (`command`, `expected`); the session runs them (`_SHARED-PATTERNS.md` Subagent Limits) |
 | Who | An agent whose role includes records (`requirements-analyst`, `solution-architect`, `documentation-curator`) writes it itself. Every other agent, and every read-only agent, returns `questions_to_record` (kind, question, decider, recommended option) in its final message; the calling session or `documentation-curator` writes the record |
-| Duplicates | Search first; update the record or close and supersede it, never silently overwrite |
+| Duplicates | Search first; update, or close and supersede; never silently overwrite |
 | Attribution | Decider role, date, who gave the answer |
 | Review ids | A review finding id (`SEC-001`, `RD-1`) is not stable. Cite the record id everywhere; the finding id may appear once, in History, as origin |
 | Then | Run `python3 scripts/kb/check_chunks.py`; re-ingest the Q&A KB if you use the pgvector backend (`questions/README.md`) |

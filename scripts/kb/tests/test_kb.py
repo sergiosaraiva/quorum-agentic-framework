@@ -14,6 +14,11 @@ import check_chunks  # noqa: E402
 import lib  # noqa: E402
 import mcp_server  # noqa: E402
 
+# The tests never read the live kb/ and questions/ (an adopter deletes the example domain there): they read this
+# small fixture tree, a copy of a few example chunks and records.
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+FIX_KB, FIX_QA = FIXTURES / "kb", FIXTURES / "questions"
+
 
 class FrontmatterTests(unittest.TestCase):
     def test_parse_inline_and_block_lists(self):
@@ -28,10 +33,19 @@ class FrontmatterTests(unittest.TestCase):
             lib.parse_frontmatter("no frontmatter")
 
 
+class FixtureTests(unittest.TestCase):
+    def test_fixture_tree_is_clean_and_marked_as_example(self):
+        warnings: list[str] = []
+        self.assertEqual(check_chunks.lint(FIX_KB, FIX_QA, warnings=warnings), [])
+        self.assertEqual(warnings, [])
+        self.assertTrue(all(c.example for c in lib.load_chunks(FIX_KB)))
+        self.assertTrue(all(r.example for r in lib.load_records(FIX_QA)))
+
+
 class SearchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.store = backends.LocalStore()
+        cls.store = backends.LocalStore(FIX_KB, FIX_QA)
 
     def test_bm25_finds_refund_chunk(self):
         hits = self.store.chunk_search("refund window after delivery", k=3)
@@ -69,7 +83,7 @@ class EmbeddingTests(unittest.TestCase):
 
 
 class LintTests(unittest.TestCase):
-    def test_shipped_examples_are_clean(self):
+    def test_shipped_kb_and_records_are_clean(self):
         self.assertEqual(check_chunks.lint(), [])
 
     def test_detects_dangling_link_and_duplicate(self):
@@ -271,7 +285,7 @@ class AcceptedRiskTests(unittest.TestCase):
 
 class McpTests(unittest.TestCase):
     def test_protocol_roundtrip(self):
-        srv = mcp_server.Server("business", backends.LocalStore())
+        srv = mcp_server.Server("business", backends.LocalStore(FIX_KB, FIX_QA))
         init = srv.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
         self.assertEqual(init["result"]["serverInfo"]["name"], "business-kb")
         self.assertIsNone(srv.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
@@ -285,14 +299,14 @@ class McpTests(unittest.TestCase):
         self.assertTrue(missing["result"]["isError"])
 
     def test_qa_tools(self):
-        srv = mcp_server.Server("qa", backends.LocalStore())
+        srv = mcp_server.Server("qa", backends.LocalStore(FIX_KB, FIX_QA))
         names = {t["name"] for t in srv.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]["tools"]}
         self.assertEqual(names, {"search", "get", "open", "related"})
 
 
 class McpRobustnessTests(unittest.TestCase):
     def setUp(self):
-        self.srv = mcp_server.Server("business", backends.LocalStore())
+        self.srv = mcp_server.Server("business", backends.LocalStore(FIX_KB, FIX_QA))
 
     def call(self, name, arguments, mid=1):
         return self.srv.handle({"jsonrpc": "2.0", "id": mid, "method": "tools/call",
@@ -352,7 +366,7 @@ class McpRobustnessTests(unittest.TestCase):
         self.assertNotIn("error", resp)
 
     def test_qa_server_rejects_non_string_filters(self):
-        qa = mcp_server.Server("qa", backends.LocalStore())
+        qa = mcp_server.Server("qa", backends.LocalStore(FIX_KB, FIX_QA))
         resp = qa.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                           "params": {"name": "search", "arguments": {"query": "x", "status": 3}}})
         self.assertEqual(resp["error"]["code"], -32602)
@@ -369,7 +383,7 @@ class GraphTests(unittest.TestCase):
         import search
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            self.assertEqual(search.main(["--graph", "BC-001", "--depth", "999999"]), 0)
+            self.assertEqual(search.main(["--graph", "BC-001", "--depth", "999999", "--root", str(FIXTURES)]), 0)
         self.assertEqual(json.loads(buf.getvalue())["depth"], lib.MAX_DEPTH)
 
 
@@ -550,7 +564,7 @@ class RecordRuleTests(unittest.TestCase):
 
 class McpTransportTests(unittest.TestCase):
     def setUp(self):
-        self.srv = mcp_server.Server("business", backends.LocalStore())
+        self.srv = mcp_server.Server("business", backends.LocalStore(FIX_KB, FIX_QA))
 
     def test_serve_survives_bad_bytes_on_strict_text_streams_and_writes_utf8_bytes(self):
         import io

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 import backends
 import lib
@@ -34,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", help="qa: BQ|TQ|OD")
     ap.add_argument("--status", help="qa: open|answered|decided|closed")
     ap.add_argument("--json", action="store_true", help="raw JSON output")
+    ap.add_argument("--root", type=Path, help="local backend: directory holding kb/chunks and questions/records "
+                                              "(default: this repository)")
     a = ap.parse_args(argv)
     a.depth = lib.clamp_int(a.depth, 0, lib.MAX_DEPTH, 1)
     a.k = lib.clamp_int(a.k, 1, lib.MAX_K, 5)
@@ -41,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.stats and a.kb != "business":
         ap.error("--stats reports the business KB only; drop --kb qa")
     try:
-        store = backends.make_store(a.backend)
+        store = backends.make_store(a.backend, a.root)
     except (ValueError, RuntimeError) as exc:  # unknown backend, or pg without psycopg or DATABASE_URL
         print(f"error: {exc}", file=sys.stderr)
         return 2

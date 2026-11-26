@@ -1,0 +1,8 @@
+# Ids that framework files cite on purpose although no chunk or record defines them.
+# One entry per line: `ID` (ignored in every file) or `PATH:ID` (PATH relative to the repo root, `*` allowed).
+# check_chunks.py reads this file; prefer PATH:ID so a real dangling citation elsewhere is still reported.
+
+# Worked example in the docs: a business question the analyst would raise (an illustration, not a record).
+docs/concepts/01-overview-and-pipeline.md:BQ-010
+docs/concepts/03-questions-and-decisions-kb.md:BQ-010
+docs/concepts/04-never-invent.md:BQ-010

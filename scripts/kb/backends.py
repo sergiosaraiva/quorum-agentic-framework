@@ -199,9 +199,10 @@ def _snippet(body: str, n: int = 240) -> str:
     return flat if len(flat) <= n else flat[: n - 3] + "..."
 
 
-def make_store(backend: str = "local"):
+def make_store(backend: str = "local", root: Path | None = None):
+    """`root` (local backend only) is a directory holding `kb/chunks` and `questions/records`; default: this repo."""
     if backend == "local":
-        return LocalStore()
+        return LocalStore(root / "kb", root / "questions") if root else LocalStore()
     if backend == "pg":
         return PgStore()
     raise ValueError(f"unknown backend {backend!r} (local|pg)")

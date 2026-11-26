@@ -18,6 +18,7 @@ The skill index `.claude/skills/SKILL-INDEX.md` has a "Used by" column that name
 | test-automator | `creating-xunit-tests`, `writing-integration-tests`, `writing-angular-tests`, `writing-playwright-e2e-tests`, `running-mutation-tests`, `load-and-performance-testing`, `tuning-postgresql-queries`, `scaling-performance-test-data` |
 | documentation-curator | `updating-internal-docs`, `updating-external-docs`, `writing-kb-chunks`, `maintaining-agent-framework` |
 | documentation-reviewer | `reviewing-documentation`, `reviewing-kb-chunks`, `verifying-cross-file-coupling` |
+| security-engineer | `backend`, `creating-dtos-and-validation`, `creating-configuration-options`, `implementing-observability`, `database`, `writing-postgresql-migrations`, `deploying-the-application`, `implementing-infrastructure-as-code`, `frontend` |
 | infrastructure-engineer | `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-configuration-options`, `implementing-observability`, `managing-application-lifecycle` |
 | prompt-engineer | `writing-world-class-prompts` |
 

@@ -1,11 +1,11 @@
 ---
 chunk_id: QF-026
-title: How many review rounds: loop-back, the three-round cap and human escalation
+title: How many review rounds: loop-back, the three re-loop cap and human escalation
 topics: [validation, process]
 links: [QF-024, QF-025, QF-027, QF-028]
 sources: [".claude/agents/_SHARED-PATTERNS.md", "docs/concepts/07-independent-validation.md", ".github/workflows/ai-pr-review.yml", "scripts/ai_review_local.py"]
 ---
-Quorum allows at most three review rounds per gate. A blocking finding at a review gate goes back to the artifact's writer, not forward. This is the loop-back rule.
+Quorum allows at most three re-loops per gate chain. A blocking finding at a review gate goes back to the artifact's writer, not forward. This is the loop-back rule.
 
 | Gate | On a blocking finding | On none |
 |------|-----------------------|---------|

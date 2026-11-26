@@ -65,7 +65,7 @@ A small slice may need fewer rungs. Branches: `main` for releases and an optiona
 
 ## Worked example: Acme Orders (all ids and scores are examples)
 
-The same four slices as `docs/slices/INDEX.md`. Priority = (2 x Value + 2 x Urgency + Unblocks) / Effort.
+The first four of the five slices in `docs/slices/INDEX.md` (VS-005, order status alignment, is left out here). Priority = (2 x Value + 2 x Urgency + Unblocks) / Effort.
 
 | Id | Slice | Depends on | Value | Urgency | Unblocks | Effort | Priority |
 |----|-------|-----------|-------|---------|----------|--------|----------|
@@ -89,11 +89,11 @@ Before VS-003 starts, its readiness analysis finds that `BC-003` (refund window)
 
 | Activity | Agent | Output |
 |----------|-------|--------|
-| Ground and scope (S1, S2) | requirements-analyst | Findings with cited ids, records for gaps |
+| Ground and scope (S1, S2), slice spec, INDEX row up to `Ready` | requirements-analyst | Findings with cited ids, records for gaps, the slice spec and its INDEX row |
 | Design and rungs (S3, S4) | solution-architect | Design, dependency-ordered plan |
 | UX define (S2b) | ux-usability-specialist | Flows, states, acceptance criteria |
 | Build a rung | code-engineer, then review pair | PR |
-| Status upkeep | documentation-curator | INDEX update |
+| Status upkeep after `Ready` (`In progress`, Rung, PR link, `Done`), in each code PR | documentation-curator | INDEX update |
 
 ## Keeping the plan honest
 

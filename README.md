@@ -14,7 +14,7 @@ An AI assistant working alone tends to fail in three ways: it invents plausible 
 |---|---|
 | Invents | Agents consult two knowledge bases and cite ids. If both are silent, they record a question and continue with unblocked work. |
 | Forgets | Every question, answer and decision is a record in a searchable Q&A knowledge base. Agents search it before asking. |
-| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most three rounds, then a human decides. |
+| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most three re-loops per gate chain, then a human decides. |
 
 ## The ideas
 
@@ -43,7 +43,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
                                   documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes. `prompt-engineer` sharpens a prompt on request.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infra changes. `prompt-engineer` sharpens a prompt on request.
 
 | Agent | Model | Role |
 |---|---|---|
@@ -82,7 +82,7 @@ docker-compose.yml        PostgreSQL with pgvector
 
 ## Quick start
 
-Prerequisites: [Claude Code](https://code.claude.com), .NET 10 SDK, Node.js, Python 3.11+, Docker (optional).
+Prerequisites: [Claude Code](https://code.claude.com), .NET 10 SDK, Node.js, Python 3.11+, and Docker (required for `dotnet test`: the integration tests use Testcontainers). PostgreSQL with pgvector and the `psycopg` package are needed only for the optional pgvector KB backend.
 
 ```bash
 # 1. Try the knowledge bases with no database
@@ -92,9 +92,10 @@ python3 -m unittest discover -s scripts/kb/tests
 python3 scripts/framework_lint.py
 
 # 2. Optional: PostgreSQL with pgvector
-cp .env.example .env            # then set your own password
+cp .env.example .env            # then set your own POSTGRES_PASSWORD; DATABASE_URL is built from it
 set -a; source .env; set +a     # export the variables for the commands below
 docker compose up -d
+python3 -m venv .venv && . .venv/bin/activate && pip install "psycopg[binary]"   # system pip is refused on Ubuntu (PEP 668)
 python3 scripts/kb/ingest.py    # applies the schemas itself; see scripts/kb/README.md for embedding options
 
 # 3. Build and test the sample backend
@@ -103,6 +104,8 @@ dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format 
 # 4. Open Claude Code in this folder; it reads CLAUDE.md and registers the MCP servers
 claude
 ```
+
+For the pg backend, start Claude Code from the shell where the virtual environment is activated: `.mcp.json` runs `python3` from `PATH`. The local backend needs no package.
 
 Install the pre-commit lint hook with `bash .claude/hooks/install-framework-check-hook.sh`.
 

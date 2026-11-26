@@ -28,7 +28,7 @@ Turns a request into a grounded, testable specification and a list of open quest
 |-------|--------|
 | 1 Analyse | Read the request and linked docs (`docs/slices/INDEX.md` for slice ids). List actors, inputs, outputs, rules, constraints |
 | 2 Ground | `business-kb` `search` each rule, then `chunk` hits and `graph_traverse` neighbours; `stats` to judge silence. `qa-kb` `search`/`get` for recorded answers; a `closed` record's History may say "Superseded by <id>": follow it |
-| 3 Skills | Match each affected layer to a skill from the routing table in `_SHARED-PATTERNS.md`; Glob that the skill exists. A layer with no skill is reported as a gap, not improvised |
+| 3 Skills | Match each affected layer to a skill with `routing-to-skills` (`.claude/skills/SKILL-INDEX.md`); Glob that the skill exists. A layer with no skill is reported as a gap, not improvised |
 | 4 Gaps | Classify each item Confirmed / Contradicted / KB silent / Missing (Alignment Gate step 4) |
 | 5 Impact | Walk each layer: entity and migration, DTO and validation, service, endpoint and authorization, Angular client and screen, Options and deployment configuration, tests, docs |
 | 6 Questions | Record each unresolved item yourself (`questions/README.md`, skill `recording-decisions`): id, question, why it matters, options, recommended option, decider, what is blocked. Continue with unblocked work. Owner decisions you cannot settle go back to the session as one batched `open_owner_questions` list, recommended option first (you cannot ask the user) |

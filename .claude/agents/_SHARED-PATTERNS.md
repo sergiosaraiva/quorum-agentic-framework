@@ -14,7 +14,7 @@ Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate 
 
 ## Subagent Limits
 
-A subagent cannot spawn agents or ask the user. "Re-invoke X", "ask the owner", "involve Y" are instructions to the calling session. It returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues. `requirements-analyst` and `solution-architect` have no `Bash` (Common Tool Permissions) and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
+A subagent cannot spawn agents or ask the user; "re-invoke X", "ask the owner" are instructions to the calling session. It returns open items (`questions_to_record`, blockers, recommended options) in its final message and continues. `requirements-analyst` and `solution-architect` have no `Bash` and cannot probe: each lists a probe as a `probe_requests` entry (`command`, `expected`), never assumes the result, and the session runs it.
 
 ## Pipeline and Lanes
 
@@ -29,7 +29,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 | Lane | When | Stages |
 |------|------|--------|
 | Trivial | One-line fix, typo, no behaviour change | Edit directly; no gate |
-| Iterate | Small, low-risk, reversible, one slice, no new contract, no migration, no auth/data/infra change. Example threshold: about 150 added lines, 5 files | `code-engineer`; review pair at the gate (before push); `test-automator` only for behaviour no test covers |
+| Iterate | Small, low-risk, reversible, one slice, no new contract, no migration, no auth/data/infra change. Example threshold: ~150 added lines, 5 files | `code-engineer`; review pair at the gate (before push); `test-automator` only for behaviour no test covers |
 | Full | Anything else: new feature, contract change, migration, auth, multi-layer | Every stage above, per its skip reason |
 | Spike | Throwaway exploration the owner explicitly asks for | Local only, no review, never merged; discard the code or rebuild it through Full |
 
@@ -103,8 +103,7 @@ What blocks. This table is the only place that decides blocking; other files def
 
 - Never skip a stage an earlier iteration passed.
 - Cap: 3 re-loops per gate chain. Still failing: stop, surface the pattern once, batched. A framework-doc change shares one budget of 3 across both gates.
-- Every non-blocking finding gets a disposition (fix, defer with a record, reject with a reason) in the hand-off.
-Round counters: skill `running-local-ai-review`.
+- Every non-blocking finding gets a disposition (fix, defer with a record, reject with a reason) in the hand-off. Round counters: skill `running-local-ai-review`.
 
 ## Independent Review Rule
 
@@ -112,7 +111,7 @@ Round counters: skill `running-local-ai-review`.
 |------|--------|
 | Different role | Never the writer's role |
 | Fresh context | Reviewers get the diff, spec/design and alignment result, not the writer's reasoning |
-| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, cloud, ux): `opus`; `documentation-reviewer` `sonnet` (mechanical; `docs/reference/model-selection-and-costs.md`) |
+| Model | The reviewer model is equal or stronger than the producer's. Judgement-heavy reviewers (quality, regression, security, architect, infrastructure, ux): `opus`; `documentation-reviewer` `sonnet` (mechanical; `docs/reference/model-selection-and-costs.md`) |
 | Read-only | No Write/Edit on repository files (ux: scratch mockups only); Bash per Common Tool Permissions. Findings use the form below |
 | No anchoring | A hypothesis in a prompt ("confirm X is fine") is rewritten as a neutral task |
 
@@ -130,22 +129,22 @@ Field `unverified` (optional list, every reviewer contract; defined here): one s
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Before a branch's first push and after any later change run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). Pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (else skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
+Outside the Trivial and Spike lanes, before a branch's first push and after any later change run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code per its lane row. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 3, then a human). The pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (else skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
 
 ## Citation Format (Mandatory)
 
-Stored artifacts (docs, specs, agent and skill bodies, CLAUDE.md) never cite line numbers: name the path plus a stable anchor (symbol, heading, test title, or a unique quoted literal). Review output may keep `line`.
+Stored artifacts (docs, specs, agent and skill bodies, CLAUDE.md) never cite line numbers: name the path plus a stable anchor (symbol, heading, test title, unique quoted literal). Review output may keep `line`.
 
 ## Anti-Hallucination Rules (All Agents)
 
 1. Read a file before editing or reviewing it; Grep/Glob that a symbol, import, skill, agent or file exists before citing it.
-2. Copy patterns from real files; cite the skill applied. No placeholders in code, no time estimates, no assumed decisions.
+2. Copy patterns from real files; cite the skill applied. No placeholders in code, no time estimates or assumed decisions.
 3. No real secrets in output; use `${ENV_VAR}`.
-4. Never claim "tests pass" or "build succeeds" without output.
+4. Never claim tests pass or the build succeeds without output.
 
 ## Skill Routing
 
-Map changed paths to skills with `routing-to-skills`; a layer with no skill is a gap, not improvised.
+Map changed paths to skills with `routing-to-skills`; a layer with no skill is a gap.
 
 ## Common Tool Permissions
 

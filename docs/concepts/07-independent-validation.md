@@ -73,10 +73,10 @@ flowchart TD
   R -->|no blocking findings| T[test-automator]
   R -->|blocking findings| P
   T -->|failing tests| P
-  P -. round 4 would be needed .-> H[Escalate to a human]
+  P -. a fourth re-loop would be needed .-> H[Escalate to a human]
 ```
 
-Findings of all reviewers in one round are consolidated and returned to the producer together. After the fix, the same reviewers run again, because a fix touches reviewed code and can reintroduce a caught defect. A stage is never skipped because an earlier iteration passed it. The cap is three rounds per gate (the GitHub review, when `ANTHROPIC_API_KEY` is set, caps at `MAX_ROUNDS` in its workflow, default 3). If the same gate still fails, the session stops and reports the pattern once: repeated failure usually means the requirement or design is wrong, not the code. For framework files (agents, skills, governed sections of `CLAUDE.md`) the three rounds are a single shared budget across both review gates.
+Findings of all reviewers in one round are consolidated and returned to the producer together. After the fix, the same reviewers run again, because a fix touches reviewed code and can reintroduce a caught defect. A stage is never skipped because an earlier iteration passed it. The cap is three re-loops per gate chain (the GitHub review, when `ANTHROPIC_API_KEY` is set, caps at `MAX_ROUNDS` in its workflow, default 3). If the same gate still fails, the session stops and reports the pattern once: repeated failure usually means the requirement or design is wrong, not the code. For framework files (agents, skills, governed sections of `CLAUDE.md`) the three re-loops are a single shared budget across both review gates.
 
 Two layers of review share this model. Locally, the session runs the pair before the first push; on the pull request, when `ANTHROPIC_API_KEY` is set, the AI CI reviews again with its own round cap ([08](08-ai-ci-local-and-github.md)). A human remains the final approver and decides merges.
 

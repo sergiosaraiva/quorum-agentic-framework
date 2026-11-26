@@ -1,6 +1,6 @@
 # {{PRODUCT_NAME}} - Project Guide
 
-A web product: .NET 10 backend, Angular frontend, PostgreSQL. Replace every `{{PLACEHOLDER}}` when you adopt this template. Statements here are design intent, not verified fact, for areas the landed code has not touched.
+A web product: .NET 10 backend, Angular frontend, PostgreSQL. Replace every `{{PLACEHOLDER}}` when you adopt this template. Statements here are design intent, not verified fact, where no code has landed.
 
 ## Objective
 
@@ -15,7 +15,7 @@ Single owner of these rules; other files point here. They never waive the Immuta
 | Act by default | Recall prior decisions first (search `qa-kb`). Ask only when the records do not settle it and you are blocked on a decision that is the user's: product behaviour where the KB, spec and prototype conflict or are silent, a scope change, a destructive or outward-facing action the request did not cover. Otherwise take the conventional option, state the choice in one line, continue |
 | Flag is not ask | "Flag it" and "do not guess" mean: record the item (BQ business question, TQ technical question, PR description) and carry on with what is unblocked. They do not mean stop |
 | Batch questions | When a stop is warranted, finish all unblocked work, collect every open item, ask once in a numbered list, recommended option first. Never one question per turn |
-| Standing authorizations | A task that produces a change ends with branch, commit (Commit Metadata), push, PR into the integration branch, and the AI review loop until a round is clean (local rounds before the first push, cap 3 via `--max-rounds`, then a human; plus the GitHub rounds, cap `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml`, default 3, when `ANTHROPIC_API_KEY` is set). Merge only when asked |
+| Standing authorizations | Outside the Trivial and Spike lanes (`_SHARED-PATTERNS.md`), a change ends with branch, commit (Commit Metadata), push, PR into the integration branch, and the AI review loop until a round is clean (local rounds before the first push, cap 3 via `--max-rounds`, then a human; plus the GitHub rounds, cap `MAX_ROUNDS` in `.github/workflows/ai-pr-review.yml`, default 3, when `ANTHROPIC_API_KEY` is set). Merge only when asked |
 | Environment | Do not trust a header saying "not a git repository": run `git rev-parse --is-inside-work-tree` before skipping a git step |
 | Answers | Lead with the result or decision, then only the detail needed to act. Gloss an internal id (VS-, BQ-, TQ-, OD-) in a few words the first time it appears |
 
@@ -40,33 +40,22 @@ Technical questions go to the technical role, business questions to the business
 
 ## Tech Stack
 
-| Layer | Choice | Detail |
-|-------|--------|--------|
-| Backend | .NET 10, C# 14, ASP.NET Core Minimal APIs, EF Core + Npgsql | [`src/Api/CLAUDE.md`](src/Api/CLAUDE.md) |
-| Database | PostgreSQL 16+, pgvector for the KBs | [`src/Infrastructure/CLAUDE.md`](src/Infrastructure/CLAUDE.md) |
-| Frontend | Angular (latest major), standalone components, signals, plain CSS/SCSS | [`frontend/CLAUDE.md`](frontend/CLAUDE.md) |
-| Auth | Any OIDC identity provider issuing JWTs; the API validates, the product authorizes | `Auth` options in `src/Api` |
-| Deployment | A container image plus a target you choose (`{{DEPLOY_TARGET}}`). The platform and its tools are the adopter's choice, recorded as a TQ, never guessed. All infrastructure is defined as code | `infrastructure-engineer` agent |
-| CI/CD | GitHub Actions; deploy with short-lived credentials where the platform supports them, no long-lived keys in the repo | `.github/workflows/` |
-| Observability | OpenTelemetry (OTLP), structured JSON logs; the backend is the adopter's choice | `implementing-observability` skill |
-| Testing | xUnit v3 built-in `Assert`, Testcontainers (PostgreSQL), Vitest, Playwright, k6, Stryker.NET | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
+| Layer | Choice |
+|-------|--------|
+| Backend | .NET 10, C# 14, ASP.NET Core Minimal APIs, EF Core + Npgsql |
+| Database | PostgreSQL 16+, pgvector for the KBs |
+| Frontend | Angular (latest major), standalone components, signals, plain CSS/SCSS |
+| Auth | Any OIDC identity provider issuing JWTs; the API validates, the product authorizes (`Auth` options in `src/Api`) |
+| Deployment | A container image plus a target you choose (`{{DEPLOY_TARGET}}`), recorded as a TQ, never guessed; all infrastructure is defined as code (`infrastructure-engineer` agent) |
+| CI/CD | GitHub Actions; deploy with short-lived credentials where the platform supports them, no long-lived keys in the repo (`.github/workflows/`) |
+| Observability | OpenTelemetry (OTLP), structured JSON logs; the backend is the adopter's choice (`implementing-observability` skill) |
+| Testing | xUnit v3 built-in `Assert`, Testcontainers (PostgreSQL), Vitest, Playwright, k6, Stryker.NET |
 
 ## Architecture Style
 
-Vertical slices, not layered horizontals. A feature owns its DTOs, service, endpoints, entity configuration and Angular component, grouped by feature folder.
+Vertical slices, not layered horizontals. A feature owns its DTOs, service, endpoints, entity configuration and Angular component, in one feature folder.
 
-```
-src/
-  Api/             # host: Program.cs, Features/<Feature>/{Endpoints,Service,Dtos}.cs
-  Infrastructure/  # AppDbContext, entities, migrations, external clients
-  Domain/          # design intent; grows when logic outgrows CRUD
-tests/             # Api.UnitTests, Api.IntegrationTests
-frontend/          # Angular workspace: src/app/{features/<name>, core, shared}
-docs/              # slices (planning), concepts, reference, presentation
-kb/  questions/    # business KB and Q&A KB (files + vector index)
-scripts/           # kb tooling, ai_review_local.py
-.claude/           # agents, skills
-```
+Layout: `src/Api` (host, `Features/<Feature>/{Endpoints,Service,Dtos}.cs`), `src/Infrastructure`, `src/Domain` (design intent; grows when logic outgrows CRUD), `tests/`, `frontend/` (`src/app/{features/<name>,core,shared}`), `docs/`, `kb/`, `questions/`, `scripts/`, `.claude/`.
 
 ## Design Principles
 
@@ -121,11 +110,11 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
                                   documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes. `prompt-engineer` runs on request. Details: `.claude/agents/_SHARED-PATTERNS.md`.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infra changes. `prompt-engineer` runs on request.
 
 Before any coding or documentation task, state the pipeline in one line, with a few words of reason per skipped stage, for example: `Pipeline: full lane - requirements-analyst skip (small scope) - code-engineer -> QG||RD -> test-automator - docs: none - KB check: done (BC-001) - Alignment Gate: applies (src/)`.
 
-Loop-back rule: findings return to the producing agent; at most 3 rounds per gate, then escalate to a human. Reviewers report evidence (file plus anchor, line optional and never in stored docs, plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
+Loop-back rule: findings return to the producing agent; at most 3 re-loops per gate chain (`_SHARED-PATTERNS.md`), then escalate to a human. Reviewers report evidence (file plus anchor, line optional and never in stored docs, plus a failing scenario), never a bare verdict. Lanes (Trivial, Iterate, Full, Spike) and the severity-to-blocking mapping: `.claude/agents/_SHARED-PATTERNS.md`.
 
 ## Delegation Is Required
 
@@ -139,7 +128,7 @@ Beyond a trivial one-line fix, delegate; the producer never reviews its own work
 | `docs/**`, `README.md` | `documentation-curator` then `documentation-reviewer`; generated files are regenerated, never hand-edited |
 | `scripts/**` | `code-engineer` |
 
-Run the local AI review before the first push: `python3 scripts/ai_review_local.py --base origin/main --require` (fails with exit 2 if the `claude` CLI is missing; the required gate with the in-session review pair; no API key needed, uses your `claude` sign-in; `--model opus` for auth, data model, migrations, money or core logic). The GitHub review is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; without it the job is skipped and its green check is not a review. A human merges.
+Run the local AI review before the first push: `python3 scripts/ai_review_local.py --base origin/main --require` (exit 2 if the `claude` CLI is missing; the required gate with the in-session pair; no API key; `--model opus` for auth, data model, migrations, money or core logic). The GitHub review is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; without it the job is skipped and its green check is not a review. A human merges.
 
 ## Verification Commands
 

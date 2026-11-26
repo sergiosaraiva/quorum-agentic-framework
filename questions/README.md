@@ -2,7 +2,7 @@
 
 This is the project's memory of what was asked and decided. Before asking a human or assuming anything, agents search it; when it is silent they record a new question and continue with unblocked work. It is read through the MCP server `qa-kb` (`search`, `get`, `open`, `related`) or `scripts/kb/search.py --kb qa`.
 
-The five records shipped here (`BQ-001`, `BQ-002`, `TQ-001`, `TQ-002`, `OD-001`) are examples for an invented "Acme Orders" domain. Replace them with your own.
+Most records shipped here are examples for an invented "Acme Orders" domain; they carry `example: true`. Framework records, which bind the agents and the process (for example `OD-022`, `OD-023`, `OD-024`, `OD-028`), do not carry it and stay. `python3 scripts/kb/remove_examples.py` lists the example records (dry run) and, with `--apply`, deletes them.
 
 ## Record kinds
 

@@ -155,7 +155,7 @@ flowchart LR
 
 - `ux-usability-specialist` only when a screen is added or redesigned.
 - `quality-guardian` and `regression-detective` run **in parallel**, with fresh context.
-- `security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes.
+- `security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infra changes.
 
 ---
 
@@ -183,7 +183,7 @@ A critical system must never rely on one checker, and the author is never the ch
 | Equal or stronger model | Reviewer model is equal or stronger than the producer's: judgement-heavy reviewers run Opus, documentation-reviewer runs Sonnet (mechanical grounding check) |
 | Different lenses | Quality asks "is it right?", regression asks "what did it break?" |
 | Evidence, not verdicts | Each finding has a file and anchor, a failing scenario and a severity (Critical and High block; Medium and Low do not) |
-| Bounded loops | Findings return to the producer, 3 rounds at most, then a human |
+| Bounded loops | Findings return to the producer, 3 re-loops at most per gate chain, then a human |
 
 ---
 

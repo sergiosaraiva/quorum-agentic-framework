@@ -5,7 +5,8 @@
     python3 scripts/kb/search.py --kb qa "invoice numbers" --backend pg  # Q&A KB, pgvector
     python3 scripts/kb/search.py --graph BC-001 --depth 2                # link-graph traversal
     python3 scripts/kb/search.py --get BC-002 | --kb qa --get BQ-001
-    python3 scripts/kb/search.py --stats | --kb qa --open
+    python3 scripts/kb/search.py --stats          # business KB only
+    python3 scripts/kb/search.py --kb qa --open
 """
 from __future__ import annotations
 
@@ -37,7 +38,13 @@ def main(argv: list[str] | None = None) -> int:
     a.depth = lib.clamp_int(a.depth, 0, lib.MAX_DEPTH, 1)
     a.k = lib.clamp_int(a.k, 1, lib.MAX_K, 5)
 
-    store = backends.make_store(a.backend)
+    if a.stats and a.kb != "business":
+        ap.error("--stats reports the business KB only; drop --kb qa")
+    try:
+        store = backends.make_store(a.backend)
+    except (ValueError, RuntimeError) as exc:  # unknown backend, or pg without psycopg or DATABASE_URL
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     biz = a.kb == "business"
     try:
         if a.stats:

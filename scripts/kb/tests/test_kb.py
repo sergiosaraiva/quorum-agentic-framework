@@ -399,3 +399,261 @@ class IngestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+GOOD_CHUNK = "---\nchunk_id: BC-001\ntitle: T\ntopics: [t]\nlinks: []\nsources: [s]\n---\n" + "word " * 50
+GOOD_RECORD = ("---\nid: {rid}\nkind: TQ\ntitle: T\nstatus: open\ndecider: tech-lead\npriority: P2\n"
+               "asked: 2026-01-01\n---\nbody\n")
+BAD_RECORD = "id: TQ-002\nkind: TQ\n---\nno opening delimiter\n"  # missing the opening `---`
+
+
+def make_kb_tree(root: Path, chunks: dict[str, str], records: dict[str, str]) -> tuple[Path, Path]:
+    kb, qa = root / "kb", root / "questions"
+    (kb / "chunks").mkdir(parents=True)
+    (qa / "records").mkdir(parents=True)
+    for name, text in chunks.items():
+        (kb / "chunks" / name).write_text(text, encoding="utf-8")
+    for name, text in records.items():
+        (qa / "records" / name).write_text(text, encoding="utf-8")
+    return kb, qa
+
+
+class DuplicateKeyTests(unittest.TestCase):
+    def test_duplicate_frontmatter_key_raises(self):
+        with self.assertRaisesRegex(ValueError, "duplicate frontmatter key 'status'"):
+            lib.parse_frontmatter("---\nid: A-1\nstatus: open\nstatus: closed\n---\nbody")
+
+
+class MalformedFileTests(unittest.TestCase):
+    """One malformed chunk or record must not take the loaders, the stores or the lint down."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.kb, self.qa = make_kb_tree(
+            Path(self._tmp.name),
+            {"BC-001-good.md": GOOD_CHUNK, "BC-002-bad.md": "no frontmatter at all\n"},
+            {"TQ-001.md": GOOD_RECORD.format(rid="TQ-001"), "TQ-002.md": BAD_RECORD})
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_loaders_skip_bad_files_with_a_warning_naming_them(self):
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            chunks, records = lib.load_chunks(self.kb), lib.load_records(self.qa)
+        self.assertEqual([c.chunk_id for c in chunks], ["BC-001"])
+        self.assertEqual([r.id for r in records], ["TQ-001"])
+        self.assertIn("BC-002-bad.md", err.getvalue())
+        self.assertIn("TQ-002.md", err.getvalue())
+
+    def test_local_store_still_serves_the_good_files(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stderr(io.StringIO()):
+            store = backends.LocalStore(self.kb, self.qa)
+        self.assertEqual(list(store.chunks), ["BC-001"])
+        self.assertEqual(list(store.records), ["TQ-001"])
+
+    def test_strict_loading_raises_so_ingest_cannot_prune_a_skipped_files_row(self):
+        with self.assertRaisesRegex(ValueError, "TQ-002.md"):
+            lib.load_records(self.qa, strict=True)
+        with self.assertRaisesRegex(ValueError, "BC-002-bad.md"):
+            lib.load_chunks(self.kb, strict=True)
+
+    def test_ingest_stops_with_exit_2_on_a_malformed_file(self):
+        import contextlib
+        import io
+        from unittest import mock
+        import ingest
+        real_chunks, real_records = lib.load_chunks, lib.load_records
+        with mock.patch.object(lib, "load_chunks", lambda strict=False: real_chunks(self.kb, strict)), \
+                mock.patch.object(lib, "load_records", lambda strict=False: real_records(self.qa, strict)), \
+                contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ingest.main(["--dry-run"]), 2)
+        self.assertIn("BC-002-bad.md", err.getvalue())
+
+    def test_non_utf8_file_is_skipped_not_fatal(self):
+        import contextlib
+        import io
+        (self.qa / "records" / "TQ-003.md").write_bytes(b"---\nid: TQ-003\n---\n\xff\xfe\n")
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual([r.id for r in lib.load_records(self.qa)], ["TQ-001"])
+        self.assertIn("TQ-003.md", err.getvalue())
+
+    def test_check_chunks_reports_error_lines_and_exits_1_without_a_traceback(self):
+        import shutil
+        import subprocess
+        # lib.REPO_ROOT is two levels above lib.py, so a copy of the scripts inside a temp tree lints that tree.
+        root = Path(self._tmp.name) / "repo"
+        kb, _ = make_kb_tree(root, {"BC-001-good.md": GOOD_CHUNK},
+                             {"TQ-001.md": GOOD_RECORD.format(rid="TQ-001"), "TQ-002.md": BAD_RECORD})
+        scripts = root / "scripts" / "kb"
+        scripts.mkdir(parents=True)
+        for name in ("lib.py", "check_chunks.py"):
+            shutil.copy(Path(lib.__file__).with_name(name), scripts / name)
+        proc = subprocess.run([sys.executable, "-E", str(scripts / "check_chunks.py")],
+                              capture_output=True, text=True, cwd=root)
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertIn("ERROR TQ-002.md:", proc.stdout)
+        self.assertIn("checked 1 chunks, 1 records: 1 error(s)", proc.stdout)
+
+    def test_id_collisions_without_refs_does_not_load_records(self):
+        from unittest import mock
+        with mock.patch.object(check_chunks.lib, "load_records", side_effect=AssertionError("loaded")):
+            self.assertEqual(check_chunks.id_collisions([]), [])
+
+
+class RecordRuleTests(unittest.TestCase):
+    def lint(self, name="TQ-001.md", **overrides):
+        fields = {"id": "TQ-001", "kind": "TQ", "title": "T", "status": "open", "decider": "tech-lead",
+                  "priority": "P2", "asked": "2026-01-01", **overrides}
+        text = "---\n" + "".join(f"{k}: {v}\n" for k, v in fields.items() if v is not None) + "---\nbody\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            kb, qa = make_kb_tree(Path(tmp), {}, {name: text})
+            return check_chunks.lint(kb, qa)
+
+    def assertError(self, errors, fragment):
+        self.assertTrue(any(fragment in e for e in errors), (fragment, errors))
+
+    def test_valid_record_is_clean(self):
+        self.assertEqual(self.lint(), [])
+        self.assertEqual(self.lint(answered="2026-02-01", priority="P3"), [])
+
+    def test_filename_must_equal_id(self):
+        self.assertError(self.lint(name="TQ-009.md"), "filename must be TQ-001.md")
+
+    def test_priority_must_be_p1_to_p3(self):
+        for bad in ("P0", "P4", "high", "p1"):
+            self.assertError(self.lint(priority=bad), "priority")
+
+    def test_asked_and_answered_must_be_iso_dates(self):
+        for bad in ("2026-13-01", "yesterday", "2026-1-1", "2026-02-30"):
+            self.assertError(self.lint(asked=bad), "asked")
+            self.assertError(self.lint(answered=bad), "answered")
+
+    def test_required_keys_must_be_present(self):
+        self.assertError(self.lint(asked=None), "missing asked")
+        self.assertError(self.lint(decider=None), "missing decider")
+        self.assertError(self.lint(title=None), "missing title")
+        self.assertError(self.lint(status=None), "status")
+        self.assertError(self.lint(id=None), "missing id")
+
+    def test_duplicate_frontmatter_key_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            kb, qa = make_kb_tree(Path(tmp), {}, {"TQ-001.md": GOOD_RECORD.format(rid="TQ-001").replace(
+                "status: open\n", "status: open\nstatus: closed\n")})
+            self.assertError(check_chunks.lint(kb, qa), "duplicate frontmatter key 'status'")
+
+
+class McpTransportTests(unittest.TestCase):
+    def setUp(self):
+        self.srv = mcp_server.Server("business", backends.LocalStore())
+
+    def test_serve_survives_bad_bytes_on_strict_text_streams_and_writes_utf8_bytes(self):
+        import io
+        from unittest import mock
+        stdin = io.TextIOWrapper(io.BytesIO(
+            b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n\xff\xfe not json\n{"jsonrpc":"2.0","id":2,"method":"ping"}\n'),
+            encoding="utf-8", errors="strict")
+        stdout = io.TextIOWrapper(io.BytesIO(), encoding="ascii", errors="strict")
+        with mock.patch.object(sys, "stdin", stdin), mock.patch.object(sys, "stdout", stdout):
+            self.srv.serve()
+        replies = [json.loads(line) for line in stdout.buffer.getvalue().decode("utf-8").splitlines()]
+        self.assertEqual([r["id"] for r in replies], [1, None, 2])
+        self.assertEqual(replies[1]["error"]["code"], -32700)
+
+    def test_serve_accepts_binary_streams(self):
+        import io
+        out = io.BytesIO()
+        self.srv.serve(io.BytesIO(b'\xff\n{"jsonrpc":"2.0","id":3,"method":"ping"}\n'), out)
+        replies = [json.loads(line) for line in out.getvalue().decode("utf-8").splitlines()]
+        self.assertEqual([r.get("error", {}).get("code") for r in replies], [-32700, None])
+
+    def test_request_with_null_id_still_gets_a_response(self):
+        resp = self.srv.handle({"jsonrpc": "2.0", "id": None, "method": "ping"})
+        self.assertEqual(resp, {"jsonrpc": "2.0", "id": None, "result": {}})
+        err = self.srv.handle({"jsonrpc": "2.0", "id": None, "method": "nope"})
+        self.assertEqual((err["id"], err["error"]["code"]), (None, -32601))
+
+    def test_notification_without_id_gets_no_response(self):
+        self.assertIsNone(self.srv.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
+        self.assertIsNone(self.srv.handle({"jsonrpc": "2.0", "method": "unknown/notification"}))
+
+    def test_missing_or_non_string_method_is_invalid_request(self):
+        for msg in ({"jsonrpc": "2.0", "id": 5}, {"jsonrpc": "2.0", "id": 5, "method": 7}, {}):
+            resp = self.srv.handle(msg)
+            self.assertEqual(resp["error"]["code"], -32600, msg)
+        self.assertEqual(self.srv.handle({"jsonrpc": "2.0", "id": 5})["id"], 5)
+
+
+class BackendSelectionTests(unittest.TestCase):
+    def run_main(self, module, argv):
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = module.main(argv)
+        return code, err.getvalue()
+
+    def test_unknown_backend_from_env_exits_2_with_a_message(self):
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"KB_BACKEND": "bogus"}):
+            code, err = self.run_main(mcp_server, ["--kb", "business"])
+        self.assertEqual(code, 2)
+        self.assertIn("unknown backend", err)
+
+    def test_pg_without_psycopg_exits_2_in_search_and_mcp_server(self):
+        from unittest import mock
+        import search
+        with mock.patch.dict(sys.modules, {"psycopg": None}):  # makes `import psycopg` raise ImportError
+            code, err = self.run_main(search, ["order", "--backend", "pg"])
+            self.assertEqual((code, "psycopg" in err), (2, True))
+            code, err = self.run_main(mcp_server, ["--kb", "qa", "--backend", "pg"])
+            self.assertEqual((code, "psycopg" in err), (2, True))
+
+    def test_stats_with_qa_kb_is_rejected(self):
+        import contextlib
+        import io
+        import search
+        with contextlib.redirect_stderr(io.StringIO()) as err, self.assertRaises(SystemExit) as cm:
+            search.main(["--kb", "qa", "--stats"])
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("--stats", err.getvalue())
+
+
+class Bm25QueryTests(unittest.TestCase):
+    def test_repeated_query_words_do_not_change_the_ranking_scores(self):
+        bm = lib.BM25([("a", "refund window"), ("b", "refund policy for orders"), ("c", "shipping")])
+        self.assertEqual(bm.search("refund refund refund"), bm.search("refund"))
+
+
+class PgStoreQueryTests(unittest.TestCase):
+    def store(self, rows):
+        from unittest import mock
+        st = backends.PgStore.__new__(backends.PgStore)  # skip __init__: psycopg and a database are not needed
+        st._q = mock.Mock(return_value=rows)
+        return st
+
+    def test_record_open_orders_an_empty_priority_last_like_local_store(self):
+        st = self.store([])
+        st.record_open()
+        self.assertIn("COALESCE(NULLIF(priority, ''), 'P9')", st._q.call_args.args[0])
+
+    def test_record_related_skips_a_dangling_chunk_id(self):
+        from unittest import mock
+        st = self.store([])
+        kept = {"chunk_id": "BC-001", "title": "T", "body": "b"}
+
+        def chunk_get(cid):
+            if cid == "BC-404":
+                raise KeyError(cid)
+            return dict(kept)
+
+        with mock.patch.object(st, "record_get", return_value={"related": [], "chunks": ["BC-404", "BC-001"]}), \
+                mock.patch.object(st, "chunk_get", side_effect=chunk_get):
+            out = st.record_related("TQ-001")
+        self.assertEqual([c["chunk_id"] for c in out["chunks"]], ["BC-001"])
+        self.assertNotIn("body", out["chunks"][0])

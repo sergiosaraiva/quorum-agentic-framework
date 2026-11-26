@@ -6,8 +6,11 @@
 
 Chunk rules: frontmatter has chunk_id/title/topics/links/sources; ids unique and match the filename;
 every link resolves; body within WORD_MIN..WORD_MAX words; no self-link.
-Record rules: id/kind/title/status unique and valid; id prefix matches kind; related ids and chunk ids resolve;
+Record rules: id/kind/title/status/decider/asked present; id unique, prefix matches kind and equals the filename
+stem; status valid; `priority` (when given) is P1|P2|P3; `asked` and `answered` (when given) are YYYY-MM-DD; a
+frontmatter key may appear only once (chunks too); related ids and chunk ids resolve;
 answered/decided records contain an Answer or Decision section.
+A malformed file is reported as `ERROR <file>: ...`; it never aborts the run.
 Accepted-risk rules (kind OD only): `accepted_risk` is true/false and allowed only on OD; true requires `expires`
 (YYYY-MM-DD, after the `answered`, else `asked`, date), a `related` BQ/TQ record and a non-empty `## Decision`;
 `expires` without `accepted_risk: true` is an error. An accepted risk past `expires` is a WARNING (exit code unchanged).
@@ -86,10 +89,13 @@ def check_accepted_risk(r: lib.Record, name: str, errors: list[str], warnings: l
         errors.append(f"{name}: accepted_risk needs a non-empty '## Decision' section")
 
 
+PRIORITIES = ("P1", "P2", "P3")
+
+
 def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | None = None,
-         warnings: list[str] | None = None) -> list[str]:
+         warnings: list[str] | None = None, counts: dict[str, int] | None = None) -> list[str]:
     """Return the errors. Warnings (which never fail the run) are appended to `warnings` when a list is given;
-    `today` defaults to date.today()."""
+    `counts`, when given, receives the number of chunks and records that parsed; `today` defaults to date.today()."""
     today = today or date.today()
     warnings = warnings if warnings is not None else []
     errors: list[str] = []
@@ -97,13 +103,15 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | Non
     for p in sorted((kb_dir / "chunks").glob("*.md")):
         try:
             chunks.append(lib.chunk_from_file(p))
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             errors.append(f"{p.name}: {exc}")
     for p in sorted((qa_dir / "records").glob("*.md")):
         try:
             records.append(lib.record_from_file(p))
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             errors.append(f"{p.name}: {exc}")
+    if counts is not None:
+        counts.update(chunks=len(chunks), records=len(records))
 
     ids: dict[str, str] = {}
     for c in chunks:
@@ -136,6 +144,10 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | Non
     chunk_ids = {c.chunk_id for c in chunks}
     for r in records:
         name = Path(r.path).name
+        if not r.id:
+            errors.append(f"{name}: missing id")
+        elif Path(r.path).stem != r.id:
+            errors.append(f"{name}: filename must be {r.id}.md (the record id)")
         if r.id in rids:
             errors.append(f"{name}: duplicate record id {r.id}")
         rids[r.id] = name
@@ -149,6 +161,15 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | Non
             errors.append(f"{name}: missing title")
         if not r.decider:
             errors.append(f"{name}: missing decider")
+        if r.priority and r.priority not in PRIORITIES:
+            errors.append(f"{name}: priority {r.priority!r} not in {PRIORITIES}")
+        if not r.asked:
+            errors.append(f"{name}: missing asked (YYYY-MM-DD)")
+        elif _date(r.asked) is None:
+            errors.append(f"{name}: asked {r.asked!r} is not a valid YYYY-MM-DD date")
+        answered = r.extra.get("answered")
+        if answered not in (None, "", []) and _date(answered) is None:
+            errors.append(f"{name}: answered {answered!r} is not a valid YYYY-MM-DD date")
         if r.status in ("answered", "decided") and not re.search(r"^## (Answer|Decision)\b", r.body, re.M):
             errors.append(f"{name}: status {r.status} but no '## Answer' or '## Decision' section")
         for c in r.chunks:
@@ -170,6 +191,8 @@ def lint(kb_dir: Path = lib.KB_DIR, qa_dir: Path = lib.QA_DIR, today: date | Non
 
 def id_collisions(refs: list[str], qa_dir: Path = lib.QA_DIR, repo: Path | None = None) -> list[str]:
     """Warnings for record ids whose title differs on another git ref. Reads git objects only (no network)."""
+    if not refs:
+        return []
     repo = repo or lib.REPO_ROOT
     local = {r.id: r for r in lib.load_records(qa_dir)}
     out: list[str] = []
@@ -224,7 +247,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="git ref to compare record ids with (repeatable; offline, uses fetched refs only)")
     a = ap.parse_args(argv)
     warnings: list[str] = []
-    errors = lint(warnings=warnings)
+    counts: dict[str, int] = {}
+    errors = lint(warnings=warnings, counts=counts)
     warnings += id_collisions(a.against)
     for w in warnings:
         print(f"WARN  {w}")
@@ -233,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.write_toc and not errors:
         (lib.KB_DIR / "TOC.md").write_text(toc_markdown(lib.load_chunks()), encoding="utf-8")
         print("wrote kb/TOC.md")
-    n_c, n_r = len(lib.load_chunks()), len(lib.load_records())
+    n_c, n_r = counts["chunks"], counts["records"]
     print(f"checked {n_c} chunks, {n_r} records: {len(errors)} error(s), {len(warnings)} warning(s)")
     return 1 if errors else 0
 

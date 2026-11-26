@@ -47,7 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     dim = lib.embed_dim()
-    chunks, records = lib.load_chunks(), lib.load_records()
+    try:  # strict: a skipped file would make the prune below delete its database row
+        chunks, records = lib.load_chunks(strict=True), lib.load_records(strict=True)
+    except ValueError as exc:
+        print(f"error: {exc}; fix it (python3 scripts/kb/check_chunks.py lists every problem) before ingesting",
+              file=sys.stderr)
+        return 2
     chunk_rows = [(c, lib.vector_literal(lib.embed(c.search_text()))) for c in chunks]
     rec_rows = [(r, lib.vector_literal(lib.embed(r.search_text()))) for r in records]
     provider = os.environ.get("EMBED_PROVIDER", "hash")

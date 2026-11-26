@@ -11,7 +11,7 @@ The agent follows four steps:
 
 1. Consult both knowledge bases before relying on recall.
 2. Cite the chunk ids and record ids the decision rests on, in the code comment, design, doc or pull request.
-3. If both are silent, or disagree with each other or with the code, say so and record a question: a BQ for a business owner or a TQ for a technical owner, with a decider; an agent without Write tools returns it as `questions_to_record` to the calling session. Do not fill the gap with a guess.
+3. If both are silent, or disagree with each other or with the code, say so and record a question: a BQ for a business owner or a TQ for a technical owner, with a decider; the requirements-analyst, solution-architect and documentation-curator write the record themselves, and every other agent returns it as `questions_to_record` to the calling session. Do not fill the gap with a guess.
 4. Continue with whatever the gap does not block.
 
 Silence is a finding. If a search returns nothing relevant, the agent runs `stats` to see whether the topic is covered at all, and treats the result as "the knowledge base does not say", never as permission. A conflict is handled the same way: if a chunk says 30 days and the code says 45, neither is assumed right and both are cited in a new question.

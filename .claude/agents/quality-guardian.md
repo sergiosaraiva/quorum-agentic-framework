@@ -92,7 +92,7 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names). State "no blocking 
 | Background work | `CancellationToken` honoured; exceptions caught and logged so the host survives; graceful shutdown (`managing-application-lifecycle`); no unbounded concurrency |
 | Streams and files | Large payloads streamed, not buffered |
 
-Impact classes for resource findings: Critical (unbounded growth on a normal path), High (leak under load), Medium (bounded but wasteful), Low (negligible).
+Impact classes for resource findings, mapped onto the shared severity table (`_SHARED-PATTERNS.md`, owner): unbounded growth on a normal path and a leak under load are High (both block); bounded but wasteful is Medium; negligible is Low. Critical is reserved for the shared Critical definition (for example a tenant leak).
 
 ## Framework and Governance Doc Review
 

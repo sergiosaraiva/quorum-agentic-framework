@@ -97,6 +97,7 @@ The "Used by" column of `.claude/skills/SKILL-INDEX.md` is the source; the same 
 | test-automator | the testing skills plus `tuning-postgresql-queries` and `scaling-performance-test-data` |
 | documentation-curator | `updating-internal-docs`, `updating-external-docs`, `writing-kb-chunks`, `maintaining-agent-framework` |
 | documentation-reviewer | `reviewing-documentation`, `reviewing-kb-chunks`, `verifying-cross-file-coupling` |
+| security-engineer | `backend`, `creating-dtos-and-validation`, `creating-configuration-options`, `implementing-observability`, `database`, `writing-postgresql-migrations`, `deploying-the-application`, `implementing-infrastructure-as-code`, `frontend` |
 | infrastructure-engineer | `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-configuration-options`, `implementing-observability`, `managing-application-lifecycle` |
 | prompt-engineer | `writing-world-class-prompts` |
 

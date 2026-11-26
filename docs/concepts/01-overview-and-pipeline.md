@@ -54,7 +54,7 @@ flowchart LR
 6. **test-automator** runs after the reviewers are clean, turning their "a test would catch this" hints into tests.
 7. **documentation-curator** then **documentation-reviewer** update and then verify the docs.
 
-`security-engineer` and `infrastructure-engineer` run proactively whenever a change touches authentication, data access, secrets, infrastructure or deployment configuration; they sit outside the linear order. `prompt-engineer` runs on request.
+`security-engineer` and `infrastructure-engineer` run proactively whenever a change touches authentication, data access, an API, secrets, infrastructure or deployment configuration; they sit outside the linear order. `prompt-engineer` runs on request.
 
 ## Lanes
 
@@ -69,9 +69,9 @@ The framework scales process to risk. The orchestrating session states the lane 
 
 Iterate is forced back to Full by triggers: migrations, entity changes, authentication or authorization, tenancy, integrity safeguards, secrets. Never waived in any lane: the Immutable Rules and the grounding rule. Outside the Trivial and Spike lanes: the pre-push gate and the local AI review (plus the GitHub AI review when `ANTHROPIC_API_KEY` is set).
 
-## Loop-back and the three-round cap
+## Loop-back and the three re-loop cap
 
-A finding at a review gate sends work back to whoever wrote the artifact, not forward. Code findings go to code-engineer; documentation findings go to documentation-curator. After the fix, the reviewers run again, because a fix touches reviewed code by definition. The loop is capped at three rounds per gate; if the same gate still fails, the session stops and surfaces the pattern once, because the requirements or the design may need revisiting. What blocks is fixed by one mapping in `.claude/agents/_SHARED-PATTERNS.md`: Critical and High block, Medium and Low do not; a documentation-reviewer finding (`ungrounded`, `fabricated-citation`, `stale`, `conflict`, `gate-failure`) blocks, and unverified items (confidence 0.50 to 0.79) never block; in the PR review a Blocker blocks and Warning or Info do not. Non-blocking findings are not dropped: each gets a recorded disposition (fixed, deferred with a record, or declined with a reason).
+A finding at a review gate sends work back to whoever wrote the artifact, not forward. Code findings go to code-engineer; documentation findings go to documentation-curator. After the fix, the reviewers run again, because a fix touches reviewed code by definition. The loop is capped at three re-loops per gate chain; if the same gate still fails, the session stops and surfaces the pattern once, because the requirements or the design may need revisiting. What blocks is fixed by one mapping in `.claude/agents/_SHARED-PATTERNS.md`: Critical and High block, Medium and Low do not; a documentation-reviewer finding (`ungrounded`, `fabricated-citation`, `stale`, `conflict`, `gate-failure`) blocks, and unverified items (confidence 0.50 to 0.79) never block; in the PR review a Blocker blocks and Warning or Info do not. Non-blocking findings are not dropped: each gets a recorded disposition (fixed, deferred with a record, or declined with a reason).
 
 ## Example: "refunds over 500 need approval" (Acme Orders)
 

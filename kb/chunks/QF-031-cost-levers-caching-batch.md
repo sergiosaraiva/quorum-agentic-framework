@@ -12,7 +12,7 @@ The Quorum cost guide lists levers in the order to try them:
 3. Right-size the model per agent.
 4. Right-size effort per agent.
 5. Batch work that can wait.
-6. Cap loops: the three-round review cap bounds the worst case.
+6. Cap loops: the three re-loop review cap bounds the worst case.
 7. Cap output with `max_tokens` and structured findings.
 8. Use task budgets on long runs.
 9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs.

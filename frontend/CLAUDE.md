@@ -40,4 +40,4 @@ A DTO change in `src/Api/Features/**/Dtos.cs` must be mirrored in the feature's 
 
 ## Lockfile
 
-CI installs with `npm ci` from the committed `frontend/package-lock.json`, which resolves every package from the public npm registry. If your organisation uses a private registry, regenerate it against that registry (`cd frontend && rm package-lock.json && npm install`) and commit it. A lockfile embeds the registry URL of whoever generated it; never commit one that points at a private registry from a public repo. The CI job skips itself if the file is removed.
+CI installs with `npm ci` from the committed `frontend/package-lock.json`, which resolves every package from the public npm registry. If your organisation uses a private registry, regenerate it against that registry (`cd frontend && rm package-lock.json && npm install`) and commit it. A lockfile embeds the registry URL of whoever generated it; never commit one that points at a private registry from a public repo. The CI job skips itself if the file is removed. npm 11 may print `install-scripts` warnings for esbuild during `npm ci`; they are harmless.

@@ -14,7 +14,7 @@ This file exists because it is loaded when you work under `src/Api/`; the neares
 
 | Topic | Rule |
 |-------|------|
-| Endpoints | static `Map<Feature>Endpoints(this IEndpointRouteBuilder)` returning a `RouteGroup`; the group calls `RequireAuthorization("<feature policy>")` explicitly with a named policy per feature group, registered in `Program.cs` from a constant in the feature folder (the seam for roles; Immutable Rule 7). A test asserts every endpoint outside the anonymous allow-list (health, OpenAPI) carries authorization metadata. An anonymous endpoint needs `AllowAnonymous()` plus a comment saying why |
+| Endpoints | static `Map<Feature>Endpoints(this IEndpointRouteBuilder)` returning the `IEndpointRouteBuilder` it received (as `MapOrdersEndpoints` does); the group calls `RequireAuthorization("<feature policy>")` explicitly with a named policy per feature group, registered in `Program.cs` from a constant in the feature folder (the seam for roles; Immutable Rule 7). A test asserts every endpoint outside the anonymous allow-list (health, OpenAPI) carries authorization metadata. An anonymous endpoint needs `AllowAnonymous()` plus a comment saying why |
 | DTOs | `record` types; validate with DataAnnotations or FluentValidation at the boundary; never expose EF entities |
 | Services | concrete classes, scoped; add an interface only at a real seam (external I/O, test boundary) |
 | Options | `services.AddOptions<T>().BindConfiguration("Section").ValidateDataAnnotations().ValidateOnStart()`; no `IConfiguration["x"]` reads in logic |

@@ -15,4 +15,4 @@ Quorum rests on five ideas, and the rest of the framework follows from them.
 
 The shared patterns file `.claude/agents/_SHARED-PATTERNS.md` lists the same principles as a table: never invent, no single point of failure, evidence over verdicts, vertical slices, and delegate (product code goes through the pipeline, because a quick direct edit skips the review pair).
 
-Each idea has a mechanism that enforces it: knowledge-base tools in the agents' allow-lists, the alignment gate before code, reviewer agents without Write or Edit tools, a three-round review cap, and a slice index that is updated in every code pull request.
+Each idea has a mechanism that enforces it: knowledge-base tools in the agents' allow-lists, the alignment gate before code, reviewer agents without Write or Edit tools, a three re-loop review cap, and a slice index that is updated in every code pull request.

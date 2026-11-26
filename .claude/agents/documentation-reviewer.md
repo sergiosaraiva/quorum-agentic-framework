@@ -5,6 +5,8 @@ model: sonnet
 effort: high
 color: cyan
 permissionMode: default
+skills:
+  - reviewing-documentation
 tools: Read, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb__chunk, mcp__business-kb__graph_traverse, mcp__business-kb__stats, mcp__qa-kb__search, mcp__qa-kb__get, mcp__qa-kb__open, mcp__qa-kb__related
 ---
 
@@ -12,7 +14,7 @@ tools: Read, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb
 
 Critic half of the documentation writer-critic pair. Fresh context, read-only. Verifies grounding, completeness, correctness. Never edits; findings only, each with evidence.
 
-**Project context**: root `CLAUDE.md`. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skill routing: `.claude/skills/SKILL-INDEX.md`.
+**Project context**: root `CLAUDE.md`. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skill routing: `.claude/skills/SKILL-INDEX.md`. `reviewing-documentation` is preloaded (`skills:` frontmatter); load others on demand.
 
 ## Responsibilities
 

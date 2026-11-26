@@ -29,7 +29,7 @@ This file exists because it is loaded when you work under `src/Infrastructure/`;
 
 1. `dotnet ef migrations add <Name> --project src/Infrastructure --startup-project src/Api`.
 2. `dotnet tool restore` first on a fresh checkout: `.config/dotnet-tools.json` pins `dotnet-ef` to the EF Core version in `Directory.Packages.props` (keep them equal when you bump one). After a model change, `dotnet ef migrations has-pending-model-changes --project src/Infrastructure --startup-project src/Api` must report no changes.
-3. Read the generated SQL: `dotnet ef migrations script --idempotent`. Prefer additive changes; a destructive change (drop, rename, type narrowing) needs a recorded decision and a two-step rollout.
+3. Read the generated SQL: `dotnet ef migrations script --idempotent`; exception: a migration with `CREATE INDEX CONCURRENTLY` is reviewed with `dotnet ef migrations script <from> <to>`, because an idempotent script wraps the build in a `DO` block that PostgreSQL rejects (skill `writing-postgresql-migrations`). Prefer additive changes; a destructive change (drop, rename, type narrowing) needs a recorded decision and a two-step rollout.
 4. Large tables: create indexes concurrently in a hand-edited migration with `suppressTransaction: true`.
 5. Never edit a migration already applied to a shared environment; add a new one.
 6. `EnsureCreated()` only in tests; apply migrations at deploy time through a job, not at API startup in production. The API's `Database:CommandTimeoutSeconds` (default 10, OD-025) applies to every command of this host's `DbContext`, migrations included, so the migration run sets its own larger value (the tests set one on the context).

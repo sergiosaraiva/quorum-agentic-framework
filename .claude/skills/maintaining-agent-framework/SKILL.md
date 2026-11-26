@@ -13,13 +13,14 @@ Framework = `.claude/agents/**`, `.claude/skills/**`, every `CLAUDE.md`. It deca
 |-------|------|
 | Frontmatter parses | Valid YAML between `---` markers |
 | Skill | `name` equals folder name; `description` present, at most 1024 characters, states "Use when..." |
-| Agent | `name` equals filename; `description`, `tools` (never `Agent` or `AskUserQuestion`), `model` (`opus`, `sonnet` or `haiku`), `effort` where applicable |
-| References | Every skill named in an agent's `skills:` has a folder; every path in a body exists |
+| Agent | `name` equals filename; `description`, `tools` (never `Agent` or `AskUserQuestion`; an entry outside the known tool vocabulary and `mcp__*` warns, the legacy name `Task` is an error), `model` (`opus`, `sonnet` or `haiku`), `permissionMode` from the allowed list |
+| Keys | A frontmatter key outside the agent or skill key list warns (probably a typo) |
+| Support files | A `.md` inside a skill folder above 16 KB warns; a `.md` in an `agents/` subfolder warns (not loaded as an agent) |
+| Deletions | `--staged` judges staged deletions too (deleting a skill folder must update the index) |
 | Catalogue | Every skill folder appears in `.claude/skills/SKILL-INDEX.md` and vice versa |
-| Forbidden terms | Project-specific or private strings not allowed in the template |
 | Shared rules | Never Invent rule 7 and "What blocks" live only in `agents/_SHARED-PATTERNS.md` (scan scope: `.claude/**/*.md`). Outside it: no copy of the rule 7 CLI command or of its branch bullets; every line saying "KB unreachable" says "rule 7", and every agent with KB MCP tools has such a line; two outdated blocking phrasings (a confidence-based one and a table header; the lint prints them) are banned; a line that says "block" (whole word) and names three or more of the five blocking statuses must name "What blocks". Agents in `NO_BASH_AGENTS` (`requirements-analyst`, `solution-architect`, `prompt-engineer`) list no `Bash` and have a Bash-free row in Common Tool Permissions; other agents with KB MCP tools list `Bash`; rule 7 names only agents that have a file. Limits: a blocking source naming fewer than three statuses, an unhyphenated agent name in rule 7, and anything outside `.claude/` are not caught (`docs/reference/pipeline-trial-findings.md`, F6) |
 
-Run `python3 scripts/framework_lint.py` (stdlib only; `--root` selects the framework folder, default `.claude`, falling back to `claude-staging` with a notice while the template is not yet installed). The pre-commit hook `.claude/hooks/pre-commit-framework-check.sh` runs the same checks on staged files. KB lint is separate: `python3 scripts/kb/check_chunks.py`; KB tooling tests: `python3 -m unittest discover -s scripts/kb/tests`.
+Run `python3 scripts/framework_lint.py` (stdlib only; `--root` selects the framework folder, default `.claude`, falling back to `claude-staging` with a notice while the template is not yet installed). The pre-commit hook `.claude/hooks/pre-commit-framework-check.sh` runs the full lint (`--root`) on a temp copy of the staged index, so partial staging and staged deletions are judged as committed. The lint does not check that body paths exist, that an agent's `skills:` entries have folders, or forbidden strings: do those in section 3. KB lint is separate: `python3 scripts/kb/check_chunks.py`; KB tooling tests: `python3 -m unittest discover -s scripts/kb/tests`.
 
 ## 2. Size budgets
 
@@ -27,7 +28,7 @@ Run `python3 scripts/framework_lint.py` (stdlib only; `--root` selects the frame
 |------|--------|
 | Agent body (incl. `_SHARED-PATTERNS.md`) | at most 16 KB; the lint warns above |
 | SKILL.md | at most 7 KB; move detail to `reference/` only when needed |
-| CLAUDE.md | ~10 KB root, smaller in sub-folders |
+| CLAUDE.md | about 12 KB root (not lint-checked), smaller in sub-folders |
 
 Over budget: cut repetition, replace prose with tables, move examples to `reference/`. A rule lives in one file; others point to it. Compaction must not drop rules, ids or paths: diff before and after.
 
@@ -36,7 +37,9 @@ Over budget: cut repetition, replace prose with tables, move examples to `refere
 | Drift | How to detect |
 |-------|---------------|
 | Counts (agents, skills) | Compare stated numbers with `ls` |
-| Paths | Check each backticked path exists |
+| Paths | Check each backticked path in a body exists (not linted) |
+| Agent skills | Every skill named in an agent's `skills:` has a folder (not linted) |
+| Forbidden terms | Grep for project-specific or private strings not allowed in the template (not linted) |
 | Versions | Compare stack versions in CLAUDE.md with project files |
 | Duplicate rules | Grep a distinctive phrase; keep one owner |
 | Stale agent names | Grep for names not in the roster |

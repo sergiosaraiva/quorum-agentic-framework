@@ -33,7 +33,7 @@ Before the Entity step: ground behaviour in the KBs (`business-kb`, `qa-kb`), ci
 | 4 | `src/Api/Features/<Feature>/<Feature>Service.cs` | `creating-application-services` | The endpoint delegates to it |
 | 5 | `src/Api/Features/<Feature>/<Feature>Endpoints.cs` | `backend` | Route registration once the service exists |
 | 6 | `tests/Api.IntegrationTests/<Feature>Endpoints*Tests.cs` (one or more files named for the behaviour, for example `OrdersEndpointsTests.cs`, `OrdersSearchTests.cs`; + unit tests only for logic separable from the database) | `writing-integration-tests`, `creating-xunit-tests` | Backend proven before the frontend consumes it |
-| 7 | `frontend/src/app/core/api/<resource>.api.ts` | `creating-angular-api-clients` | The component needs a typed client |
+| 7 | `frontend/src/app/features/<feature>/<resource>-api.service.ts` (landed: `orders-api.service.ts`) and `models.ts` | `creating-angular-api-clients` | The component needs a typed client |
 | 8 | `frontend/src/app/features/<feature>/` (+ a signal store only if state is shared across unrelated components) | `frontend`, `managing-state-with-signals` | Built on the existing client |
 | 9 | `frontend/**/*.spec.ts` | `writing-angular-tests` | Tests the finished component |
 | 10 | Root or sub-`CLAUDE.md`, slice status | `updating-internal-docs` | Documents what was built |
@@ -59,9 +59,9 @@ Feature: "Team invites" - a user invites a teammate by email.
 2. TeamInviteConfiguration.cs + migration AddTeamInvite
 3. Dtos.cs: CreateInviteRequest(Email), InviteDto(Id, Email, Status, ExpiresAt)
 4. TeamInviteService (concrete): CreateAsync, ListPendingAsync
-5. TeamInviteEndpoints: POST / and GET / under /api/invites, RequireAuthorization("invites:write")
+5. TeamInviteEndpoints: POST / and GET / in MapGroup("/api/invites").RequireAuthorization(<named policy>) (group-level, as `backend`)
 6. TeamInviteEndpointTests: create 201, invalid email 400, anonymous 401
-7. core/api/invites.api.ts
+7. features/invites/invites-api.service.ts + models.ts
 8. features/invites/invite-list.ts + invite-form.ts (loading, error, empty and data states)
 9. invite-list.spec.ts
 10. Update the Api CLAUDE.md feature table and docs/slices/INDEX.md

@@ -12,7 +12,7 @@ description: Use when writing end-to-end tests for Angular user journeys with Pl
 | Scope | Full journeys in a real browser against a real backend (dev server, Testcontainers-backed API or staging). One or two tests per critical journey (sign in, core create/read flow); edge logic belongs in unit, component and integration tests |
 | Locators | `getByRole` first, then `getByLabel`, `getByText`, `getByTestId`. Never CSS class selectors |
 | Waiting | Web-first assertions (`await expect(locator).toBeVisible()`) auto-retry. Never `page.waitForTimeout()` |
-| Auth | Capture `storageState` once in global setup; reuse with `test.use({ storageState })`. Gitignore the auth folder: it holds real session tokens |
+| Auth | Capture `storageState` once in a setup project (`dependencies: ['setup']`); reuse via the project's `storageState` or `test.use({ storageState })`. Gitignore the auth folder: it holds real session tokens |
 | Isolation | Each test gets its own browser context (default); tests never depend on another test's data. Create and clean up data through the API |
 | Structure | Composable fixtures before a Page Object Model; add POM only when duplication hurts |
 | Accessibility | Run an axe scan (`@axe-core/playwright`) on each key page and fail on serious or critical violations; keyboard-only path for the main flow |
@@ -47,25 +47,24 @@ test('creates a report and shows it in the list', async ({ page }) => {
 
 `test.use({ storageState })` builds on the built-in `page` fixture, which inherits `baseURL` and `trace` from the config. Hand-roll `browser.newContext()` only for two auth states inside one test, and then pass `baseURL` explicitly.
 
-## Example: global setup
+## Example: setup project
+
+Playwright recommends a setup project that the test projects depend on (https://playwright.dev/docs/auth, https://playwright.dev/docs/test-global-setup-teardown); it shows in the report and traces, unlike `globalSetup`.
 
 ```typescript
-// e2e/global-setup.ts
-import { chromium, type FullConfig } from '@playwright/test';
+// e2e/auth.setup.ts
+import { test as setup } from '@playwright/test';
 
-export default async function globalSetup(config: FullConfig) {
-  const browser = await chromium.launch();
-  const baseURL = config.projects[0].use?.baseURL;
-  const context = await browser.newContext({ baseURL });
-  const page = await context.newPage();
+const authFile = 'e2e/.auth/user.json';   // gitignore e2e/.auth/
+
+setup('authenticate', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill(process.env.E2E_USER ?? '');
   await page.getByLabel('Password').fill(process.env.E2E_PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('/dashboard');
-  await context.storageState({ path: 'e2e/.auth/user.json' });   // gitignore e2e/.auth/
-  await browser.close();
-}
+  await page.context().storageState({ path: authFile });
+});
 ```
 
 Credentials come from `${E2E_USER}` / `${E2E_PASSWORD}` CI secrets, never source.
@@ -83,12 +82,15 @@ test('reports page has no serious accessibility violations', async ({ page }) =>
 ```
 
 ```typescript
-// playwright.config.ts (excerpt)
+// playwright.config.ts (excerpt; import { defineConfig, devices } from '@playwright/test')
 export default defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   use: { baseURL: process.env.E2E_BASE_URL, trace: 'on-first-retry' },
-  globalSetup: require.resolve('./e2e/global-setup'),
+  projects: [
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/user.json' }, dependencies: ['setup'] },
+  ],
 });
 ```
 

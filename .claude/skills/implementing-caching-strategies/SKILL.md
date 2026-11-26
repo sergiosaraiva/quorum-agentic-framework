@@ -19,7 +19,7 @@ Never cache per-request authorization decisions, data needing read-your-writes, 
 
 ## Quick Reference
 
-- Use `HybridCache` (in-process L1 plus optional distributed L2, stampede protection built in): one mechanism instead of a per-call-site choice between memory and distributed
+- Use `HybridCache` (package `Microsoft.Extensions.Caching.Hybrid`; in-process L1 plus optional distributed L2, stampede protection built in): one mechanism instead of a per-call-site choice between memory and distributed
 - Tenant data (including reference data in a per-tenant database): feature code does not inject `IMemoryCache`/`HybridCache` directly. It uses a thin `ITenantCache` wrapper that derives the key prefix (`t:{tenantId}:`) and a tag (`tenant:{tenantId}`) from the resolved tenant, never from a caller-supplied prefix. Skip the wrapper in a single-tenant product
 - Anything that captures the tenant resolver or `ITenantCache` is registered `Scoped`, never `Singleton` (a singleton would bind the first tenant for every later request)
 - Offboarding or incident response that must drop one tenant's entries goes through an admin path using the tag, not key scanning (`KEYS`/`SCAN`)
@@ -49,12 +49,12 @@ public sealed class CountryLookupService(ITenantCache cache, AppDbContext db, IO
         cache.GetOrCreateAsync("countries:all", async innerCt =>
         {
             var rows = await db.Countries.AsNoTracking().ToListAsync(innerCt);
-            return (IReadOnlyList<CountryDto>)rows.Select(CountryDto.FromEntity).ToList();
-        }, new HybridCacheEntryOptions { Expiration = options.Value.LookupExpiration }, ct);
+            return (IReadOnlyList<CountryDto>)rows.Select(r => new CountryDto(r.Code, r.Name)).ToList();
+        }, new HybridCacheEntryOptions { Expiration = options.Value.LookupExpiration }, cancellationToken: ct);   // on HybridCache the 4th parameter is `tags`, so name the token
 }
 
 // Program.cs
-builder.Services.AddHybridCache();
+builder.Services.AddHybridCache();   // package Microsoft.Extensions.Caching.Hybrid
 builder.Services.AddScoped<CountryLookupService>();   // Scoped: it captures the tenant-aware cache
 ```
 

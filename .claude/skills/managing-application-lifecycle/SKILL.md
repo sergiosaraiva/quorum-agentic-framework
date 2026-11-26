@@ -49,7 +49,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c
 
 ```csharp
 public sealed class ExpiredInviteCleaner(
-    IServiceScopeFactory scopes, IOptions<CleanupOptions> options, ILogger<ExpiredInviteCleaner> logger)
+    IServiceScopeFactory scopes, IOptions<CleanupOptions> options, TimeProvider clock, ILogger<ExpiredInviteCleaner> logger)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,7 +61,7 @@ public sealed class ExpiredInviteCleaner(
             {
                 using var scope = scopes.CreateScope();            // DbContext is scoped
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var removed = await db.Invites.Where(i => i.ExpiresAt < DateTimeOffset.UtcNow)
+                var removed = await db.Invites.Where(i => i.ExpiresAt < clock.GetUtcNow())
                     .ExecuteDeleteAsync(stoppingToken);            // idempotent: safe in every replica
                 logger.LogInformation("Removed {Count} expired invites", removed);
             }

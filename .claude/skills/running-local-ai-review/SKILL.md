@@ -16,6 +16,8 @@ The script reviews your branch diff with the `claude` CLI and your own sign-in; 
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
 | 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
 
+The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools and web tools, and `--strict-mcp-config` loads no MCP servers, so a prompt-injected diff cannot reach project allow rules or user MCP servers.
+
 Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
 
 ## Flags

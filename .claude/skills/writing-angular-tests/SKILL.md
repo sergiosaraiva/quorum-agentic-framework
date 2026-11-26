@@ -84,7 +84,7 @@ it('debounces the search request', () => {
 
 ## Accessibility in component tests
 
-Prefer queries that double as checks: `getByRole('button', { name: 'Save' })` fails when the accessible name is missing. Assert focus moves to the dialog or first error after the triggering action. Automated axe checks belong in the e2e tier.
+Prefer queries that double as checks: `getByRole('button', { name: 'Save' })` fails when the accessible name is missing. That is the Testing Library API and needs `@testing-library/angular` (not installed); with plain `TestBed` use the DOM equivalent, `fixture.nativeElement.querySelector('button[aria-label="Save"]')` or a text/role-attribute query, and assert the accessible name. Assert focus moves to the dialog or first error after the triggering action. Automated axe checks belong in the e2e tier.
 
 ## Quality Checklist
 

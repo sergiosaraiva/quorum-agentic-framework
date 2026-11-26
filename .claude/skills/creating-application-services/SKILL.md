@@ -39,18 +39,19 @@ public sealed class ReportService(AppDbContext db, ILogger<ReportService> logger
 {
     public async Task<ReportDto?> GetAsync(Guid id, CancellationToken ct)
     {
-        var entity = await db.Reports.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
-        return entity is null ? null : ReportDto.FromEntity(entity);
+        // project in the query: EF selects only the DTO columns (landed: OrdersService.ToResponse)
+        return await db.Reports.AsNoTracking().Where(r => r.Id == id)
+            .Select(r => new ReportDto(r.Id, r.Title, r.PeriodStart, r.PeriodEnd, r.Status)).SingleOrDefaultAsync(ct);
     }
 
     public async Task<ReportDto> CreateAsync(CreateReportRequest request, CancellationToken ct)
     {
         var entity = new Report { Id = Guid.CreateVersion7(), Title = request.Title };
-        // created_at/created_by are stamped by the SaveChanges interceptor (database skill), never here
+        // created_at/updated_at come from the injected TimeProvider (landed: OrdersService.CreateAsync); with *_by columns a SaveChanges interceptor stamps them (database skill)
         db.Reports.Add(entity);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Report {ReportId} created", entity.Id);   // structured fields, no PII
-        return ReportDto.FromEntity(entity);
+        return new ReportDto(entity.Id, entity.Title, entity.PeriodStart, entity.PeriodEnd, entity.Status);   // in-memory mapping: inline or a static FromEntity
     }
 }
 // Program.cs

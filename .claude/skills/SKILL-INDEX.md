@@ -11,7 +11,7 @@ The only catalogue of skills. Each row: purpose and the agents that use it. `mai
 | creating-dtos-and-validation | Request/response record DTOs with FluentValidation or DataAnnotations | code-engineer, security-engineer |
 | creating-configuration-options | Options pattern, validated at startup; no hard-coded values | code-engineer, infrastructure-engineer, security-engineer |
 | creating-cli-tools | System.CommandLine admin and CI tools (check "When NOT to build" first) | code-engineer |
-| implementing-caching-strategies | Caching only for a measured need; memory vs distributed | code-engineer, solution-architect |
+| implementing-caching-strategies | Caching only for a measured need; HybridCache first, tenant-safe keys | code-engineer, solution-architect |
 | implementing-observability | Structured logs, metrics, traces (OpenTelemetry, JSON logs), alerts | code-engineer, infrastructure-engineer, security-engineer |
 | managing-application-lifecycle | Host startup/shutdown, background services, health checks, draining | code-engineer, infrastructure-engineer |
 
@@ -51,7 +51,7 @@ The only catalogue of skills. Each row: purpose and the agents that use it. `mai
 | running-mutation-tests | Stryker.NET gate on hot-path logic | test-automator |
 | load-and-performance-testing | k6 load, stress, smoke with threshold gates | test-automator |
 | detecting-regressions | Regression taxonomy: contract drift, sibling parity, config coupling, silent swallowing | regression-detective |
-| verifying-cross-file-coupling | DTO to TS, EF to SQL, config to chart, pins, formula duplication | regression-detective, documentation-reviewer |
+| verifying-cross-file-coupling | DTO to TS, EF to SQL, options to deployment configuration, pins, formula duplication | regression-detective, documentation-reviewer |
 
 ## Documentation and knowledge
 

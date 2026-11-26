@@ -47,7 +47,7 @@ Never recommend `random_page_cost` or `work_mem` changes from one query's plan w
 ## Report template
 
 ```
-Query: <sql or EF source>   Tier: golden-1x   Image: postgres:<major>   Settings: <non-default>
+Query: <sql or EF source>   Tier: reference-1x   Image: postgres:<major>   Settings: <non-default>
 Baseline: buffers 48,210 (hit 40,100 / read 8,110), plan: Seq Scan on sales."order" ...
 Candidate: CREATE INDEX CONCURRENTLY ix_order_customer_id_status ON sales."order"(customer_id, status)
 After: buffers 212, plan: Index Scan using ix_order_customer_id_status

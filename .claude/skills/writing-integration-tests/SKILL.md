@@ -125,7 +125,10 @@ public async Task Migrations_ApplyCleanlyToFreshDatabase()
 {
     await using var db = new PostgreSqlBuilder("postgres:16-alpine").Build();   // factory's tag
     await db.StartAsync(TestContext.Current.CancellationToken);
-    var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(db.GetConnectionString()).Options;
+    var options = new DbContextOptionsBuilder<AppDbContext>()
+        .UseNpgsql(db.GetConnectionString())
+        .UseSnakeCaseNamingConvention()   // as in production; else Migrate throws "pending model changes"
+        .Options;
     await using var context = new AppDbContext(options);
     await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
 }

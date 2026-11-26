@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import sys
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,7 +35,8 @@ def _scalar(value: str):
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
-    """Parse a minimal YAML subset: `key: value`, `key: [a, b]`, block lists with `- item`."""
+    """Parse a minimal YAML subset: `key: value`, `key: [a, b]`, block lists with `- item`.
+    Raises ValueError for a missing block, a malformed line or a duplicate key."""
     m = re.match(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)(.*)\Z", text, re.S)
     if not m:
         raise ValueError("missing frontmatter block (--- ... ---)")
@@ -51,6 +53,8 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
         if not sep:
             raise ValueError(f"bad frontmatter line: {raw!r}")
         key, v = k.strip(), v.strip()
+        if key in meta:
+            raise ValueError(f"duplicate frontmatter key {key!r}")
         if v == "":
             meta[key] = []  # block list follows (or empty)
         elif v.startswith("[") and v.endswith("]"):
@@ -149,12 +153,28 @@ def record_from_file(path: Path) -> Record:
                   extra={k: v for k, v in meta.items() if k not in known})
 
 
-def load_chunks(kb_dir: Path = KB_DIR) -> list[Chunk]:
-    return [chunk_from_file(p) for p in sorted((kb_dir / "chunks").glob("*.md"))]
+def _load_each(paths: list[Path], loader, strict: bool = False):
+    """Load every file. A malformed one is skipped with a warning on stderr (naming the file) so the rest still
+    serves; with `strict` it raises ValueError instead, for callers that act on the full set (ingest prunes
+    database rows whose file is missing, so a skipped file must stop it rather than delete its row).
+    `check_chunks.py` reports the same files as errors."""
+    out = []
+    for p in paths:
+        try:
+            out.append(loader(p))
+        except (ValueError, OSError) as exc:  # UnicodeDecodeError is a ValueError
+            if strict:
+                raise ValueError(f"{p.name}: {exc}") from exc
+            print(f"warning: skipping {p.name}: {exc}", file=sys.stderr)
+    return out
 
 
-def load_records(qa_dir: Path = QA_DIR) -> list[Record]:
-    return [record_from_file(p) for p in sorted((qa_dir / "records").glob("*.md"))]
+def load_chunks(kb_dir: Path = KB_DIR, strict: bool = False) -> list[Chunk]:
+    return _load_each(sorted((kb_dir / "chunks").glob("*.md")), chunk_from_file, strict)
+
+
+def load_records(qa_dir: Path = QA_DIR, strict: bool = False) -> list[Record]:
+    return _load_each(sorted((qa_dir / "records").glob("*.md")), record_from_file, strict)
 
 
 # ---------------------------------------------------------------- tokenizing
@@ -198,7 +218,7 @@ class BM25:
 
     def search(self, query: str, k: int = 5) -> list[tuple[str, float]]:
         n = len(self.ids)
-        q = tokenize(query)
+        q = list(dict.fromkeys(tokenize(query)))  # a repeated query word must not score twice
         scored = []
         for i, tf in enumerate(self.tfs):
             score = 0.0

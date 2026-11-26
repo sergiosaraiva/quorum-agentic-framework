@@ -278,5 +278,97 @@ class MergeTests(unittest.TestCase):
         self.assertEqual([f["severity"] for f in merged], ["blocking"])
 
 
+class ReadOnlyReviewerTests(unittest.TestCase):
+    def built_command(self) -> list[str]:
+        from unittest import mock
+        seen = {}
+
+        def fake_run(cmd, **kw):
+            seen["cmd"] = cmd
+            return mock.Mock(returncode=0, stdout="{}", stderr="")
+
+        with mock.patch.object(air, "run", side_effect=fake_run):
+            air.call_model("prompt", "sonnet", "claude", 5)
+        return seen["cmd"]
+
+    def flag_value(self, cmd: list[str], flag: str) -> set[str]:
+        return set(cmd[cmd.index(flag) + 1].replace(" ", ",").split(","))
+
+    def test_command_restricts_tools_not_only_preapproves(self):
+        cmd = self.built_command()
+        self.assertEqual(self.flag_value(cmd, "--tools"), {"Read", "Grep", "Glob"})
+        self.assertEqual(self.flag_value(cmd, "--allowedTools"), {"Read", "Grep", "Glob"})
+
+    def test_command_denies_shell_and_write_tools_and_loads_no_mcp_servers(self):
+        cmd = self.built_command()
+        self.assertLessEqual({"Bash", "Edit", "Write"}, self.flag_value(cmd, "--disallowedTools"))
+        self.assertIn("--strict-mcp-config", cmd)
+        self.assertNotIn("--mcp-config", cmd)
+
+
+class ExtractJsonObjectTests(unittest.TestCase):
+    def test_empty_example_before_real_findings_does_not_mask_them(self):
+        text = ('An empty result looks like {"findings": []}. Actual: '
+                '{"findings":[{"severity":"critical","file":"a.py","line":1,"title":"t"}]}')
+        out = air.parse_findings(text)
+        self.assertEqual([f["severity"] for f in out], ["blocking"])
+
+    def test_empty_object_after_real_findings_does_not_mask_them_either(self):
+        text = '{"findings":[{"severity":"high","title":"t"}]} (a clean chunk would be {"findings": []})'
+        self.assertEqual(len(air.parse_findings(text)), 1)
+
+    def test_several_non_empty_candidates_are_all_kept_without_duplicates(self):
+        a, b = '{"severity":"low","title":"a"}', '{"severity":"low","title":"b"}'
+        out = air.parse_findings(f'{{"findings":[{a}]}} then {{"findings":[{a},{b}]}}')
+        self.assertEqual([f["title"] for f in out], ["a", "b"])
+
+    def test_several_candidates_all_empty_is_clean(self):
+        self.assertEqual(air.parse_findings('{"findings": []} and again {"findings": []}'), [])
+
+
+class EnvironmentErrorTests(unittest.TestCase):
+    def main_code(self, *args: str) -> tuple[int, str]:
+        import contextlib
+        import io
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()) as err, \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = air.main(["--out-dir", tmp, *args])
+        return code, err.getvalue()
+
+    def test_unknown_base_exits_2_with_a_message(self):
+        code, err = self.main_code("--base", "origin/no-such-branch-xyz")
+        self.assertEqual(code, 2)
+        self.assertIn("git diff failed", err)
+
+    def test_option_like_base_is_rejected_and_writes_nothing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "injected.txt"
+            code, err = self.main_code(f"--base=--output={target}")
+            self.assertEqual(code, 2)
+            self.assertIn("must not start with '-'", err)
+            self.assertFalse(target.exists())
+
+    def test_non_utf8_bytes_in_command_output_are_replaced_not_fatal(self):
+        proc = air.run([sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok \\xff\\xfe end')"])
+        self.assertEqual(proc.returncode, 0)
+        self.assertTrue(proc.stdout.startswith("ok ") and proc.stdout.endswith(" end"))
+
+    def test_non_scalar_file_line_and_title_do_not_crash_parse_or_merge(self):
+        text = json.dumps({"findings": [
+            {"severity": "low", "file": {"p": "a.py"}, "line": [3, 4], "title": ["t"]},
+            {"severity": "high", "file": {"p": "a.py"}, "line": [3, 4], "title": ["t"]},
+            {"severity": "low", "file": "b.py", "line": 7, "title": "u"}]})
+        merged = air.merge(air.parse_findings(text))
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0]["severity"], "blocking")  # duplicates collapse, most severe wins
+        self.assertIsInstance(merged[0]["line"], str)
+        self.assertIn("a.py", air.render_markdown(merged, 1, "m", "main"))
+
+    def test_merge_alone_tolerates_unhashable_values(self):
+        self.assertEqual(len(air.merge([{"severity": "info", "file": ["x"], "line": {"a": 1}, "title": [1]}])), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

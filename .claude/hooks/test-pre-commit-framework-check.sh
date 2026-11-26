@@ -25,6 +25,9 @@ expect() { # expect <0|nonzero> <label>
     echo "FAIL: $label (exit $rc, wanted $want)"; fail=1
   fi
 }
+sedi() { # sedi <expr> <file>: in-place edit that works with GNU and BSD sed
+  sed -i.bak "$1" "$2" && rm -f "$2.bak"
+}
 stage() { git add -f .claude >/dev/null; }
 reset() { git rm -rq --cached .claude/agents .claude/skills >/dev/null 2>&1 || true; rm -f .claude/agents/* .claude/skills/*/SKILL.md; }
 
@@ -48,28 +51,28 @@ EOF
 stage; expect 0 "good agent and skill"
 
 # 2 bad agent: wrong name
-sed -i 's/^name: demo$/name: other/' .claude/agents/demo.md; stage
+sedi 's/^name: demo$/name: other/' .claude/agents/demo.md; stage
 expect nonzero "agent name differs from filename"
-sed -i 's/^name: other$/name: demo/' .claude/agents/demo.md
+sedi 's/^name: other$/name: demo/' .claude/agents/demo.md
 
 # 3 bad agent: bad model
-sed -i 's/^model: sonnet$/model: gpt/' .claude/agents/demo.md; stage
+sedi 's/^model: sonnet$/model: gpt/' .claude/agents/demo.md; stage
 expect nonzero "agent model not allowed"
-sed -i 's/^model: gpt$/model: sonnet/' .claude/agents/demo.md
+sedi 's/^model: gpt$/model: sonnet/' .claude/agents/demo.md
 
 # 4 bad agent: forbidden tool
-sed -i 's/^tools: Read, Grep$/tools: Read, Agent/' .claude/agents/demo.md; stage
+sedi 's/^tools: Read, Grep$/tools: Read, Agent/' .claude/agents/demo.md; stage
 expect nonzero "agent lists Agent tool"
-sed -i 's/^tools: Read, Agent$/tools: Read, Grep/' .claude/agents/demo.md
+sedi 's/^tools: Read, Agent$/tools: Read, Grep/' .claude/agents/demo.md
 
 # 5 skill: name differs from folder
-sed -i 's/^name: demo-skill$/name: wrong/' .claude/skills/demo-skill/SKILL.md; stage
+sedi 's/^name: demo-skill$/name: wrong/' .claude/skills/demo-skill/SKILL.md; stage
 expect nonzero "skill name differs from folder"
-sed -i 's/^name: wrong$/name: demo-skill/' .claude/skills/demo-skill/SKILL.md
+sedi 's/^name: wrong$/name: demo-skill/' .claude/skills/demo-skill/SKILL.md
 
 # 6 skill: description too long
 long="$(python3 -c 'print("x"*1030)')"
-sed -i "s/^description: A fine skill description.$/description: $long/" .claude/skills/demo-skill/SKILL.md; stage
+sedi "s/^description: A fine skill description.$/description: $long/" .claude/skills/demo-skill/SKILL.md; stage
 expect nonzero "skill description over 1024 chars"
 
 # 7 skill: no frontmatter
@@ -91,6 +94,17 @@ if bash .claude/hooks/install-framework-check-hook.sh >/dev/null 2>&1 && grep -q
 else
   echo "FAIL: installer did not install"; fail=1
 fi
+
+# 8b installer run from a subdirectory installs into the repo's hooks dir, not a path relative to the subdirectory
+rm -f .git/hooks/pre-commit
+mkdir -p deep/sub
+if (cd deep/sub && bash "$TMP/.claude/hooks/install-framework-check-hook.sh" >/dev/null 2>&1) \
+    && grep -q quorum-hooks-managed .git/hooks/pre-commit && [ ! -e deep/sub/.git ] && [ ! -e deep/.git ]; then
+  echo "PASS: installer run from a subdirectory installs into the repo hooks dir"
+else
+  echo "FAIL: installer run from a subdirectory did not install into .git/hooks"; fail=1
+fi
+rm -rf deep
 
 # 9 delegated path: scripts/framework_lint.py present, judged on STAGED content
 LINT="$HERE/../../scripts/framework_lint.py"
@@ -129,14 +143,14 @@ EOF2
   git commit -qm base --no-verify
 
   # staged blob bad, working tree fixed afterwards (partial staging): must fail
-  sed -i 's/^name: demo$/name: other/' .claude/agents/demo.md; git add .claude/agents/demo.md
-  sed -i 's/^name: other$/name: demo/' .claude/agents/demo.md
+  sedi 's/^name: demo$/name: other/' .claude/agents/demo.md; git add .claude/agents/demo.md
+  sedi 's/^name: other$/name: demo/' .claude/agents/demo.md
   expect nonzero "delegated: partially staged bad file is caught"
   git reset -q --hard
 
   # staged blob good, working tree broken afterwards (unstaged edit): must pass
-  sed -i 's/^description: A fine description.$/description: Changed./' .claude/agents/demo.md; git add .claude/agents/demo.md
-  sed -i 's/^model: sonnet$/model: gpt/' .claude/agents/demo.md
+  sedi 's/^description: A fine description.$/description: Changed./' .claude/agents/demo.md; git add .claude/agents/demo.md
+  sedi 's/^model: sonnet$/model: gpt/' .claude/agents/demo.md
   expect 0 "delegated: unstaged breakage is not judged"
   git reset -q --hard
 

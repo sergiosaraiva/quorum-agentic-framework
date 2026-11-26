@@ -7,10 +7,13 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 MARKER="quorum-hooks-managed"
 
+# `git rev-parse --git-path` prints a path relative to the current directory; resolve it from the repo root so
+# running the installer from a subdirectory cannot install the hook outside the repository.
+cd "$REPO_ROOT"
 HOOKS_DIR="$(git rev-parse --git-path hooks)"
 case "$HOOKS_DIR" in
   /*) ;;
-  *) HOOKS_DIR="$(cd "$REPO_ROOT" && cd "$HOOKS_DIR" 2>/dev/null && pwd || echo "$REPO_ROOT/$HOOKS_DIR")" ;;
+  *) HOOKS_DIR="$REPO_ROOT/$HOOKS_DIR" ;;
 esac
 mkdir -p "$HOOKS_DIR"
 TARGET="$HOOKS_DIR/pre-commit"

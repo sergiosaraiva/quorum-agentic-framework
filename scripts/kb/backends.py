@@ -176,16 +176,21 @@ class PgStore:
     def record_open(self, kind: str | None = None, decider: str | None = None) -> list[dict]:
         rows = self._q(f"SELECT {self._RCOLS} FROM qa_records WHERE status = 'open' "
                        "AND (%s::text IS NULL OR kind = %s) AND (%s::text IS NULL OR decider = %s) "
-                       "ORDER BY priority, id", (kind, kind, decider, decider))
+                       "ORDER BY COALESCE(NULLIF(priority, ''), 'P9'), id", (kind, kind, decider, decider))
         return [self._rec(r) for r in rows]
 
     def record_related(self, record_id: str) -> dict:
         rec = self.record_get(record_id)
         rows = self._q(f"SELECT {self._RCOLS} FROM qa_records WHERE id = ANY(%s) OR %s = ANY(related) "
                        "ORDER BY id", (rec["related"], record_id))
-        chunks = [self.chunk_get(c) for c in rec["chunks"]]
-        for c in chunks:
-            c.pop("body", None)
+        chunks = []
+        for cid in rec["chunks"]:
+            try:
+                chunk = self.chunk_get(cid)
+            except KeyError:  # dangling chunk id: skipped, as LocalStore does
+                continue
+            chunk.pop("body", None)
+            chunks.append(chunk)
         return {"id": record_id, "records": [self._rec(r) for r in rows if r[0] != record_id], "chunks": chunks}
 
 

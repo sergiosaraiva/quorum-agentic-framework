@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         print(json.dumps(summarize(changed_cs_files(a.base), merged_lines(a.reports))))
-    except (OSError, ET.ParseError, subprocess.CalledProcessError) as exc:
+    except (OSError, ET.ParseError, ValueError, subprocess.CalledProcessError) as exc:  # ValueError: non-integer number or hits
         print(f"coverage_changed: {exc}", file=sys.stderr)
         return 2
     return 0

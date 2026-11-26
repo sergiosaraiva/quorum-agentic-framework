@@ -4,7 +4,9 @@ check when it happens to be installed).
 
     python3 scripts/framework_lint.py                 # whole framework; exit 1 on any error
     python3 scripts/framework_lint.py --strict        # size warnings become errors
-    python3 scripts/framework_lint.py --staged        # only files staged in git (used by the pre-commit hook)
+    python3 scripts/framework_lint.py --staged        # only files staged in git, staged deletions included
+                                                      # (the pre-commit hook does not use it: it runs --root on a
+                                                      # temp copy of the staged index)
     python3 scripts/framework_lint.py --root <dir>    # directory holding agents/ and skills/
 
 Checks
@@ -12,11 +14,18 @@ Checks
   name          equals the file name (agents/<name>.md) or the folder name (skills/<name>/SKILL.md)
   description   present, at most 1024 characters
   agents        `model` is opus, sonnet or haiku; `tools` never lists Agent or AskUserQuestion
-                (subagents cannot spawn subagents or ask the user; they return open items to the caller)
+                (subagents cannot spawn subagents or ask the user; they return open items to the caller),
+                an entry outside KNOWN_TOOLS and `mcp__*` is a warning (an error with --strict), and the legacy name
+                `Task` is an error; `permissionMode` is one of PERMISSION_MODES
+  keys          (warning) a frontmatter key outside AGENT_KEYS or SKILL_KEYS is probably a typo
   index         skills/SKILL-INDEX.md lists every skill folder and nothing else
   slices        (only when docs/slices/INDEX.md sits beside the lint root) each Mermaid `class` line matches
                 the slice's Status column; see check_slice_index
-  size          agent file <= 16 KB, skill file <= 7 KB (warning; an error with --strict)
+  size          agent file <= 16 KB, skill file <= 7 KB (warning; an error with --strict); measured with CRLF
+                normalised to LF. Other .md files inside a skill folder: no budget is stated, so a warning above
+                16 KB that --strict does not turn into an error
+  layout        (warning) .md files in a subfolder of agents/ are not loaded as agents (the agents folder is not
+                searched recursively)
   coherence     (only when agents/_SHARED-PATTERNS.md exists, and it is itself checked as the owner) single
                 owner of two shared rules: rule 7 (KB unreachable fallback) and "What blocks"; see
                 check_shared_rules. It reads the working tree under the lint root, so it does not honour
@@ -38,6 +47,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODELS = ("opus", "sonnet", "haiku")
 FORBIDDEN_TOOLS = ("Agent", "AskUserQuestion")
+KNOWN_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob", "Bash", "Skill", "Agent", "WebFetch", "WebSearch",
+               "NotebookEdit", "TodoWrite")  # plus any `mcp__*` tool; FORBIDDEN_TOOLS have their own error
+LEGACY_TOOLS = {"Task": "Agent"}
+PERMISSION_MODES = ("default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto")
+AGENT_KEYS = ("name", "description", "tools", "disallowedTools", "model", "effort", "color", "memory", "permissionMode",
+              "maxTurns", "skills", "hooks", "mcpServers", "isolation", "background", "initialPrompt")
+SKILL_KEYS = ("name", "description", "when_to_use", "allowed-tools", "disable-model-invocation", "user-invocable",
+              "argument-hint", "model", "effort", "context", "agent", "hooks", "license", "metadata", "version", "paths")
+MAX_SKILL_SUPPORT_BYTES = 16 * 1024
 MAX_DESCRIPTION = 1024
 MAX_AGENT_BYTES = 16 * 1024
 MAX_SKILL_BYTES = 7 * 1024
@@ -194,6 +212,10 @@ class Report:
     def error(self, path: Path, msg: str):
         self.errors.append(f"ERROR {path}: {msg}")
 
+    def advise(self, path: Path, msg: str):
+        """A warning that --strict never turns into an error (no budget or rule states a limit)."""
+        self.warnings.append(f"WARN  {path}: {msg}")
+
     def warn(self, path: Path, msg: str):
         (self.errors if self.strict else self.warnings).append(f"{'ERROR' if self.strict else 'WARN'}  {path}: {msg}")
 
@@ -202,8 +224,9 @@ def check_file(path: Path, kind: str, expected_name: str, report: Report, reader
     """kind is 'agent' or 'skill'. `reader(path) -> bytes` defaults to the working-tree file."""
     raw = reader(path) if reader else path.read_bytes()
     limit = MAX_AGENT_BYTES if kind == "agent" else MAX_SKILL_BYTES
-    if len(raw) > limit:
-        report.warn(path, f"{len(raw)} bytes exceeds the {limit // 1024} KB {kind} budget; move detail into a reference file or a skill")
+    size = len(raw.replace(b"\r\n", b"\n"))  # a CRLF checkout must not count its extra bytes
+    if size > limit:
+        report.warn(path, f"{size} bytes exceeds the {limit // 1024} KB {kind} budget; move detail into a reference file or a skill")
     block, _ = split_frontmatter(raw.decode("utf-8", errors="replace"))
     if block is None:
         report.error(path, "missing frontmatter: the file must start with a line `---` and close with a line `---`")
@@ -232,13 +255,28 @@ def check_file(path: Path, kind: str, expected_name: str, report: Report, reader
         report.error(path, "missing `description`")
     elif len(desc) > MAX_DESCRIPTION:
         report.error(path, f"description is {len(desc)} characters; the limit is {MAX_DESCRIPTION}")
+    unknown = sorted(k for k in data if k not in (AGENT_KEYS if kind == "agent" else SKILL_KEYS))
+    if unknown:
+        report.advise(path, f"unknown frontmatter key(s) {', '.join(unknown)}; check the spelling "
+                            f"(known: {', '.join(AGENT_KEYS if kind == 'agent' else SKILL_KEYS)})")
     if kind == "agent":
+        mode = data.get("permissionMode")
+        if mode is not None and mode not in PERMISSION_MODES:
+            report.error(path, f"permissionMode {mode!r} must be one of {', '.join(PERMISSION_MODES)}")
         if data.get("model") not in MODELS:
             report.error(path, f"model {data.get('model')!r} must be one of {', '.join(MODELS)}")
         bad = [t for t in tool_names(data.get("tools")) if t in FORBIDDEN_TOOLS]
         if bad:
             report.error(path, f"tools must not list {', '.join(bad)}: subagents cannot spawn agents or ask the user; "
                                "return open items to the calling session instead")
+        for t in tool_names(data.get("tools")):
+            if t in LEGACY_TOOLS:
+                report.error(path, f"tool {t!r} is the legacy name of {LEGACY_TOOLS[t]!r} (and subagents must not list it)")
+            elif t not in KNOWN_TOOLS and t not in FORBIDDEN_TOOLS and not t.startswith("mcp__"):
+                # A warning, not an error: Claude Code adds tools over time, so a name outside the list may be new
+                # rather than a typo. --strict turns it into an error.
+                report.warn(path, f"unknown tool {t!r} (typo, or a tool newer than this list?); known: "
+                                  f"{', '.join(KNOWN_TOOLS)} or an mcp__<server>__<tool> name")
 
 
 def index_names(index_path: Path, reader=None) -> set[str]:
@@ -252,7 +290,8 @@ def index_names(index_path: Path, reader=None) -> set[str]:
 
 
 def staged_paths(repo: Path = REPO_ROOT) -> list[str]:
-    proc = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
+    """Staged paths, deletions included (deleting a skill must update SKILL-INDEX.md)."""
+    proc = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACDMR"],
                           cwd=repo, text=True, capture_output=True)
     if proc.returncode != 0:
         sys.exit(f"git diff --cached failed: {proc.stderr.strip()}")
@@ -289,27 +328,50 @@ def lint(root: Path, strict: bool = False, only: set[Path] | None = None, reader
     `reader` supplies file bytes (the staged blob for --staged)."""
     report = Report(strict)
     agents_dir, skills_dir = root / "agents", root / "skills"
+
+    def in_index(f: Path) -> bool:
+        """False for a staged path that is gone from the index (`git rm --cached` leaves the working copy):
+        such a file is a deletion, not something to read or to count as present."""
+        if reader is None or only is None or f.resolve() not in only:
+            return True
+        try:
+            reader(f)
+        except OSError:
+            return False
+        return True
+
     for f in sorted(agents_dir.glob("*.md")) if agents_dir.is_dir() else []:
-        if only is not None and f.resolve() not in only:
+        if (only is not None and f.resolve() not in only) or not in_index(f):
             continue
         if f.name.startswith("_"):
-            size = len(reader(f) if reader else f.read_bytes())
+            size = len((reader(f) if reader else f.read_bytes()).replace(b"\r\n", b"\n"))
             if size > MAX_AGENT_BYTES:
                 report.warn(f, f"{size} bytes exceeds the {MAX_AGENT_BYTES // 1024} KB budget")
             continue
         check_file(f, "agent", f.stem, report, reader)
+    for f in sorted(agents_dir.rglob("*.md")) if agents_dir.is_dir() else []:
+        if f.parent != agents_dir and (only is None or f.resolve() in only):
+            report.advise(f, "is in a subfolder of agents/, which is not searched: it will not load as an agent; "
+                             "move it up one level or rename the folder away from agents/")
     skill_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.is_dir() else []
     for d in skill_dirs:
         skill = d / "SKILL.md"
         if not skill.exists():
             report.error(d, "skill folder has no SKILL.md")
             continue
-        if only is not None and skill.resolve() not in only:
+        for f in sorted(d.rglob("*.md")):
+            if f != skill and (only is None or f.resolve() in only) and in_index(f):
+                size = len((reader(f) if reader else f.read_bytes()).replace(b"\r\n", b"\n"))
+                if size > MAX_SKILL_SUPPORT_BYTES:
+                    report.advise(f, f"{size} bytes; supporting skill files have no stated budget, "
+                                     f"consider splitting past {MAX_SKILL_SUPPORT_BYTES // 1024} KB")
+        if (only is not None and skill.resolve() not in only) or not in_index(skill):
             continue
         check_file(skill, "skill", d.name, report, reader)
     index = skills_dir / "SKILL-INDEX.md"
-    if index.exists() and (only is None or index.resolve() in only or any(p.name == "SKILL.md" for p in only)):
-        listed, present = index_names(index, reader if only is not None and index.resolve() in only else None), {d.name for d in skill_dirs if (d / "SKILL.md").exists()}
+    if index.exists() and (only is None or index.resolve() in only
+                                or any(skills_dir.resolve() in p.parents for p in only)):
+        listed, present = index_names(index, reader if only is not None and index.resolve() in only else None), {d.name for d in skill_dirs if (d / "SKILL.md").exists() and in_index(d / "SKILL.md")}
         for missing in sorted(present - listed):
             report.error(index, f"skill {missing!r} exists but is not listed in SKILL-INDEX.md")
         for ghost in sorted(listed - present):

@@ -27,7 +27,7 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 | `--base` | Base ref (env `AI_REVIEW_BASE`, default `origin/main`) |
 | `--model` | Model alias or id (env `AI_REVIEW_MODEL`, default `sonnet`) |
 | `--max-chunk-bytes` | Chunk size limit (default 60000) |
-| `--max-rounds` | Local round cap (default 3) |
+| `--max-rounds` | Local round cap (default 5) |
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
@@ -53,7 +53,7 @@ python3 scripts/ai_review_local.py --reset                         # after a hum
 
 ## Rounds and triage
 
-Round cap 3 (round = review, fix, review). After round 3 with findings still open, stop and escalate to a human; do not loop further.
+Round cap 5 (round = review, fix, review). After round 5 with findings still open, stop and escalate to a human; do not loop further.
 
 | Severity | Action |
 |----------|--------|
@@ -69,10 +69,10 @@ The script also accepts severities from the reviewer agents, case-insensitively:
 
 ## Counters
 
-Three counters exist and none shares state: the in-session Loop-Back cap (3 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch; removing the label `needs-human-review` is optional housekeeping). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
+Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch; removing the label `needs-human-review` is optional housekeeping). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
 
 ## Order
 
 1. Build, tests and format green locally.
-2. In-session pair over the whole branch, then this script with `--require`, up to 3 rounds (`--model opus` for risky changes).
+2. In-session pair over the whole branch, then this script with `--require`, up to 5 rounds (`--model opus` for risky changes).
 3. Push and open the PR; a human merges. If `ANTHROPIC_API_KEY` is set, the GitHub review (`pr-review`) also runs as an optional second gate.

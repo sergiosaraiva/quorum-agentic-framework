@@ -46,7 +46,7 @@ Notes:
 | Prompt sharpening, classification, routing, log triage, bulk summaries | Haiku | Cheap and quick. Output is checked or low-stakes. |
 | A task that failed twice on Sonnet | Opus once, then return to Sonnet | Pay for judgment only where it is needed. |
 | Hardest long-horizon work (large refactor plan, migration strategy, incident root cause) | Fable 5.2 | Highest capability. At $8 / $40 per MTok it is twice Opus input price, so reserve it. |
-| Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 3 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
+| Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 5 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
 | GitHub AI CI on every PR (optional, needs `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
 
 Rule of thumb: spend on the checker, save on the maker. Reviewer errors cost an escaped defect. Implementer errors cost a review round.
@@ -117,7 +117,7 @@ Illustrative only. Assume a PR diff plus context of 30,000 input tokens and 5,00
 | Sonnet 5.5 | 30,000 x $2 / 1M = $0.06 | 5,000 x $10 / 1M = $0.05 | $0.11 |
 | Haiku 5.5 | 30,000 x $0.10 / 1M = $0.003 | 5,000 x $0.50 / 1M = $0.0025 | $0.0055 |
 
-The default pipeline runs two Opus reviewers in parallel (quality-guardian and regression-detective), so one round is 2 x $0.22 = $0.44 before thinking tokens, and a three-round cap bounds it at 3 x $0.44 = $1.32 for that stage. Haiku 5.5 is used here at prompts under 100K tokens; above that, the higher tier applies. Real runs add thinking tokens and tool calls, so measure your own. The point: a review round costs cents, an escaped defect costs hours.
+The default pipeline runs two Opus reviewers in parallel (quality-guardian and regression-detective), so one round is 2 x $0.22 = $0.44 before thinking tokens, and a five-round cap bounds it at 5 x $0.44 = $2.20 for that stage. Haiku 5.5 is used here at prompts under 100K tokens; above that, the higher tier applies. Real runs add thinking tokens and tool calls, so measure your own. The point: a review round costs cents, an escaped defect costs hours.
 
 ## 8. Subscription plans versus API billing
 

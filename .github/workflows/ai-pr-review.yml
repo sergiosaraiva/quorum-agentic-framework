@@ -32,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MAX_ROUNDS: 3
+  MAX_ROUNDS: 5
   ROUND_MARKER: "<!-- ai-review-round -->"
   # Reviewers are judgement-heavy work: default to the strongest model. Override with the repo variable AI_REVIEW_MODEL.
   REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL || 'opus' }}

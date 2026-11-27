@@ -75,7 +75,7 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
 }
 ```
 
-Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
+Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 5 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
 
 ## Tools
 

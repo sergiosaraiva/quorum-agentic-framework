@@ -89,7 +89,7 @@ Run `python3 scripts/kb/ingest.py` for both KBs; each run re-embeds everything. 
 
 ### 10. Set up CI
 
-Add the repository secret `ANTHROPIC_API_KEY` (optional: without it the review is skipped; and any deployment credentials your platform needs, stored as secrets) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 3); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. The required review is local (the in-session pair plus `python3 scripts/ai_review_local.py --base origin/main --require`, no API key). Enable `.github/workflows/ai-pr-review.yml` as an optional second gate only if you set the key, and then make its check required on the integration branch; without the key the job is skipped and a green check is not a review. The frontend CI job runs on the committed `frontend/package-lock.json` and skips itself if you remove it (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
+Add the repository secret `ANTHROPIC_API_KEY` (optional: without it the review is skipped; and any deployment credentials your platform needs, stored as secrets) and the variables you need: `RUNNER_LABEL` (default `ubuntu-latest`) and optionally `AI_REVIEW_MODEL` (default `opus`). The round cap is `MAX_ROUNDS` in the workflow `env` (default 5); edit it there. The workflow pins each action to a commit SHA with the tag in a comment; re-resolve the SHA when you bump an action. The required review is local (the in-session pair plus `python3 scripts/ai_review_local.py --base origin/main --require`, no API key). Enable `.github/workflows/ai-pr-review.yml` as an optional second gate only if you set the key, and then make its check required on the integration branch; without the key the job is skipped and a green check is not a review. The frontend CI job runs on the committed `frontend/package-lock.json` and skips itself if you remove it (see `frontend/CLAUDE.md`). Try the local script first: `python3 scripts/ai_review_local.py --dry-run`. See [08](08-ai-ci-local-and-github.md).
 
 ### 11. Run your first slice
 
@@ -132,4 +132,4 @@ Start with the defaults in `docs/reference/model-selection-and-costs.md` (Opus a
 
 ## When something is wrong
 
-Agents give stale or wrong guidance: fix the instruction file, not just the output. A claim has no source: record a question. The loop hits its three re-loop cap: stop and re-examine the requirement or design, as [01](01-overview-and-pipeline.md) describes.
+Agents give stale or wrong guidance: fix the instruction file, not just the output. A claim has no source: record a question. The loop hits its five re-loop cap: stop and re-examine the requirement or design, as [01](01-overview-and-pipeline.md) describes.

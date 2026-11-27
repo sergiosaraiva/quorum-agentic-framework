@@ -13,7 +13,7 @@ How it works: it collects `git diff <base>...HEAD` (default `origin/main`); spli
 |--------|---------|
 | `--base` | Diff base; the parent branch for a stacked pull request |
 | `--model` | Model alias or id; default `sonnet` |
-| `--max-rounds` | Round cap, default 3 |
+| `--max-rounds` | Round cap, default 5 |
 | `--require` | Exit 2 instead of skipping when the `claude` CLI is missing, or when HEAD has no commits the base lacks; use it for the gate |
 | `--reset` | Reset the round counter after a human review |
 | `--dry-run` | Print the first prompt without calling a model |

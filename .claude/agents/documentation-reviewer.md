@@ -54,7 +54,7 @@ Critic half of the documentation writer-critic pair. Fresh context, read-only. V
 }
 ```
 
-The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Finding form: `_SHARED-PATTERNS.md`; `status` replaces `severity` and maps through "What blocks" (`claim` is agent-specific). Undocumented public surface is an `incomplete` finding whose `claim` is the surface name. Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `unverified`; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 3 rounds, then escalate to a human.
+The `reviewing-kb-chunks` skill adds statuses (`slop`, `redundant`, `not-self-contained`, `too-long`, `too-short`); all are non-blocking and listed in that skill. Finding form: `_SHARED-PATTERNS.md`; `status` replaces `severity` and maps through "What blocks" (`claim` is agent-specific). Undocumented public surface is an `incomplete` finding whose `claim` is the surface name. Style findings never block and carry no confidence score. Blocking: status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure`, reported at confidence >= 0.8 (lower goes in `unverified`; `_SHARED-PATTERNS.md`, "What blocks"); other statuses are reported and dispositioned. Findings loop back to the curator; cap 5 rounds, then escalate to a human.
 
 ## Tools
 

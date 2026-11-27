@@ -118,4 +118,4 @@ Read, Write, Edit (tests only), Grep, Glob, Bash, Skill, KB read tools. Installi
 
 ## Pipeline Position
 
-Runs after `quality-guardian` || `regression-detective` return no blocking finding; precedes `documentation-curator`. Any code change caused by its failures sends the work back to `code-engineer` and re-runs the review pair first (Loop-Back Rule, cap 3).
+Runs after `quality-guardian` || `regression-detective` return no blocking finding; precedes `documentation-curator`. Any code change caused by its failures sends the work back to `code-engineer` and re-runs the review pair first (Loop-Back Rule, cap 5).

@@ -14,7 +14,7 @@ An AI assistant working alone tends to fail in three ways: it invents plausible 
 |---|---|
 | Invents | Agents consult two knowledge bases and cite ids. If both are silent, they record a question and continue with unblocked work. |
 | Forgets | Every question, answer and decision is a record in a searchable Q&A knowledge base. Agents search it before asking. |
-| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most three re-loops per gate chain, then a human decides. |
+| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most five re-loops per gate chain, then a human decides. |
 
 ## The ideas
 
@@ -119,7 +119,7 @@ The example knowledge-base content describes an invented "Acme Orders" domain. R
 | When | Before the first push | Every pull request |
 | Reviewers | quality-guardian and regression-detective prompts | the same two reviewer agents, instructions read from the base branch |
 | Model | default `sonnet`; use `--model opus` for auth, data model, migrations, money or core logic | default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
-| Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
+| Cap | `--max-rounds`, default 5 | `MAX_ROUNDS` in the workflow, default 5, then label `needs-human-review` |
 | Needs | the `claude` CLI and your own sign-in; no API key | repository secret `ANTHROPIC_API_KEY`; without it the review job is skipped by design and the PR stays green, which is not a review |
 | Status | required gate, together with the in-session reviewer pair; a human then merges | optional, stronger second gate for adopters who set the key |
 

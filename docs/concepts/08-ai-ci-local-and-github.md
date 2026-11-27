@@ -13,7 +13,7 @@ Quorum reviews every change with AI before a human merges it. The required revie
 | Model | Default `sonnet` (`--model` overrides; `opus` for risky changes) | Default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
 | Reviewers run | `quality-guardian` and `regression-detective` prompts only | the same two reviewer agents |
 | Cost control | Cheaper model; capped rounds | Round cap in the workflow; escalation label |
-| Role | The required gate with the in-session pair: catches problems before the push. Capped at 3 rounds, then a human | Optional, stronger second gate when `ANTHROPIC_API_KEY` is set: visible to the team, the record of review |
+| Role | The required gate with the in-session pair: catches problems before the push. Capped at 5 rounds, then a human | Optional, stronger second gate when `ANTHROPIC_API_KEY` is set: visible to the team, the record of review |
 
 The local loop exists because a CI round costs minutes, tokens and reviewer attention. Catching the blocking defects before pushing keeps the PR history clean and the cap unused for real surprises. The GitHub loop exists because local review depends on discipline; with the key set, the PR check is a second gate nobody can forget.
 
@@ -42,7 +42,7 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--base` | git ref to diff against (default `origin/main`, or `AI_REVIEW_BASE`) |
 | `--model` | model for the review (default `sonnet`, or `AI_REVIEW_MODEL`) |
 | `--max-chunk-bytes` | size limit per chunk (default 60000); oversized hunks are split by lines, no code is dropped |
-| `--max-rounds` | round cap (default 3); at the cap the script exits with code 3 |
+| `--max-rounds` | round cap (default 5); at the cap the script exits with code 3 |
 | `--out-dir` | where findings and round state are written (default `.ai-review`) |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
 | `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH, or when HEAD has no commits the base lacks (a base that moved on is fine); use it for the gate |
@@ -68,7 +68,7 @@ The workflow has two jobs. The gate job counts review rounds; the review job run
 | Reviewer instructions | The first checkout is the base branch and is the working directory, so `CLAUDE.md` and `.claude/**` are read from it. The PR head is checked out into `pr-head/` inside the workspace (actions/checkout refuses paths outside it) as data only, and a step deletes its `CLAUDE.md` files, `.claude/` and `.mcp.json`. A PR therefore cannot weaken the reviewer's instructions; its changes to those files are reviewed as code through the diff. The workflow file is the exception: on `pull_request` GitHub runs it from the PR's merge ref, so a same-repo branch can edit it, and the edited copy runs with repository secrets before review (CODEOWNERS and branch protection only gate the merge). To keep the key from people with push access, store it as an environment secret behind required reviewers and add `environment:` to the review job (TQ-019) |
 | Knowledge bases | The reviewer has no KB MCP server in CI. It reads `kb/chunks/` and `questions/records/` directly |
 | Action pinning | Every action is pinned to a full commit SHA with the tag in a trailing comment. When you bump an action, re-resolve the SHA and keep the tag comment |
-| Round counter | After each review a workflow step posts one marker comment `<!-- ai-review-round -->` as `github-actions[bot]`; only comments from that author count. The gate counts them (round = count + 1) and compares with `MAX_ROUNDS` in the workflow `env` (default 3; edit it there) |
+| Round counter | After each review a workflow step posts one marker comment `<!-- ai-review-round -->` as `github-actions[bot]`; only comments from that author count. The gate counts them (round = count + 1) and compares with `MAX_ROUNDS` in the workflow `env` (default 5; edit it there) |
 | Escalation | At the cap the review job is skipped; if the label `needs-human-review` is not yet set, the gate adds it and posts one explanatory comment (never twice); a person takes over |
 | Model | Default `opus`; the repository variable `AI_REVIEW_MODEL` overrides it |
 | Required check | You can make the review a required status check; a PR that changes only files the reviewer excludes needs a documented way to satisfy it (not provided by the template) |
@@ -104,7 +104,7 @@ Three counters exist and they share no state:
 
 | Counter | Where it lives | Reset |
 |---------|----------------|-------|
-| Loop-back cap (3 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
+| Loop-back cap (5 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
 | Local `--max-rounds` | `.ai-review/state.json` (under `--out-dir`) | `--reset` drops the branch's count; the next completed round starts from 1 |
 | GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (edit the workflow on the PR branch); removing the label `needs-human-review` is optional housekeeping |
 
@@ -112,7 +112,7 @@ Running the local script does not consume GitHub rounds, and a GitHub round does
 
 ## Costs
 
-Each round costs the tokens of the diff plus context in, and the findings out. The local loop is the cheap filter: fix most things before the first PR round. The PR loop's cap bounds the worst case; with a three-round cap a single PR cannot loop indefinitely. Reduce spend by keeping PRs small and running the cheap deterministic checks (build, format, affected tests) before any AI call.
+Each round costs the tokens of the diff plus context in, and the findings out. The local loop is the cheap filter: fix most things before the first PR round. The PR loop's cap bounds the worst case; with a five-round cap a single PR cannot loop indefinitely. Reduce spend by keeping PRs small and running the cheap deterministic checks (build, format, affected tests) before any AI call.
 
 ## How they complement each other
 

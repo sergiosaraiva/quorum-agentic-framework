@@ -12,7 +12,7 @@ Reviewers are read-only and independent of the author. Build and tests are CI's 
 
 | Step | Detail |
 |------|--------|
-| Round gate | Counts earlier rounds as comments authored by `github-actions[bot]` that contain the marker `<!-- ai-review-round -->`; one marker comment is posted per finished round. At `MAX_ROUNDS` (env in the workflow, default 3) it adds the label `needs-human-review` once and stops reviewing |
+| Round gate | Counts earlier rounds as comments authored by `github-actions[bot]` that contain the marker `<!-- ai-review-round -->`; one marker comment is posted per finished round. At `MAX_ROUNDS` (env in the workflow, default 5) it adds the label `needs-human-review` once and stops reviewing |
 | Reviewer instructions | `CLAUDE.md` and `.claude/**` are read from the BASE branch checkout, not the PR head, so a PR cannot weaken its reviewer's instructions. The workflow file itself runs from the PR's merge ref with repository secrets before review (CODEOWNERS gates only the merge); to keep the key from people with push access use an environment secret behind required reviewers (TQ-019) |
 | Model | Default `opus`; the repository variable `AI_REVIEW_MODEL` overrides it |
 | Review | Runs the `quality-guardian` and `regression-detective` subagents on the PR diff |

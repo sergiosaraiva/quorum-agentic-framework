@@ -211,6 +211,20 @@ class StateTests(unittest.TestCase):
             self.assertIn("round 1/3", run_on("feature/b"))  # a new branch starts fresh
             self.assertIn("round 4/3", run_on("feature/a"))  # feature/a keeps its own count
 
+    def test_default_round_cap_is_five(self):
+        import contextlib
+        import io
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            args = ["--out-dir", tmp, "--base", "origin/main", "--dry-run"]  # no --max-rounds: the default applies
+            err = io.StringIO()
+            with mock.patch.object(air, "get_diff", return_value=make_diff("a.cs", ["x"])), \
+                    mock.patch.object(air, "current_branch", return_value="feature/c"), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                self.assertEqual(air.main(args), 0)
+            self.assertIn("round 1/5", err.getvalue())
+
 
 class SeverityMappingTests(unittest.TestCase):
     def test_each_mapping(self):

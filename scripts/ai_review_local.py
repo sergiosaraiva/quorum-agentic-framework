@@ -10,7 +10,7 @@ review is an optional second gate that runs only when ANTHROPIC_API_KEY is set.
 
 Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and
 --require is not set; 1 blocking findings; 2 usage or environment error (bad or option-like --base,
-failed git diff, model call failure, malformed model output); 3 round cap reached (hand the branch to a human).
+failed git diff, model call failure, malformed model output); 3 the review-round cap (--max-rounds, default 5) is already used up (hand the branch to a human).
 
 The reviewer runs read-only: `--tools` restricts the built-in tools to Read, Grep and Glob, `--disallowedTools`
 denies Bash, the write tools and every MCP tool (`mcp__*`; `--tools` does not affect MCP tools), and
@@ -395,7 +395,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--model", default=os.environ.get("AI_REVIEW_MODEL", "sonnet"),
                     help="model alias or id; env AI_REVIEW_MODEL (default: sonnet)")
     ap.add_argument("--max-chunk-bytes", type=int, default=int(os.environ.get("AI_REVIEW_CHUNK_BYTES", "60000")))
-    ap.add_argument("--max-rounds", type=int, default=3)
+    ap.add_argument("--max-rounds", type=int, default=5, help="review round cap per branch (default: 5; owner decision OD-031)")
     ap.add_argument("--out-dir", default=".ai-review")
     ap.add_argument("--claude-bin", default=os.environ.get("CLAUDE_BIN", "claude"))
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")

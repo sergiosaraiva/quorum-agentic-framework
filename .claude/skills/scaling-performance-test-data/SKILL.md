@@ -51,7 +51,7 @@ SELECT uuidv7(),
        (ARRAY['draft','placed','paid','shipped','closed'])[1 + floor(random() * 5)::int],
        round((random() * 5000)::numeric, 2),
        :fixed_timestamp::timestamptz - (random() * interval '365 days'),
-       :fixed_timestamp::timestamptz - (random() * interval '365 days')
+       :fixed_timestamp::timestamptz  -- updated_at: never before created_at
 FROM picks p
 JOIN tmp_customer_rank c USING (rn);
 ```

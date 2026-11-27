@@ -48,6 +48,12 @@ class DanglingRefTests(TreeCase):
     def test_fixture_tree_has_no_dangling_reference(self):
         self.assertEqual(self.refs(), [])
 
+    def test_empty_or_malformed_defined_ids_add_no_prefix(self):
+        # A record without an id loads as id ""; it must not turn every `-NNN` (ISO-8601, VS-003) into a citation.
+        write(self.root / "CLAUDE.md", "Dates follow ISO-8601; slice VS-003.\n")
+        found = check_chunks.dangling_refs(self.root, {"", "not-an-id", "QF-001"})
+        self.assertEqual([r for r in found if r[0] == "CLAUDE.md"], [])
+
     def test_undefined_id_is_reported_per_file_and_id_once(self):
         write(self.root / "CLAUDE.md", "See OD-001 and OD-777, again OD-777 and BC-404.\n")
         self.assertEqual(self.refs(), ["CLAUDE.md: cites BC-404, which no chunk or record defines",

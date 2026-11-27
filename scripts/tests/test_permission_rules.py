@@ -104,6 +104,11 @@ class PermissionRuleTests(unittest.TestCase):
         for pattern in ("git log:*", "git diff:*", "git status:*", "scripts/run-mutation-tests.sh:*", "python3 scripts/kb/search.py:*", "dotnet build:*", "npm test"):
             self.assertFalse(is_read_only(pattern), pattern)
 
+    def test_local_sessions_ask_before_git_output(self):
+        # git log|diff|show --output=<path> writes files; the allow-listed git rules must not run it unprompted.
+        ask = [m.group(1) for m in (RULE.match(r) for r in json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]) if m]
+        self.assertTrue(any(pattern_matches(p, "git log -1 --format=x --output=.git/config") for p in ask), ask)
+
     def test_removing_the_git_deny_makes_the_check_fail(self):
         # git log|diff|show --output=<path> writes files, so the allow-listed git rules must stay denied in CI.
         self.assertIn("git log:*", uncovered(self.allow, [d for d in self.deny if d != "git:*"]))

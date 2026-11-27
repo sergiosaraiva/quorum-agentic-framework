@@ -131,6 +131,9 @@ RULES = [
      "Deleting local branches is blocked. Ask the user."),
     ("git discard changes", lambda c, a: c == "git" and discards_changes(a),
      "Discarding working-tree changes (checkout . or -- <paths>, switch -f, restore . or --source or --worktree) is blocked. Ask the user."),
+    ("git --output", lambda c, a: c == "git" and a[:1] in (["log"], ["diff"], ["show"], ["whatchanged"])
+     and any(x.startswith("--output") for x in a[1:]),
+     "git log|diff|show --output=<path> writes files (for example .git/config) and is blocked. Redirect stdout instead."),
     ("rm -rf", lambda c, a: c == "rm" and rm_force_recursive(a),
      "rm with recursive and force together is blocked. Delete specific files, or rm -r without -f, or ask the user."),
     ("dotnet ef database", lambda c, a: c == "dotnet" and "ef" in a and "database" in a and bool({"update", "drop"} & set(a)),
@@ -355,7 +358,10 @@ class Parser:
         # nested subshells such as `((a) ; (b))`, which run commands and must be lexed as such.
         pairs = paren_matches(self.s)
         close = pairs.get(i, -1)
-        return close + 1 if close > i + 2 and pairs.get(i + 1) == close - 1 else -1
+        if close <= i + 2 or pairs.get(i + 1) != close - 1:
+            return -1
+        # A quote or backslash in the span can hide a paren from this raw matcher: lex it as commands (fail closed).
+        return -1 if any(q in self.s[i:close] for q in "'\"\\") else close + 1
 
     def redirect(self):
         s, i = self.s, self.i

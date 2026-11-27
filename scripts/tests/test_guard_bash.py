@@ -10,6 +10,13 @@ from pathlib import Path
 GUARD = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "guard_bash.py"
 
 BLOCKED = [
+    # a quoted or escaped paren must not make subshells look like arithmetic
+    '((true "(" ); (git push -f; echo ")"))',
+    "((true \\( ); (git push -f origin main; echo \\)))",
+    # git --output writes files (quoted or not)
+    "git log -1 --format=x --output=.git/config",
+    "git log -1 '--output=.git/config'",
+    "git -C . diff --output x",
     # nested subshells that start with `((` are not arithmetic (Bash runs both commands)
     "((git push -f); (true))",
     "((true); (git push -f))",

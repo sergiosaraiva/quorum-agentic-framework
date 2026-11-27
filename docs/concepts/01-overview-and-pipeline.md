@@ -4,7 +4,7 @@ Quorum is a template for building software with a team of AI agents instead of a
 
 ## The idea in one paragraph
 
-An AI that writes code and also approves it is a single point of failure, and an AI that fills gaps in the requirements with plausible guesses is a liability. Quorum answers both. Every product claim must be grounded in a record (a knowledge-base chunk or a recorded decision), and the agent that produced a change is never the one that approves it. Independent reviewers with fresh context validate the work, findings go back to the producer, and after three failed rounds a human decides.
+An AI that writes code and also approves it is a single point of failure, and an AI that fills gaps in the requirements with plausible guesses is a liability. Quorum answers both. Every product claim must be grounded in a record (a knowledge-base chunk or a recorded decision), and the agent that produced a change is never the one that approves it. Independent reviewers with fresh context validate the work, findings go back to the producer, and after five failed rounds a human decides.
 
 ## The twelve agents
 

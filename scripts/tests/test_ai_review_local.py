@@ -485,6 +485,128 @@ class RequireRealBaseTests(unittest.TestCase):
         self.assertEqual(self.main_code("--base", self.first, "--require", "--dry-run")[0], 0)
 
 
+class AnchoredBaseTests(unittest.TestCase):
+    """--require with a remote configured: the base must be anchored to shared history, so `--base HEAD~1` (a producer
+    narrowing the review to the last commit, with the reviewer prompts read from a branch commit) is rejected."""
+    GIT = ReviewerPromptsFromBaseTests.GIT
+    main_code = RequireRealBaseTests.main_code
+
+    def commit(self, name: str, text: str = "x\n") -> str:
+        (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / name).write_text(text, encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", name)
+        return self.git("rev-parse", "HEAD")
+
+    def setUp(self):
+        import subprocess
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        tmp = Path(self._tmp.name)
+        self.root, self.remote, self.out = tmp / "repo", tmp / "remote.git", str(tmp / "out")
+        self.root.mkdir()
+        self.git = lambda *a: subprocess.run([*self.GIT, *a], cwd=self.root, capture_output=True, text=True, check=True).stdout.strip()
+        self.git("init", "-q", "-b", "main")
+        self.commit(".claude/skills/pr-review/SKILL.md", "SKILL v1\n")
+        self.commit("a.txt")
+        self.fork = self.git("rev-parse", "HEAD")
+
+    def with_remote(self):
+        """A bare remote holding main, so that origin/main exists as a remote-tracking ref."""
+        import subprocess
+        subprocess.run(["git", "init", "-q", "--bare", str(self.remote)], check=True, capture_output=True)
+        self.git("remote", "add", "origin", str(self.remote))
+        self.git("push", "-q", "origin", "main")
+
+    def feature_branch(self, push: bool = False):
+        self.git("checkout", "-q", "-b", "feat")
+        self.commit("f1.txt")
+        self.commit("f2.txt")
+        if push:
+            self.git("push", "-q", "origin", "feat")
+
+    def test_head_minus_one_is_rejected_when_a_remote_exists_even_after_the_branch_is_pushed(self):
+        self.with_remote()
+        self.feature_branch(push=True)  # origin/feat now contains HEAD~1
+        code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("not anchored to shared history", err)
+
+    def test_head_minus_one_is_rejected_before_the_branch_is_pushed(self):
+        self.with_remote()
+        self.feature_branch()
+        self.assertEqual(self.main_code("--base", "HEAD~1", "--require", "--dry-run")[0], 2)
+
+    def test_the_branchs_own_remote_counterpart_is_rejected_as_a_base(self):
+        self.with_remote()
+        self.feature_branch(push=True)
+        self.commit("f3.txt")
+        code, _, err = self.main_code("--base", "origin/feat", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("not anchored", err)
+
+    def test_origin_main_is_accepted(self):
+        self.with_remote()
+        self.feature_branch(push=True)
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+
+    def test_a_local_branch_cut_from_a_remote_one_is_accepted(self):
+        self.with_remote()
+        self.feature_branch()
+        self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 0)
+
+    def test_a_diverged_base_is_accepted(self):
+        self.with_remote()
+        self.feature_branch()
+        self.git("checkout", "-q", "main")
+        self.commit("m1.txt")
+        self.git("push", "-q", "origin", "main")  # main moved on after feat was cut
+        self.git("checkout", "-q", "feat")
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 0)
+
+    def test_a_remote_without_fetched_branches_cannot_anchor_a_base(self):
+        import subprocess
+        subprocess.run(["git", "init", "-q", "--bare", str(self.remote)], check=True, capture_output=True)
+        self.git("remote", "add", "origin", str(self.remote))  # never pushed or fetched: no remote-tracking refs
+        self.feature_branch()
+        self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 2)
+
+    def test_without_any_remote_the_old_behaviour_stays_with_a_notice(self):
+        self.feature_branch()
+        code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertIn("no git remote is configured", err)
+
+    def test_without_require_the_base_is_not_checked_against_the_remote(self):
+        self.with_remote()
+        self.feature_branch()
+        self.assertEqual(self.main_code("--base", "HEAD~1", "--dry-run")[0], 0)
+
+    def test_prompts_are_read_at_the_merge_base_not_at_a_base_that_moved_on(self):
+        self.with_remote()
+        self.feature_branch()
+        self.git("checkout", "-q", "main")
+        self.commit(".claude/skills/pr-review/SKILL.md", "SKILL v2 moved on\n")
+        self.git("push", "-q", "origin", "main")
+        self.git("checkout", "-q", "feat")
+        import contextlib
+        import io
+        from unittest import mock
+        fw = self.root / ".claude"
+        out = io.StringIO()
+        with mock.patch.object(air, "REPO_ROOT", self.root), mock.patch.object(air, "FRAMEWORK_DIR", fw), \
+                mock.patch.object(air, "SKILL_PATH", fw / "skills" / "pr-review" / "SKILL.md"), \
+                contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(out):
+            self.assertEqual(air.main(["--out-dir", self.out, "--base", "origin/main", "--dry-run"]), 0)
+            self.assertEqual(air.review_revision("origin/main"), self.fork)
+        self.assertIn("SKILL v1", out.getvalue())
+        self.assertNotIn("moved on", out.getvalue())
+
+
 class ExtractJsonObjectTests(unittest.TestCase):
     def test_empty_example_before_real_findings_does_not_mask_them(self):
         text = ('An empty result looks like {"findings": []}. Actual: '

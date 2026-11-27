@@ -9,7 +9,9 @@ An example file is a chunk under `kb/chunks/` or a record under `questions/recor
 `example: true`. `--apply` is plain file deletion; commit the result yourself. After deleting it regenerates
 `kb/TOC.md` (when the file exists) and prints, grouped by file, every remaining citation of a removed id in the
 files the dangling-reference check of check_chunks.py scans (ids listed in scripts/kb/ref-ignore.txt are skipped).
-Exit code 0 on success, 2 on a usage or I/O error.
+A delete that fails (a read-only file, a permission error) is reported on stderr and does not stop the run: the TOC is still
+regenerated and the remaining citations are still listed. Exit code 0 on success, 2 on a usage or I/O error or when any
+delete failed.
 """
 from __future__ import annotations
 
@@ -63,21 +65,32 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     examples = find_examples(root)
-    for path, _ in examples:
-        print(f"{'delete' if a.apply else 'would delete'}  {path.relative_to(root).as_posix()}")
-    print(f"{len(examples)} example file(s) with `example: true`")
     if not a.apply:
+        for path, _ in examples:
+            print(f"would delete  {path.relative_to(root).as_posix()}")
+        print(f"{len(examples)} example file(s) with `example: true`")
         print("dry run: nothing deleted; re-run with --apply to delete them")
         return 0
 
-    try:
-        for path, _ in examples:
+    failed: list[Path] = []
+    deleted: set[str] = set()
+    for path, rid in examples:  # a `delete` line is printed only once the file is really gone
+        try:
             path.unlink()
+        except OSError as exc:
+            print(f"error: cannot delete {path.relative_to(root).as_posix()}: {exc}", file=sys.stderr)
+            failed.append(path)
+        else:
+            deleted.add(rid)
+            print(f"delete  {path.relative_to(root).as_posix()}")
+    print(f"{len(examples)} example file(s) with `example: true`")
+
+    try:
         toc = root / "kb" / "TOC.md"
         if toc.is_file():
             check_chunks.write_toc(root / "kb")
             print("regenerated kb/TOC.md")
-        citations = remaining_citations(root, {rid for _, rid in examples})
+        citations = remaining_citations(root, deleted)
     except OSError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -90,6 +103,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("\nno remaining citation of a removed id")
     print(CLOSING)
+    if failed:
+        print(f"error: {len(failed)} file(s) could not be deleted; fix the cause and run again", file=sys.stderr)
+        return 2
     return 0
 
 

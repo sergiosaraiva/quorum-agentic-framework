@@ -634,6 +634,41 @@ class BackendSelectionTests(unittest.TestCase):
         self.assertIn("--stats", err.getvalue())
 
 
+class SearchRootTests(unittest.TestCase):
+    def usage_error(self, *argv):
+        import contextlib
+        import io
+        import search
+        with contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()), \
+                self.assertRaises(SystemExit) as cm:
+            search.main(list(argv))
+        self.assertEqual(cm.exception.code, 2)
+        return err.getvalue()
+
+    def test_root_with_the_pg_backend_is_rejected_not_ignored(self):
+        err = self.usage_error("order", "--backend", "pg", "--root", str(FIXTURES))
+        self.assertIn("--root only applies to the local backend", err)
+
+    def test_a_root_without_kb_chunks_or_records_is_rejected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("no kb/chunks and no questions/records", self.usage_error("order", "--root", tmp))
+            (Path(tmp) / "kb" / "chunks").mkdir(parents=True)
+            err = self.usage_error("order", "--root", tmp)
+            self.assertIn("no questions/records", err)
+            self.assertNotIn("no kb/chunks", err)
+
+    def test_a_mistyped_root_is_an_error_not_an_empty_result(self):
+        self.assertIn("--root /tmp/does-not-exist-typo", self.usage_error("order", "--root", "/tmp/does-not-exist-typo"))
+
+    def test_a_valid_root_still_works(self):
+        import contextlib
+        import io
+        import search
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(search.main(["refund", "--root", str(FIXTURES)]), 0)
+
+
 class Bm25QueryTests(unittest.TestCase):
     def test_repeated_query_words_do_not_change_the_ranking_scores(self):
         bm = lib.BM25([("a", "refund window"), ("b", "refund policy for orders"), ("c", "shipping")])

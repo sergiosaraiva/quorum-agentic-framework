@@ -102,7 +102,7 @@ An executor model does the work. A stronger advisor model is consulted at key po
 3. Right-size the model per agent (section 3).
 4. Right-size effort per agent (section 4).
 5. Batch work that can wait (50% discount): nightly KB re-embedding, bulk chunk review, overnight regression sweeps.
-6. Cap loops: the 3-round review cap bounds the worst case at a known number of calls.
+6. Cap loops: the 5-round review cap bounds the worst case at a known number of calls.
 7. Cap output: set `max_tokens` and ask for structured findings, not essays.
 8. Use task budgets on long agent runs so the model paces itself instead of being cut off.
 9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs and ends in fewer rounds.

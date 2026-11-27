@@ -143,6 +143,44 @@ class RemoveExamplesTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("denied", err)
 
+    def test_a_failed_delete_in_the_middle_still_regenerates_the_toc_and_lists_citations_then_exits_2(self):
+        from unittest import mock
+        victim = sorted(p for p, _ in remove_examples.find_examples(self.root))[4]  # a read-only file in the middle
+        real_unlink = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == victim:
+                raise PermissionError(13, "Permission denied", str(path))
+            return real_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", unlink):
+            code, out, err = run("--root", str(self.root), "--apply")
+        rel = victim.relative_to(self.root).as_posix()
+        self.assertEqual(code, 2)
+        self.assertIn(f"cannot delete {rel}", err)
+        self.assertTrue(victim.exists())
+        self.assertNotIn(f"delete  {rel}", out)  # a delete line only after a successful unlink
+        self.assertEqual(out.count("delete  "), 9)
+        self.assertIn("regenerated kb/TOC.md", out)  # still done after the failure
+        self.assertEqual(check_chunks.stale_toc(self.root / "kb"), [])
+        self.assertIn("remaining citation(s) of a removed id", out)  # still reported
+        self.assertTrue(out.rstrip().endswith("are removed separately."))
+        self.assertIn("1 file(s) could not be deleted", err)
+
+    def test_the_id_of_a_file_that_could_not_be_deleted_is_not_reported_as_removed(self):
+        from unittest import mock
+        victim = self.chunks / "BC-003-refund-policy.md"
+        real_unlink = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == victim:
+                raise PermissionError(13, "Permission denied", str(path))
+            return real_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", unlink):
+            _, out, _ = run("--root", str(self.root), "--apply")
+        self.assertIn("  CLAUDE.md: OD-001\n", out)  # CLAUDE.md also cites BC-003, which still exists, so it is not listed
+
     def test_frontmatter_id_is_used_not_the_filename(self):
         (self.records / "OD-001.md").unlink()
         (self.records / "scratch.md").write_text(

@@ -21,11 +21,15 @@ settings.json on purpose, so a missing interpreter cannot block every Bash call)
 layer. stdin is read as bytes and decoded as UTF-8 with replacement, so a non-UTF-8 locale cannot turn a non-ASCII
 command into a fail-open.
 
-Covered, beyond the rules in RULES: `git` global options (`-C`, `-c`, `--git-dir`...) and `-c alias.*`; env assignments and
-wrappers (sudo, env, command, time, nice, ionice, setsid, stdbuf, flock, timeout, xargs, busybox...); `sh -c '<script>'`
+Covered, beyond the rules in RULES: `git` global options (`-C`, `-c`, `--git-dir`...) and `-c alias.*`, `-c clean.requireForce=false` and a
+dashed git binary (`/usr/lib/git-core/git-push` is `git push`); env assignments and wrappers (sudo, env, command, time, nice,
+ionice, setsid, stdbuf, flock, timeout, xargs, busybox...) including short-option clusters read like getopt (`sudo -Eu root`);
+the comma form of brace expansion in an unquoted word (`git push {--force,origin}`); `dotnet build|test|run|msbuild|publish|pack`
+with `-p:PreBuildEvent=` or `-p:PostBuildEvent=` (they run commands); `sh -c '<script>'`
 (also after `--`); substitutions `$(...)`, backticks and `<(...)` anywhere outside single quotes; `find -exec|-execdir|-ok|-okdir
 <command>`; unambiguous long-option prefixes of 3+ characters (`--recur`, `--forc`); heredocs recognised only outside quotes and
-comments, with the body skipped as data unless it feeds a shell or stdin-reading interpreter (checked as a script) or the
+comments, with the body (or here-string word, `bash <<< '...'`) skipped as data unless it feeds a shell (checked as a script; text fed
+to python, perl, node... is data, only a download piped into it is blocked) or the
 closing delimiter never appears (then the rest is checked as commands in the same parser); downloads piped into a shell or
 interpreter, including `/dev/stdin`, `-`, `sh -c "$(cat)"`, `busybox sh` and a `( ... )` wrapper; ANSI-C quoting `$'...'`
 (decoded: \n \t \' \\ \xHH and the other common escapes) and locale quoting `$"..."`; arithmetic `$(( ))`, `(( ))` and
@@ -38,12 +42,18 @@ Known gaps (not fixed; best effort, not a sandbox):
   arithmetic spans became opaque, which fixed `1 << 2` being read as a heredoc), and inside unquoted-heredoc bodies; a
   quoted `((` or `))` inside arithmetic, which shifts where the span is taken to end; `for ((...)) do` without a `;`;
   a NUL inside `$'...'` (Bash cuts the word there, e.g. `$'--force\0x'`); scripts that run a destructive command internally
-  and heredoc bodies fed to interpreters (`python3 - <<EOF`) beyond what a shell parse of the text shows; nesting deeper than
+  and heredoc bodies or here-strings fed to interpreters (`python3 - <<EOF`), which are not inspected at all; nesting deeper than
   MAX_NEST or MAX_DEPTH (blocked, fail closed).
 - Wrapper long options that take a separate value: `sudo --user root ...`, `timeout --signal KILL 5 ...`, `nice --adjustment 5`,
   `ionice --class 3`, `env --chdir d` and `env --unset X`, `stdbuf --output L`, `xargs --max-args 1` and `xargs -a f` /
   `--arg-file f`; `env -S` / `--split-string`; `flock f --command '...'`; wrappers not listed (su -c, ssh, docker run,
   watch...).
+- Brace sequences (`{a..b}`) are not expanded, and a brace expansion that yields over MAX_BRACE words is blocked (fail closed).
+- dotnet: a build event set through the environment (`PostBuildEvent=cmd dotnet build`), `Directory.Build.props`, a response file
+  (`@x.rsp`) or the project file; `-l:`/`--logger`/`--test-adapter-path` load code (the settings `ask` list covers them).
+- Destructive commands not covered by RULES: `git update-ref -d`, `git stash clear|drop`, `git worktree remove --force`,
+  `git branch -M|-C` (force rename or copy over a branch), `gh api -X DELETE` (the settings `ask` list covers it). `gh pr merge`
+  is not blocked here; it is under `ask` in settings.json, so the user is prompted.
 - git: `--config-env x` and `--attr-source x` with a separated value, `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` /
   `GIT_CONFIG_VALUE_n` environment configuration, `-c remote.*.mirror` and `-c remote.*.push`, aliases defined in config files
   and other `-c` hooks (`core.pager`, `core.sshCommand`); `git checkout <path>`, `git checkout -f` and `git restore <file>`
@@ -63,7 +73,7 @@ SHELL_RE = re.compile(r"^(ba|z|da|k|c|tc|fi|a)?sh$")
 INTERP_RE = re.compile(r"^(python[\d.]*|perl|ruby|node|php|deno)$")
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # wrapper -> options that consume the next token (stripped before matching the real command)
-WRAPPERS = {"sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U"}, "env": {"-u", "-C", "-S"}, "command": set(),
+WRAPPERS = {"sudo": {"-u", "-g", "-h", "-p", "-r", "-t", "-C", "-D", "-R", "-T", "-U"}, "env": {"-u", "-C", "-S"}, "command": set(),
             "builtin": set(), "exec": set(), "time": set(), "nohup": set(), "nice": {"-n"}, "timeout": {"-s", "-k"},
             "xargs": {"-I", "-n", "-P", "-d", "-E", "-L", "-s"}, "setsid": set(), "stdbuf": {"-i", "-o", "-e"},
             "ionice": {"-c", "-n", "-p", "-P", "-u"}, "flock": {"-w", "-E", "--timeout", "--conflict-exit-code"},
@@ -79,6 +89,15 @@ STDIN_PATHS = {"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"}
 FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
 MAX_DEPTH = 3  # nested `sh -c`, heredoc scripts and find -exec commands
 MAX_NEST = 8  # nested substitutions while lexing
+MAX_BRACE = 1024  # words one brace expansion may produce; beyond it the command is blocked (fail closed)
+# Unquoted `{`, `,` and `}` are kept as private-use marks while a word is lexed, so that quoted or escaped ones are not
+# brace-expanded and `${x}` is left alone; the marks are mapped back when the word ends.
+BRACE_MARKS = {"{": "\ue000", ",": "\ue001", "}": "\ue002"}
+BRACE_OPEN, BRACE_COMMA, BRACE_CLOSE = BRACE_MARKS.values()
+BRACE_RESTORE = str.maketrans({v: k for k, v in BRACE_MARKS.items()})
+DOTNET_BUILD_COMMANDS = {"build", "test", "run", "msbuild", "publish", "pack"}
+BUILD_EVENT_PROPERTY = re.compile(r"^(--?|/)(p|property):.*(pre|post)buildevent", re.IGNORECASE | re.DOTALL)
+GIT_FALSE_VALUES = {"false", "no", "off", "0", ""}
 
 
 def has_flag(args, short, *long):
@@ -94,6 +113,69 @@ def has_flag(args, short, *long):
         elif a.startswith("-") and set(a[1:]) & set(short):
             return True
     return False
+
+
+BRANCH_VALUE_OPTIONS = ("--sort", "--format", "--points-at")  # git branch long options whose separate value may look like a flag
+
+
+def branch_deletes(args):
+    """git branch with -d, -D or --delete. The value after --sort, --format or --points-at is skipped (`--sort -committerdate`
+    is not -d); --contains, --merged and their --no- forms only take a dash-free value, and --color and --column only an
+    `=value`, so nothing is skipped after them (`--merged -D x` still deletes)."""
+    kept, skip = [], False
+    for a in args[1:]:
+        if skip:
+            skip = False
+            continue
+        kept.append(a)
+        name = a.split("=", 1)[0]
+        if a.startswith("--") and "=" not in a and any(name == f or (len(name) >= 5 and f.startswith(name)) for f in BRANCH_VALUE_OPTIONS):
+            skip = True
+    return has_flag(kept, "dD", "--delete")
+
+
+def takes_value(option, value_options):
+    """True if a wrapper option consumes the next token. A short-option cluster is read like getopt: letters are
+    scanned in order, and the first one that takes a value either ends the cluster (attached value, `-uroot`) or, as the
+    last letter, takes the next token (`-Eu root`)."""
+    if option in value_options:
+        return True
+    if not option.startswith("-") or option.startswith("--") or len(option) < 3:
+        return False
+    for k, letter in enumerate(option[1:], 1):
+        if "-" + letter in value_options:
+            return k == len(option) - 1
+    return False
+
+
+def expand_braces(word, budget=None):
+    """Comma brace expansion of a word whose unquoted braces and commas are BRACE_MARKS: `--{force,x}` -> `--force`, `--x`.
+    The leftmost group with a top-level comma is expanded, recursively. `{a..b}` sequences are not expanded (Known gaps).
+    Raises TooDeep past MAX_BRACE results."""
+    budget = [MAX_BRACE] if budget is None else budget
+    budget[0] -= 1
+    if budget[0] < 0:
+        raise TooDeep
+    if BRACE_COMMA not in word:
+        return [word]
+    stack, best = [], None
+    for k, ch in enumerate(word):
+        if ch == BRACE_OPEN:
+            stack.append((k, []))
+        elif ch == BRACE_COMMA and stack:
+            stack[-1][1].append(k)
+        elif ch == BRACE_CLOSE and stack:
+            opened, commas = stack.pop()
+            if commas and (best is None or opened < best[0]):
+                best = (opened, k, commas)
+    if best is None:
+        return [word]
+    opened, closed, commas = best
+    bounds = [opened, *commas, closed]
+    out = []
+    for lo, hi in zip(bounds, bounds[1:]):
+        out += expand_braces(word[:opened] + word[lo + 1:hi] + word[closed + 1:], budget)
+    return out
 
 
 def refspec(args, prefix):  # push refspec `+main` forces, `:branch` deletes
@@ -113,6 +195,29 @@ def discards_changes(args):
     return False
 
 
+def git_output_option(args):  # `--output` and `--output=<path>`; --output-indicator-* is a harmless display option
+    return any(x == "--output" or x.startswith("--output=") for x in args)
+
+
+def clean_unforced(config):
+    """True if a git `-c clean.requireForce=<false>` (or --config-env) lets `git clean` delete without -f."""
+    for value in config:
+        key, _, setting = value.partition("=")
+        if key.lower() == "clean.requireforce" and "=" in value and setting.strip().lower() not in ("true", "yes", "on", "1"):
+            return True
+    return False
+
+
+def dotnet_build_event(args):
+    """`dotnet build|test|run|msbuild|publish|pack` with a property override of PreBuildEvent or PostBuildEvent, which runs
+    an arbitrary command (-p:, /p:, -property:, --property:)."""
+    if "--" in args:
+        args = args[:args.index("--")]
+    if next((x for x in args if not x.startswith("-")), "") not in DOTNET_BUILD_COMMANDS:
+        return False
+    return any(BUILD_EVENT_PROPERTY.match(x) for x in args)
+
+
 def rm_force_recursive(args):
     return has_flag(args, "rR", "--recursive") and has_flag(args, "f", "--force")
 
@@ -124,24 +229,27 @@ RULES = [
     ("git push delete", lambda c, a: c == "git" and a[:1] == ["push"] and (has_flag(a, "d", "--delete", "--prune") or refspec(a[1:], ":")),
      "Deleting remote branches (--delete, --prune, :branch) is blocked. Ask the user to do it."),
     ("git reset --hard", lambda c, a: c == "git" and a[:1] == ["reset"] and has_flag(a, "", "--hard"),
-     "git reset --hard discards work and is blocked. Use git stash or a targeted checkout after asking."),
+     "git reset --hard discards work and is blocked. Check git status or git stash instead, or ask the user to run it."),
     ("git clean force", lambda c, a: c == "git" and a[:1] == ["clean"] and has_flag(a, "f", "--force"),
-     "git clean -f deletes untracked files and is blocked. Preview with git clean -n and ask the user."),
-    ("git branch delete", lambda c, a: c == "git" and a[:1] == ["branch"] and has_flag(a, "dD", "--delete"),
+     "git clean -f deletes untracked files and is blocked. List untracked files with git status and ask the user to run it."),
+    ("git branch delete", lambda c, a: c == "git" and a[:1] == ["branch"] and branch_deletes(a),
      "Deleting local branches is blocked. Ask the user."),
     ("git discard changes", lambda c, a: c == "git" and discards_changes(a),
      "Discarding working-tree changes (checkout . or -- <paths>, switch -f, restore . or --source or --worktree) is blocked. Ask the user."),
     ("git --output", lambda c, a: c == "git" and a[:1] in (["log"], ["diff"], ["show"], ["whatchanged"])
-     and any(x.startswith("--output") for x in a[1:]),
+     and git_output_option(a[1:]),
      "git log|diff|show --output=<path> writes files (for example .git/config) and is blocked. Redirect stdout instead."),
     ("rm -rf", lambda c, a: c == "rm" and rm_force_recursive(a),
-     "rm with recursive and force together is blocked. Delete specific files, or rm -r without -f, or ask the user."),
+     "rm with recursive and force together is blocked. Delete specific paths one by one, or ask the user."),
+    ("dotnet build event", lambda c, a: c == "dotnet" and dotnet_build_event(a),
+     "dotnet with -p:PreBuildEvent=... or -p:PostBuildEvent=... runs an arbitrary command and is blocked. Set build events in the project file, reviewed."),
     ("dotnet ef database", lambda c, a: c == "dotnet" and "ef" in a and "database" in a and bool({"update", "drop"} & set(a)),
      "dotnet ef database update|drop is blocked: migrations are reviewed first and applied by the deploy pipeline (Immutable Rule 2). Use migrations script."),
     ("terraform apply", lambda c, a: c == "terraform" and next((x for x in a if not x.startswith("-")), "") in ("apply", "destroy"),
      "terraform apply|destroy is blocked: infrastructure changes go through reviewed code and the pipeline."),
 ]
 DOWNLOAD_REASON = "Piping a download into a shell or interpreter (curl|wget ... | sh) is blocked. Download to a file, review it, then run it."
+CLEAN_REASON = "git -c clean.requireForce=false lets git clean delete untracked files without -f and is blocked. List untracked files with git status and ask the user to run it."
 ALIAS_REASON = "git -c alias.* defines a command that the rules cannot see and is blocked. Run the git command directly."
 DEEP_REASON = "The command nests substitutions, scripts or find -exec too deeply to inspect and is blocked. Simplify it."
 
@@ -183,7 +291,7 @@ class Parser:
         self.s, self.i, self.depth = s, i, depth
         self.extra = [] if extra is None else extra
         self.segs, self.cur, self.pending = [], Seg(), []
-        self.word, self.has_word, self.skip_word = [], False, False
+        self.word, self.has_word, self.skip_word, self.herestring = [], False, False, False
         self.unclosed = set()  # heredoc (delimiter, strip_tabs) pairs already known to have no closing line
 
     def add(self, text):
@@ -191,15 +299,21 @@ class Parser:
         self.has_word = True
 
     def end_word(self):
+        text = "".join(self.word)
         if self.has_word and not self.skip_word:
-            self.cur.words.append("".join(self.word))
+            variants = expand_braces(text)
+            if len(variants) > 1:  # an empty result of `{,git}` is removed by Bash
+                variants = [v for v in variants if v]
+            self.cur.words.extend(v.translate(BRACE_RESTORE) for v in variants)
+        elif self.has_word and self.herestring:  # `bash <<< 'script'`: the word is data for the command, like a heredoc body
+            self.cur.bodies.append(text.translate(BRACE_RESTORE))
         if self.has_word:
-            self.skip_word = False
+            self.skip_word = self.herestring = False
         self.word, self.has_word = [], False
 
     def end_seg(self, piped=False):
         self.end_word()
-        self.cur.piped, self.skip_word = piped, False
+        self.cur.piped, self.skip_word, self.herestring = piped, False, False
         self.segs.append(self.cur)
         self.cur = Seg()
 
@@ -259,7 +373,8 @@ class Parser:
                 self.i += len(op)
                 self.end_seg(piped=op in ("|", "|&"))
             else:
-                self.add(c)
+                dollar_brace = c == "{" and self.i > 0 and s[self.i - 1] == "$"  # `${x}` is not a brace expansion
+                self.add(c if dollar_brace else BRACE_MARKS.get(c, c))
                 self.i += 1
         self.end_seg()
         return self.segs
@@ -374,6 +489,7 @@ class Parser:
         op = next(o for o in ("<<<", "&>>", "&>", ">>", ">&", ">|", "<&", "<>", "<", ">") if s.startswith(o, i))
         self.i += len(op)
         self.skip_word = True  # the redirect target is a file name, not an argument
+        self.herestring = op == "<<<"
 
     def heredoc_operator(self):
         s, i = self.s, self.i + 2
@@ -442,7 +558,7 @@ def normalise(tokens):
         elif base in WRAPPERS:
             rest = tokens[1:]
             while rest and (rest[0].startswith("-") or ASSIGN_RE.match(rest[0])):
-                rest = rest[2:] if rest[0] in WRAPPERS[base] else rest[1:]
+                rest = rest[2:] if takes_value(rest[0], WRAPPERS[base]) else rest[1:]
             tokens = rest[WRAPPER_POSITIONALS.get(base, 0):]
             if base == "flock" and tokens[:1] in (["-c"], ["--command"]):
                 tokens = ["sh"] + tokens  # flock <file> -c '<script>' runs the script in a shell
@@ -451,6 +567,8 @@ def normalise(tokens):
     if not tokens:
         return "", [], []
     cmd, args, config = os.path.basename(tokens[0]), tokens[1:], []
+    if cmd.startswith("git-") and len(cmd) > 4:  # /usr/lib/git-core/git-push is `git push`
+        cmd, args = "git", [cmd[4:], *args]
     if cmd == "git":
         while args and args[0].startswith("-"):
             if args[0] == "-c" and len(args) > 1:
@@ -461,9 +579,11 @@ def normalise(tokens):
     return cmd, args, config
 
 
-def reads_stdin(args):  # an interpreter runs piped input unless given inline code (-c ...) or a script/module argument
+def reads_stdin(args, is_shell):
+    """A shell or interpreter runs piped input unless given inline code (-c ...) or a script/module argument. `-s` reads the
+    script from stdin for a shell only (for python it skips the user site directory)."""
     positional = [a for a in args if not a.startswith("-")]
-    return "-s" in args or "-" in args or not positional or positional[0] in STDIN_PATHS
+    return (is_shell and "-s" in args) or "-" in args or not positional or positional[0] in STDIN_PATHS
 
 
 def shell_script(args):
@@ -505,17 +625,19 @@ def check_segments(segs, depth):
         cmd, args, config = normalise(seg.words)
         is_shell, is_script_reader = bool(SHELL_RE.match(cmd)), bool(SHELL_RE.match(cmd) or INTERP_RE.match(cmd))
         script = shell_script(args) if is_shell else None
-        if downloaded and is_script_reader and reads_stdin(args):
+        if downloaded and is_script_reader and reads_stdin(args, is_shell):
             return DOWNLOAD_REASON
         if downloaded and script and re.search(r"\$\(\s*cat\b|`\s*cat\b", script):
             return DOWNLOAD_REASON
         if cmd == "git" and any(v.lower().startswith("alias.") for v in config):
             return ALIAS_REASON
+        if cmd == "git" and args[:1] == ["clean"] and clean_unforced(config):
+            return CLEAN_REASON
         for _, predicate, reason in RULES:
             if predicate(cmd, args):
                 return reason
         inner_scripts = [script] if script else []
-        if is_script_reader and reads_stdin(args):  # heredoc or piped heredoc text that the command runs
+        if is_shell and reads_stdin(args, is_shell):  # heredoc or piped text that a shell runs; text fed to an interpreter is data
             inner_scripts += seg.bodies + carried
         for text in inner_scripts:
             inner = check(text, depth + 1)

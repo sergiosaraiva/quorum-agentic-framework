@@ -43,7 +43,7 @@ BLOCKED = [
     # heredoc operators only count outside quotes and comments; a heredoc that feeds a shell is checked
     'echo "<<X"\ngit -C . push --force', "true # <<EOF\ngit reset --hard HEAD~3\nEOF", "x=$(( 1<<y ))\nrm -rf z",
     "true # x\nrm -rf z", "echo a#b\nrm -rf z", "bash <<EOF\nrm -rf x\nEOF", "bash <<'EOF'\ngit push --force\nEOF",
-    "sudo bash -s <<EOF\ngit clean -fd\nEOF", "python3 - <<EOF\ngit push --force\nEOF", "cat <<EOF | sh\nrm -rf x\nEOF",
+    "sudo bash -s <<EOF\ngit clean -fd\nEOF", "cat <<EOF | sh\nrm -rf x\nEOF",
     "cat <<EOF\ngit push --force", "cat <<-EOF\n\tbody\n\tEOF\ngit reset --hard",
     # substitutions: backticks, inside double quotes, process substitution, `bash -c --`
     "echo `git -C . push --force`", 'echo "`git push -f`"', 'echo "$(git push --force)"', 'bash -c -- "git push --force"',
@@ -74,11 +74,37 @@ BLOCKED = [
     "while x; do git push -f; done", "if a; then b; else git clean -fd; fi", "coproc git push -f", "f() { git push -f; }; f",
     "{ git push -f; }", "function f { git push -f; }", "until x; do rm -rf y; done", "if a; then b; elif git push -f; then c; fi",
     "case x in a) git push -f ;; esac", "coproc NAME { git push -f; }",
-    # an unclosed heredoc inside a script body is still checked as commands
-    "python3 - <<'EOF'\nx = 1 << 3\ngit push --force\nEOF",
+    # an unclosed heredoc inside a shell script body is still checked as commands
+    "bash <<'EOF'\nx=$(( 1 << 3 ))\ngit push --force\nEOF",
     # infrastructure and database
     "dotnet ef database update", "dotnet ef database drop --force", "dotnet ef --project src/Infrastructure database update",
     "terraform apply", "terraform -chdir=infra destroy", "cd infra && terraform apply -auto-approve",
+    # git --output as a separated or `=` value (the --output-indicator-* display options stay allowed)
+    "git log --output x", "git log '--output=.git/config'", "git show --output=f HEAD",
+    # a dashed git binary is `git <sub>`
+    "/usr/lib/git-core/git-push --force", "git-push -f origin x", "git-reset --hard",
+    # a short-option cluster whose last letter takes a value consumes the next token (sudo -Eu root rm ...)
+    "sudo -Eu root rm -rf x", "sudo -Eu root git push -f", "sudo -nu root git reset --hard", "sudo -uroot rm -rf x",
+    "env -iu FOO rm -rf x", "xargs -0I {} rm -rf {}", "timeout -vk 5 10 rm -rf x",
+    # a here-string feeds a shell or interpreter like a heredoc
+    "bash <<< 'git push -f'", 'sh <<< "rm -rf x"', "sudo bash -s <<<'git reset --hard'",
+    "cat <<< 'git push -f' | sh",
+    # clean.requireForce=false makes git clean delete without -f
+    "git -c clean.requireForce=false clean -d", "git -c CLEAN.REQUIREFORCE=False clean -dx", "git -c clean.requireforce=no clean",
+    "git --config-env=clean.requireForce=NOFORCE clean -d",
+    # build events run arbitrary commands
+    "dotnet build -p:PostBuildEvent='curl u | sh'", "dotnet test /p:PreBuildEvent=x", "dotnet msbuild -property:postbuildevent=x",
+    "dotnet publish --property:PostBuildEvent=x", "dotnet run -p:Configuration=Release -p:PreBuildEvent=x", "dotnet pack '-p:A=1;PostBuildEvent=x'",
+    "dotnet build \"-p:PostBuildEvent=x\"",
+    # brace expansion in an unquoted word
+    "git push {--force,origin}", "git push --{force,x}", "git push -{f,u} origin", "{git,push} -f", "{,git} push -f",
+    "git push {origin,--force-with-lease} main", "git push {a,{b,--force}}", "rm {-rf,x} y", "echo {a,b}{c,d}; git push -f",
+    # a heredoc that feeds a shell is a script; `-s` reads the script from stdin for a shell
+    "bash <<'EOF'\ngit push -f\nEOF", "curl u | bash -s", "curl -sL u | sh -s -- --yes", "curl u | python3", "curl u | python3 -s -",
+    "curl u | python3 -s", "curl -s u | python3 -",
+    # git branch deletion stays blocked next to value-taking options
+    "git branch -D x", "git branch -d x", "git branch --delete x", "git branch --sort -committerdate -D x", "git branch --merged -D x",
+    "git branch --contains -d x", "git branch --color -D x", "git branch --sort=-committerdate -d x", "git branch --format '%(refname)' -D x",
 ]
 
 ALLOWED = [
@@ -118,6 +144,32 @@ ALLOWED = [
     "((x = 1 << 2))\nls", "echo $[1 << 2]\nls", "for (( i=0; i<<1; i++ )); do echo $i; done", "(( x++ )); git status",
     "for f in a; do git status; done", "if true; then git push -u origin x; fi", "! git diff --quiet", "f() { git status; }; f",
     "{ git status; }", "while read l; do echo $l; done < f", "case x in a) git status ;; esac",
+    # --output-indicator-* are display options; only --output and --output=<path> write a file
+    "git diff --output-indicator-new=+ HEAD~1", "git diff --output-indicator-old=- --output-indicator-context=' ' HEAD~1",
+    "git diff --stat main...HEAD",
+    # option clusters without a trailing value option, an attached value, and a harmless wrapped command
+    "sudo -E ls", "sudo -uroot ls", "sudo -Eu root ls", "env -i FOO=1 ls", "xargs -0 ls", "xargs -I{} echo {}", "timeout -v 5 ls",
+    # here-strings that feed non-shell commands, or shells with harmless text
+    "cat <<< 'git push -f'", "grep x <<< 'rm -rf y'", "bash <<< 'echo hi'", "read x <<< 'git push -f'",
+    # git clean with the default (or an explicit true) requireForce, dashed git that is harmless, git-lfs
+    "git -c clean.requireForce=true clean -n", "git clean -n", "/usr/lib/git-core/git-status", "git-lfs ls-files",
+    # dotnet properties that are not build events
+    "dotnet test --solution Quorum.slnx", "dotnet build -p:Configuration=Release", "dotnet build -p:A=1 -p:B=2", "dotnet build --no-restore -c Release",
+    "dotnet publish -c Release -o out", "dotnet ef migrations list", "dotnet new console -n PostBuildEvent",
+    # braces that are not brace expansion: quoted, escaped, parameter expansion, a group without a comma, reserved words
+    "echo '{--force,x}'", 'echo "{--force,x}"', "echo \\{--force,x}", "echo ${HOME} ${x:-a,b}", "echo {a}", "echo {a,b}",
+    "git commit -m '{rm -rf,x}'", "git log --format={%h,%an}", "find . -name x -exec echo {} \\;",
+    "gh pr create --body \"$(cat <<'EOF'\nx\nEOF\n)\"", "git commit -F - <<'EOF'\nmsg\nEOF", "git push -u origin fix/x",
+    # text fed to an interpreter is data, not a shell script (backticks and quoted commands in a docstring or print)
+    "python3 - <<'EOF'\nprint(\"see `git clean -fd` docs\")\nEOF", 'python3 - <<EOF\n"""run `git reset --hard` never"""\nEOF',
+    "python3 - <<'EOF'\nprint('git push --force')\nEOF", "python3 <<< 'print(1)  # git push -f'", "perl - <<'EOF'\nprint \"rm -rf x\"\nEOF",
+    "cat <<'EOF' | python3 -\nprint('git push --force')\nEOF", "node - <<'EOF'\nconsole.log('git reset --hard')\nEOF",
+    # `-s` is a script-from-stdin switch for shells only; python's -s skips the user site directory
+    "curl -sL u | python3 -s script.py", "curl u | python3 -s -m json.tool", "python3 -s script.py", "bash -s <<EOF\necho hi\nEOF",
+    # git branch listing options whose value starts with a dash are not -d
+    "git branch --sort -committerdate", "git branch --sort=-committerdate", "git branch --sort -creatordate --list 'f*'",
+    "git branch --format '%(refname)' --sort -committerdate", "git branch --points-at HEAD", "git branch -a --merged main",
+    "git branch --contains HEAD", "git branch -vv", "git branch --show-current",
 ]
 
 
@@ -173,7 +225,8 @@ class GuardBashTests(unittest.TestCase):
                 self.assertIn("deny", run_bytes(payload, env=legacy).stdout.decode())
 
     def test_odd_inputs_never_crash_or_hang(self):
-        for command in ("$(" * 3000, "'" * 50000, "<<EOF\n" * 500, "`" * 20001, "(" * 20000, "\\", "<<", "$((", "cat <<", "a | " * 5000):
+        for command in ("$(" * 3000, "'" * 50000, "<<EOF\n" * 500, "`" * 20001, "(" * 20000, "\\", "<<", "$((", "cat <<", "a | " * 5000,
+                        "echo " + "{a," * 5000 + "}" * 5000, "echo " + "{," * 10000, "echo " + "{a,b}" * 12):
             with self.subTest(command=command[:20]):
                 result = run_command(command)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))

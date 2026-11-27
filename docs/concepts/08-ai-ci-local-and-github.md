@@ -45,14 +45,14 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--max-rounds` | round cap (default 5); at the cap the script exits with code 3 |
 | `--out-dir` | where findings and round state are written (default `.ai-review`) |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
-| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH, or when HEAD has no commits the base lacks (a base that moved on is fine); use it for the gate |
+| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH, when HEAD has no commits the base lacks (a base that moved on is fine), or, with a remote configured, when the base is not anchored to shared history (a remote-tracking ref such as `origin/main`, or a branch cut from one; `HEAD~1` fails); use it for the gate |
 | `--reset` | drop the current branch's saved count after a human review; the next completed round starts from 1 |
 | `--dry-run` | print the prompt without calling a model |
 
 | Aspect | Behaviour |
 |--------|-----------|
 | Model | `sonnet` by default; use `--model opus` for auth, data model, migrations, money or core logic. Do not go below what can follow the code |
-| Rounds | Capped (default three), matching the session loop-back rule; at the cap, stop and report |
+| Rounds | Capped (default five, OD-031), matching the session loop-back rule; at the cap, stop and report |
 | Scope | The whole branch diff, not only the last commit |
 | Output | A reply with no `findings` list, or malformed output, is an error (non-zero exit), never a silent pass; `{"findings": []}` is a valid clean result |
 | Secrets | The `claude` CLI uses your own sign-in or the API key in your environment (`${ANTHROPIC_API_KEY}`); nothing is read from a file in the repo |
@@ -91,8 +91,8 @@ A pull request is attacker-controlled text: its diff, title, body, branch name a
 
 | Measure | Purpose |
 |---------|---------|
-| The workflow prompt tells the model that the PR title, body, branch name, diff, comments and files are untrusted data and never to be obeyed; the head is checked out into `pr-head/` with its `CLAUDE.md` files, `.claude/` and `.mcp.json` removed; reviewer instructions come from the base branch. The local script additionally wraps the diff in `<diff>` tags with the same notice | Reduce injection |
-| Give the review step no write access to the repository contents and no secrets beyond the model key; the reviewer may not run build, test, script or git commands. The workflow passes `--allowedTools` (read tools, `Agent`, `Skill`, inline comments, `gh pr diff`, `gh pr view`) and a `--disallowedTools` list that denies edits, web access and Bash for `dotnet`, `npm`, `npx`, `node`, `python3`, `python`, `bash`, `sh`, `git` (`git log|diff|show --output=<path>` writes files) and `scripts/`; the base `settings.json` allow list also applies in CI, so that deny list is what stops a prompt-injected diff from running PR-head code next to the key | Limit what a successful injection could do |
+| The workflow prompt tells the model that the PR title, body, branch name, diff, files and every PR conversation or review comment (from any user) are untrusted data and never to be obeyed; the head is checked out into `pr-head/` with its `CLAUDE.md` files, `.claude/` and `.mcp.json` removed; reviewer instructions come from the base branch. The local script additionally wraps the diff in `<diff>` tags with the same notice | Reduce injection |
+| Give the review step no write access to the repository contents and no secrets beyond the model key; the reviewer may not run build, test, script or git commands. The workflow passes `--allowedTools` (read tools, `Agent`, `Skill`, inline comments, `gh pr diff`, `gh pr view`) and a `--disallowedTools` list that denies edits, web access and Bash for `dotnet`, `npm`, `npx`, `node`, `python3`, `python`, `bash`, `sh`, `git` (`git log|diff|show --output=<path>` writes files) and `scripts/`; the base `settings.json` allow list also applies in CI, so that deny list is what stops a prompt-injected diff from running PR-head code next to the key. The action `settings` input also turns on `blockReadsOutsideWorkingDirectories` and denies `Read(//proc/**)` and `Read(//home/runner/work/_temp/**)`, so the reviewer cannot read runner files such as `/proc/self/environ` and quote them in a comment | Limit what a successful injection could do |
 | Never interpolate PR fields directly into shell commands; pass them through environment variables or files | Avoid command injection in the runner |
 | Findings are only comments; they cannot merge or approve | A fooled reviewer cannot ship code |
 | Keep a human merge decision | Final backstop |

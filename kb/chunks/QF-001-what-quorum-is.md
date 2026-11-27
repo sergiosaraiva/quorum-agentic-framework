@@ -15,6 +15,6 @@ Quorum exists because a single AI coding assistant working alone has three failu
 | It forgets | Yesterday's decision is argued again today or silently reversed |
 | It self-approves | The author reviews its own diff and finds it fine |
 
-Quorum answers each one. Agents consult a business knowledge base and a questions-and-decisions knowledge base, cite record ids, and record a question when both are silent. Every question, answer and decision is a searchable record, so nothing is lost in a chat. Independent reviewer agents with fresh context, no Write or Edit tools and an equal or stronger model validate every change, and after three failed review rounds a human decides.
+Quorum answers each one. Agents consult a business knowledge base and a questions-and-decisions knowledge base, cite record ids, and record a question when both are silent. Every question, answer and decision is a searchable record, so nothing is lost in a chat. Independent reviewer agents with fresh context, no Write or Edit tools and an equal or stronger model validate every change, and after five failed review rounds (OD-031) a human decides.
 
 The repository is a template: an adopting team replaces the `{{PLACEHOLDER}}` values in the root `CLAUDE.md`, deletes the invented Acme Orders example content and writes its own knowledge.

@@ -114,7 +114,21 @@
       "Bash(git push:*)",
       "Bash(npm ci)",
       "Bash(python3 scripts/kb/remove_examples.py:*)",
-      "Bash(git * --output*)"
+      "Bash(git * --output*)",
+      "Bash(dotnet * -p*)",
+      "Bash(dotnet * /p*)",
+      "Bash(dotnet * --property*)",
+      "Bash(dotnet * -l*)",
+      "Bash(dotnet * -logger*)",
+      "Bash(dotnet * --logger*)",
+      "Bash(dotnet * --test-adapter-path*)",
+      "Bash(npm audit fix*)",
+      "Bash(python3 scripts/ai_review_local.py * --reset*)",
+      "Bash(python3 scripts/ai_review_local.py * --max-rounds*)",
+      "Bash(python3 scripts/ai_review_local.py * --claude-bin*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh api * -X DELETE*)",
+      "Bash(gh api * --method DELETE*)"
     ],
     "deny": [
       "Read(./.env.local)",
@@ -164,7 +178,8 @@
       "Bash(git push * --delete*)",
       "Bash(git push origin :*)",
       "Bash(git restore .:*)",
-      "Bash(git restore --source:*)"
+      "Bash(git restore --source:*)",
+      "Bash(gh repo delete:*)"
     ],
     "defaultMode": "default"
   },

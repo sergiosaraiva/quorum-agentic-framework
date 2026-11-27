@@ -23,15 +23,19 @@ connector and settings behaviour is documented, not exercised by the tests. `--a
 pre-approve the three tools and leave project allow rules (Bash, Edit) and user MCP servers usable by a prompt-injected diff.
 
 The reviewer role prompts (the pr-review skill, quality-guardian, regression-detective) and the Immutable Rules of the
-root CLAUDE.md are read from the base revision with `git show <base>:<path>`, not from the working tree. That is the whole
+root CLAUDE.md are read from the merge-base of --base and HEAD with `git show <merge-base>:<path>`, not from the working
+tree (so a base that moved on and a branch used as the base both resolve to shared history). That is the whole
 extent of the protection: `claude -p` still runs in the working tree, so the branch's own CLAUDE.md files,
 `.claude/settings.json` and the files the reviewer Reads during the review (for example `_SHARED-PATTERNS.md` and the skills)
 still come from the branch, and this script is the branch's copy. A branch that edits those can still influence its
-reviewer. A path that does not exist at base (a first adoption) falls back to the working tree with a notice.
+reviewer. A path that does not exist at the merge-base (a first adoption) falls back to the working tree with a notice.
 
 With --require the review must be a real one: exit 2 when HEAD has no commits that --base lacks
 (base equal to or ahead of HEAD: nothing to compare). A base that moved on after the branch was cut is fine, because the
-diff is taken from the merge-base. Without --require an empty diff just reports
+diff is taken from the merge-base. The base must also be anchored to shared history, so the producer of a branch cannot
+narrow the review with `--base HEAD~1`: it must resolve to a remote-tracking ref (`origin/main`), or its merge-base with
+HEAD must be contained in a remote-tracking branch other than this branch's own (`git branch -r --contains`). A repository
+with no remote at all keeps today's behaviour (a notice is printed). Without --require an empty diff just reports
 "nothing to review" and exits 0.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
@@ -103,6 +107,13 @@ def read_at_base(path: Path, base: str) -> str:
     return read_body(path)
 
 
+def review_revision(base: str) -> str:
+    """The revision the reviewer prompts are read at: the merge-base of `base` and HEAD (shared history), else `base`
+    itself when there is none (unrelated histories). A base that moved on and a branch used as the base both resolve here."""
+    proc = run(["git", "merge-base", base, "HEAD"])
+    return proc.stdout.strip() if proc.returncode == 0 and proc.stdout.strip() else base
+
+
 def load_reviewer_prompts(base: str) -> list[str]:
     """The skill and reviewer role sections of the prompt, read from the base revision."""
     parts = ["## Review skill\n" + read_at_base(SKILL_PATH, base)]
@@ -121,10 +132,23 @@ def get_diff(base: str) -> str:
     return proc.stdout
 
 
+def _anchored_to_remote(base: str, merge_base: str) -> bool:
+    """True when `base` is a remote-tracking ref (other than this branch's own counterpart), or the merge-base is contained
+    in a remote-tracking branch other than this branch's own. The branch's own remote counterpart is excluded because a
+    pushed branch contains its own earlier commits: `--base HEAD~1` would otherwise pass after the push."""
+    own = {f"{remote}/{current_branch()}" for remote in run(["git", "remote"]).stdout.split()}
+    symbolic = run(["git", "rev-parse", "--symbolic-full-name", base]).stdout.strip()
+    if symbolic.startswith("refs/remotes/"):
+        return symbolic.removeprefix("refs/remotes/") not in own
+    containing = run(["git", "branch", "-r", "--contains", merge_base]).stdout.splitlines()
+    return any(name and "->" not in name and name not in own for name in (line.strip() for line in containing))
+
+
 def require_real_base(base: str) -> str | None:
     """For --require: an error message when `base` cannot anchor a real review, else None. The review diffs `base...HEAD`
-    (from the merge-base), so a base that moved on after the branch was cut is fine; only a HEAD with no commits of its
-    own (equal to or behind base) would pass the gate with an empty review."""
+    (from the merge-base), so a base that moved on after the branch was cut is fine; a HEAD with no commits of its own
+    (equal to or behind base) would pass the gate with an empty review, and a base inside the branch's own history
+    (`HEAD~1`) would narrow it, so with a remote configured the base must be anchored to a remote-tracking branch."""
     head = run(["git", "rev-parse", "HEAD"])
     resolved = run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"])
     if head.returncode != 0 or resolved.returncode != 0:
@@ -134,6 +158,16 @@ def require_real_base(base: str) -> str | None:
     ahead = run(["git", "rev-list", "--count", f"{resolved.stdout.strip()}..HEAD"])
     if ahead.returncode != 0 or ahead.stdout.strip() == "0":
         return f"--require: HEAD has no commits that base {base!r} lacks, so there is nothing to review; pass the branch this one was cut from"
+    if not run(["git", "remote"]).stdout.split():
+        print("notice: no git remote is configured, so --base cannot be checked against shared history; "
+              "make sure it is the integration branch this one was cut from", file=sys.stderr)
+        return None
+    merge_base = run(["git", "merge-base", resolved.stdout.strip(), "HEAD"])
+    if merge_base.returncode != 0 or not merge_base.stdout.strip():
+        return f"--require: base {base!r} shares no history with HEAD; pass the integration branch this one was cut from"
+    if not _anchored_to_remote(base, merge_base.stdout.strip()):
+        return (f"--require: base {base!r} is not anchored to shared history (a remote-tracking ref such as origin/main, or a branch "
+                "cut from one); it would review only part of this branch. Pass the integration branch, after `git fetch`")
     return None
 
 
@@ -401,7 +435,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
     ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing, or when --base is "
-                    "HEAD itself or HEAD has no commits of its own (an empty review must not pass the gate)")
+                    "HEAD itself, HEAD has no commits of its own, or (with a remote configured) --base is not a "
+                    "remote-tracking ref or a branch cut from one, e.g. HEAD~1 (an empty or partial review must not pass the gate)")
     ap.add_argument("--dry-run", action="store_true", help="print the prompt, do not call the model")
     args = ap.parse_args(argv)
 
@@ -433,8 +468,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No diff against {args.base}; nothing to review.")
         return 0
     chunks = split_diff(diff, args.max_chunk_bytes)
-    root_rules = read_at_base(REPO_ROOT / "CLAUDE.md", args.base)
-    roles = load_reviewer_prompts(args.base)
+    revision = review_revision(args.base)
+    root_rules = read_at_base(REPO_ROOT / "CLAUDE.md", revision)
+    roles = load_reviewer_prompts(revision)
     rules_match = re.search(r"## Immutable Rules.*?(?=\n## )", root_rules, flags=re.DOTALL)
     context = rules_match.group(0) if rules_match else ""
 

@@ -42,7 +42,9 @@ def representative_command(pattern: str) -> str:
 
 
 def pattern_matches(pattern: str, command: str) -> bool:
-    if pattern.endswith(":*"):
+    # `X:*` is the legacy prefix form only when X has no `*`; `dotnet * -p:*` is a glob whose last `:*` is a literal colon
+    # followed by a wildcard (it must match `dotnet build -p:Prop=x`). Whether Claude Code reads it that way is unverified here.
+    if pattern.endswith(":*") and "*" not in pattern[:-2]:
         prefix = pattern[:-2]
         return command == prefix or command.startswith(prefix + " ")
     if pattern.endswith(" *") and "*" not in pattern[:-2]:
@@ -109,6 +111,14 @@ class PermissionRuleTests(unittest.TestCase):
         ask = [m.group(1) for m in (RULE.match(r) for r in json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]) if m]
         self.assertTrue(any(pattern_matches(p, "git log -1 --format=x --output=.git/config") for p in ask), ask)
 
+    def test_local_sessions_ask_before_commands_that_run_code_or_change_shared_state(self):
+        # The guard cannot block these without blocking legitimate use, so the user is prompted instead.
+        ask = [m.group(1) for m in (RULE.match(r) for r in json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]) if m]
+        for command in ("dotnet build -p:PreBuildEvent=x", "npm audit fix --force",
+                        "python3 scripts/ai_review_local.py --base origin/main --reset", "gh pr merge 1"):
+            with self.subTest(command=command):
+                self.assertTrue(any(pattern_matches(p, command) for p in ask), command)
+
     def test_removing_the_git_deny_makes_the_check_fail(self):
         # git log|diff|show --output=<path> writes files, so the allow-listed git rules must stay denied in CI.
         self.assertIn("git log:*", uncovered(self.allow, [d for d in self.deny if d != "git:*"]))
@@ -134,6 +144,8 @@ class PermissionRuleTests(unittest.TestCase):
         self.assertTrue(pattern_matches("scripts/*", "scripts/run-mutation-tests.sh --solution x"))
         self.assertFalse(pattern_matches("scripts/*", "xscripts/a"))
         self.assertFalse(pattern_matches("scripts/:*", "scripts/run.sh"))
+        self.assertTrue(pattern_matches("dotnet * -p:*", "dotnet build -p:PreBuildEvent=x"))
+        self.assertFalse(pattern_matches("dotnet * -p:*", "dotnet build -c Release"))
         self.assertTrue(pattern_matches("pwd", "pwd"))
         self.assertFalse(pattern_matches("pwd", "pwd -P"))
 

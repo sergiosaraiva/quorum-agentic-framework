@@ -43,6 +43,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.stats and a.kb != "business":
         ap.error("--stats reports the business KB only; drop --kb qa")
+    if a.root is not None:
+        if a.backend != "local":
+            ap.error("--root only applies to the local backend; the pg backend reads the database. Drop --root or use --backend local")
+        missing = [rel for rel in ("kb/chunks", "questions/records") if not (a.root / rel).is_dir()]
+        if missing:
+            ap.error(f"--root {a.root} has no {' and no '.join(missing)}; point it at a directory holding kb/chunks and questions/records")
     try:
         store = backends.make_store(a.backend, a.root)
     except (ValueError, RuntimeError) as exc:  # unknown backend, or pg without psycopg or DATABASE_URL

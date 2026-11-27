@@ -32,20 +32,25 @@ reviewer. A path that does not exist at the merge-base (a first adoption) falls 
 
 With --require the review must be a real one: exit 2 when HEAD has no commits that --base lacks
 (base equal to or ahead of HEAD: nothing to compare). A base that moved on after the branch was cut is fine, because the
-diff is taken from the merge-base. The base must also be anchored to shared history, so the producer of a branch cannot
-narrow the review with `--base HEAD~1`: it must resolve to a remote-tracking ref (`origin/main`), or its merge-base with
-HEAD must be contained in a remote-tracking branch other than this branch's own (`git branch -r --contains`). "This branch's
-own" is `<remote>/<local name>`, the branch's upstream (`@{upstream}`) and its push target (`@{push}`), so a branch pushed as
-`HEAD:feature/other` with `-u` cannot anchor itself. When `refs/remotes/<remote>/HEAD` exists (every clone has it; for a
-repository made with `git init` run `git remote set-head <remote> -a`) the base is anchored to the integration branch
-instead: the merge-base of base and HEAD must be an ancestor of it, which also closes `git push origin HEAD:feature/other`
-without `-u`. A detached HEAD is refused under --require (there is no branch to exclude). Remaining limit: this reads
+diff is taken from the merge-base. The base must also be the integration branch, so the producer of a branch cannot
+narrow the review with `--base HEAD~1` or `--base origin/main~1` (a commit of main that the branch reverts would cancel out of
+the diff). When `refs/remotes/<remote>/HEAD` exists (every clone has it; for a repository made with `git init` run
+`git remote set-head <remote> -a`) the merge-base of base and HEAD must EQUAL the fork point `git merge-base <remote>/HEAD HEAD`;
+this also closes `git push origin HEAD:feature/other` without `-u`. Without it the base must resolve symbolically to a
+remote-tracking branch (`git rev-parse --symbolic-full-name <base>` starts with `refs/remotes/`; `~N`, `^` and raw SHAs are
+refused) other than this branch's own: `<remote>/<local name>`, its upstream (`@{upstream}`) and its push target (`@{push}`), so a
+branch pushed as `HEAD:feature/other` with `-u` cannot anchor itself. Consequence (TQ-022): a stacked branch, or a branch whose
+integration branch is not the remote's default, runs the gate with `--base origin/main` (a wider review); a parent branch that
+the remote's HEAD does not contain is refused. `git remote set-head <remote> <branch>` changes the default if the integration
+branch differs. A detached HEAD is refused under --require (there is no branch to exclude). Remaining limit: this reads
 local refs, so a locally forged `refs/remotes/*` ref (`git update-ref refs/remotes/origin/x HEAD~1`) still anchors a base; the
 check stops accidents and the easy shortcut, not a determined producer. A repository with no remote at all keeps today's
 behaviour (a notice is printed). Without --require an empty diff just reports "nothing to review" and exits 0.
 
 The round state is always `<repository>/.ai-review/state.json`, whatever --out-dir says (--out-dir only moves findings.json
-and findings.md), so a new --out-dir cannot reset the round cap (OD-031); only --reset does. Options are exact: argparse
+and findings.md), so a new --out-dir cannot reset the round cap (OD-031); --reset does. Known limit: the state is keyed by branch
+name, so renaming or copying the branch (`git branch -m`, `git switch -c`) also starts a new count; neither command is
+allow-listed in .claude/settings.json, so the user is prompted for it. Options are exact: argparse
 abbreviations are off (`--res` is an error, not `--reset`), which keeps the `ask` rules in .claude/settings.json matching.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
@@ -160,27 +165,30 @@ def _own_remote_refs() -> set[str]:
 
 
 def _anchored_to_remote(base: str, merge_base: str) -> bool:
-    """True when the review base is anchored to shared history. With `refs/remotes/<remote>/HEAD` present, the merge-base must
-    be an ancestor of that integration branch. Otherwise `base` must be a remote-tracking ref, or the merge-base must be
-    contained in a remote-tracking branch, other than this branch's own (see _own_remote_refs): a pushed branch contains its
-    own earlier commits, so `--base HEAD~1` would otherwise pass after the push."""
+    """True when the review base is anchored to the integration branch. With `refs/remotes/<remote>/HEAD` present, the merge-base
+    of base and HEAD must EQUAL the fork point `git merge-base <remote>/HEAD HEAD`: a base that is an ancestor of the fork point
+    (`origin/main~1`) would also be contained in the integration branch, but its diff would include, and so cancel out, the
+    commits of the integration branch that the branch reverts; a parent branch (a stacked branch) has a later merge-base and is
+    refused too. Without it, `base` must resolve symbolically to a remote-tracking branch tip other than this branch's own
+    (see _own_remote_refs): `~N`, `^` and raw SHAs have no symbolic name, and a pushed branch contains its own earlier commits,
+    so `--base HEAD~1` would otherwise pass after the push."""
     candidates = [f"refs/remotes/{remote}/HEAD" for remote in run(["git", "remote"]).stdout.split()]
     heads = [ref for ref in candidates if run(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]).returncode == 0]
     if heads:
-        return any(run(["git", "merge-base", "--is-ancestor", merge_base, ref]).returncode == 0 for ref in heads)
-    own = _own_remote_refs()
+        for ref in heads:
+            fork = run(["git", "merge-base", ref, "HEAD"])
+            if fork.returncode == 0 and fork.stdout.strip() == merge_base:
+                return True
+        return False
     symbolic = run(["git", "rev-parse", "--symbolic-full-name", base]).stdout.strip()
-    if symbolic.startswith("refs/remotes/"):
-        return symbolic.removeprefix("refs/remotes/") not in own
-    containing = run(["git", "branch", "-r", "--contains", merge_base]).stdout.splitlines()
-    return any(name and "->" not in name and name not in own for name in (line.strip() for line in containing))
+    return symbolic.startswith("refs/remotes/") and symbolic.removeprefix("refs/remotes/") not in _own_remote_refs()
 
 
 def require_real_base(base: str) -> str | None:
     """For --require: an error message when `base` cannot anchor a real review, else None. The review diffs `base...HEAD`
     (from the merge-base), so a base that moved on after the branch was cut is fine; a HEAD with no commits of its own
     (equal to or behind base) would pass the gate with an empty review, and a base inside the branch's own history
-    (`HEAD~1`) would narrow it, so with a remote configured the base must be anchored to a remote-tracking branch."""
+    (`HEAD~1`, `origin/main~1`) would narrow it, so with a remote configured the base must be the integration branch."""
     head = run(["git", "rev-parse", "HEAD"])
     resolved = run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"])
     if head.returncode != 0 or resolved.returncode != 0:
@@ -200,9 +208,11 @@ def require_real_base(base: str) -> str | None:
     if merge_base.returncode != 0 or not merge_base.stdout.strip():
         return f"--require: base {base!r} shares no history with HEAD; pass the integration branch this one was cut from"
     if not _anchored_to_remote(base, merge_base.stdout.strip()):
-        return (f"--require: base {base!r} is not anchored to shared history (the integration branch such as origin/main, or a branch "
-                "cut from it); it would review only part of this branch. Pass the integration branch, after `git fetch` "
-                "(a repository without refs/remotes/<remote>/HEAD: `git remote set-head <remote> -a`)")
+        return (f"--require: base {base!r} is not anchored to shared history: under --require the base must be the integration branch "
+                "the remote's HEAD points at (for example origin/main, after `git fetch`); it would otherwise review only part of this "
+                "branch. A stacked branch, or a branch whose integration branch is not the remote's default, also uses it "
+                "(--base origin/main reviews the wider diff). `git remote set-head <remote> <branch>` changes the default when the "
+                "integration branch differs (`git remote set-head <remote> -a` for a repository made with `git init`)")
     return None
 
 
@@ -475,8 +485,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
     ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing, or when --base is "
-                    "HEAD itself, HEAD has no commits of its own, or (with a remote configured) --base is not a "
-                    "remote-tracking ref or a branch cut from one, e.g. HEAD~1 (an empty or partial review must not pass the gate)")
+                    "HEAD itself or HEAD has no commits of its own. With a remote configured --base must be the integration branch the "
+                    "remote's HEAD points at (e.g. origin/main), not HEAD~1, origin/main~1 or a parent branch: a stacked branch or a "
+                    "non-default integration branch also uses it (wider review), and `git remote set-head <remote> <branch>` changes "
+                    "the default if the integration branch differs (an empty or partial review must not pass the gate)")
     ap.add_argument("--dry-run", action="store_true", help="print the prompt, do not call the model")
     args = ap.parse_args(argv)
 

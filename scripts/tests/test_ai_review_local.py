@@ -582,10 +582,14 @@ class AnchoredBaseTests(unittest.TestCase):
         code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
         self.assertEqual(code, 0, err)
 
-    def test_a_local_branch_cut_from_a_remote_one_is_accepted(self):
+    def test_a_local_branch_name_is_refused_without_origin_head_but_its_remote_tracking_ref_is_accepted(self):
+        # Without refs/remotes/origin/HEAD only a base that resolves symbolically to a remote-tracking branch anchors.
         self.with_remote()
         self.feature_branch()
-        self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 0)
+        code, _, err = self.main_code("--base", "main", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("not anchored", err)
+        self.assertEqual(self.main_code("--base", "origin/main", "--require", "--dry-run")[0], 0)
 
     def test_a_diverged_base_is_accepted(self):
         self.with_remote()
@@ -596,7 +600,6 @@ class AnchoredBaseTests(unittest.TestCase):
         self.git("checkout", "-q", "feat")
         code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
         self.assertEqual(code, 0, err)
-        self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 0)
 
     def set_head(self):
         self.git("remote", "set-head", "origin", "main")  # refs/remotes/origin/HEAD, as every clone has it
@@ -659,6 +662,62 @@ class AnchoredBaseTests(unittest.TestCase):
         self.commit("g1.txt")
         self.assertEqual(self.main_code("--base", "feat", "--require", "--dry-run")[0], 2)
         self.assertEqual(self.main_code("--base", "origin/main", "--require", "--dry-run")[0], 0)
+
+    def revert_branch(self):
+        """main gains m1.txt (pushed); feat is cut from it, deletes m1.txt again and adds f1.txt."""
+        self.with_remote()
+        self.commit("m1.txt", "main change\n")
+        self.git("push", "-q", "origin", "main")
+        self.git("checkout", "-q", "-b", "feat")
+        self.git("rm", "-q", "m1.txt")
+        self.git("commit", "-q", "-m", "revert m1")
+        self.commit("f1.txt")
+
+    def test_an_older_ancestor_of_the_integration_branch_is_refused_whatever_origin_head_says(self):
+        # origin/main~1 is contained in origin/main, but its diff would hide a commit of main that the branch reverts.
+        for with_head in (True, False):
+            with self.subTest(origin_head=with_head):
+                self.setUp()
+                self.revert_branch()
+                if with_head:
+                    self.set_head()
+                for base in ("origin/main~1", "origin/main^", self.fork):
+                    code, _, err = self.main_code("--base", base, "--require", "--dry-run")
+                    self.assertEqual(code, 2, (base, err))
+                    self.assertIn("not anchored", err)
+
+    def test_the_integration_branch_shows_the_commit_the_branch_reverts_in_the_diff(self):
+        for with_head in (True, False):
+            with self.subTest(origin_head=with_head):
+                self.setUp()
+                self.revert_branch()
+                if with_head:
+                    self.set_head()
+                code, out, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+                self.assertEqual(code, 0, err)
+                self.assertIn("diff --git a/m1.txt b/m1.txt", out)
+                self.assertIn("deleted file mode", out)
+
+    def test_the_error_names_the_integration_branch_and_how_to_change_the_default(self):
+        self.with_remote()
+        self.feature_branch()
+        _, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        for text in ("integration branch", "origin/main", "stacked branch", "git remote set-head <remote> <branch>"):
+            self.assertIn(text, err)
+
+    def test_help_and_module_docstring_state_the_integration_branch_rule_and_the_branch_name_limit(self):
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            air.main(["--help"])
+        help_text = " ".join(out.getvalue().split())
+        for text in ("integration branch the remote's HEAD points at", "origin/main", "stacked branch", "git remote set-head <remote> <branch>"):
+            self.assertIn(text, help_text)
+        doc = " ".join(air.__doc__.split())
+        self.assertIn("keyed by branch name", doc)
+        self.assertIn("renaming or copying the branch", doc)
+        self.assertNotIn("only --reset", doc)
 
     def test_a_remote_without_fetched_branches_cannot_anchor_a_base(self):
         import subprocess
@@ -768,8 +827,10 @@ class EnvironmentErrorTests(unittest.TestCase):
         import contextlib
         import io
         import tempfile
+        from unittest import mock
         with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()) as err, \
-                contextlib.redirect_stdout(io.StringIO()):
+                contextlib.redirect_stdout(io.StringIO()), \
+                mock.patch.object(air, "state_path", lambda: Path(tmp) / "state.json"):  # never read the real .ai-review/state.json
             code = air.main(["--out-dir", tmp, *args])
         return code, err.getvalue()
 

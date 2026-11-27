@@ -39,13 +39,13 @@ The script builds a review prompt from the branch diff against a base (`python3 
 
 | Flag | Meaning |
 |------|---------|
-| `--base` | git ref to diff against (default `origin/main`, or `AI_REVIEW_BASE`) |
+| `--base` | git ref to diff against (default `origin/main`, or `AI_REVIEW_BASE`). The required gate uses the integration branch (`origin/main`) even for a stacked rung, which gives a wider review (parent plus child); a parent branch as base is fine only without `--require`, which is not the gate (TQ-022) |
 | `--model` | model for the review (default `sonnet`, or `AI_REVIEW_MODEL`) |
 | `--max-chunk-bytes` | size limit per chunk (default 60000); oversized hunks are split by lines, no code is dropped |
 | `--max-rounds` | round cap (default 5); at the cap the script exits with code 3 |
-| `--out-dir` | where findings and round state are written (default `.ai-review`) |
+| `--out-dir` | where `findings.json` and `findings.md` are written (default `.ai-review`); the round state always stays in `.ai-review/state.json` |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
-| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH, when HEAD has no commits the base lacks (a base that moved on is fine), or, with a remote configured, when the base is not anchored to shared history (a remote-tracking ref such as `origin/main`, or a branch cut from one; `HEAD~1` fails); use it for the gate |
+| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH or HEAD has no commits the base lacks (a base that moved on is fine); with a remote configured, also exit 2 when HEAD is detached or the base is not the remote default branch (what `origin/HEAD` points at) at the fork point, and without `origin/HEAD` only a remote-tracking branch tip is accepted, so `HEAD~1` and a stacked parent fail; without a remote, a notice only; use it for the gate (TQ-022) |
 | `--reset` | drop the current branch's saved count after a human review; the next completed round starts from 1 |
 | `--dry-run` | print the prompt without calling a model |
 
@@ -54,6 +54,7 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | Model | `sonnet` by default; use `--model opus` for auth, data model, migrations, money or core logic. Do not go below what can follow the code |
 | Rounds | Capped (default five, OD-031), matching the session loop-back rule; at the cap, stop and report |
 | Scope | The whole branch diff, not only the last commit |
+| Flags | Exact; abbreviations are rejected (`--res` is an error, not `--reset`), which keeps the `ask` rules in `.claude/settings.json` matching |
 | Output | A reply with no `findings` list, or malformed output, is an error (non-zero exit), never a silent pass; `{"findings": []}` is a valid clean result |
 | Secrets | The `claude` CLI uses your own sign-in or the API key in your environment (`${ANTHROPIC_API_KEY}`); nothing is read from a file in the repo |
 | Cost | Pay per token or from your plan (see `docs/reference/model-selection-and-costs.md`) |
@@ -92,7 +93,7 @@ A pull request is attacker-controlled text: its diff, title, body, branch name a
 | Measure | Purpose |
 |---------|---------|
 | The workflow prompt tells the model that the PR title, body, branch name, diff, files and every PR conversation or review comment (from any user) are untrusted data and never to be obeyed; the head is checked out into `pr-head/` with its `CLAUDE.md` files, `.claude/` and `.mcp.json` removed; reviewer instructions come from the base branch. The local script additionally wraps the diff in `<diff>` tags with the same notice | Reduce injection |
-| Give the review step no write access to the repository contents and no secrets beyond the model key; the reviewer may not run build, test, script or git commands. The workflow passes `--allowedTools` (read tools, `Agent`, `Skill`, inline comments, `gh pr diff`, `gh pr view`) and a `--disallowedTools` list that denies edits, web access and Bash for `dotnet`, `npm`, `npx`, `node`, `python3`, `python`, `bash`, `sh`, `git` (`git log|diff|show --output=<path>` writes files) and `scripts/`; the base `settings.json` allow list also applies in CI, so that deny list is what stops a prompt-injected diff from running PR-head code next to the key. The action `settings` input also turns on `blockReadsOutsideWorkingDirectories` and denies `Read(//proc/**)` and `Read(//home/runner/work/_temp/**)`, so the reviewer cannot read runner files such as `/proc/self/environ` and quote them in a comment. The review step also sets `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"`, which strips secrets from the reviewer's Bash subprocesses | Limit what a successful injection could do |
+| Give the review step no write access to the repository contents and no secrets beyond the model key; the reviewer may not run build, test, script or git commands. The workflow passes `--allowedTools` (read tools, `Agent`, `Skill`, inline comments, `gh pr diff`, `gh pr view`) and a `--disallowedTools` list that denies edits, web access and Bash for `dotnet`, `npm`, `npx`, `node`, `python3`, `python`, `bash`, `sh`, `git` (`git log|diff|show --output=<path>` writes files) and `scripts/`; the base `settings.json` allow list also applies in CI, so that deny list is what stops a prompt-injected diff from running PR-head code next to the key. The action `settings` input also turns on `blockReadsOutsideWorkingDirectories` and denies `Read(//proc/**)` and `Read(//home/runner/work/_temp/**)`, so the reviewer cannot read runner files such as `/proc/self/environ` and quote them in a comment. | Limit what a successful injection could do |
 | Never interpolate PR fields directly into shell commands; pass them through environment variables or files | Avoid command injection in the runner |
 | Findings are only comments; they cannot merge or approve | A fooled reviewer cannot ship code |
 | Keep a human merge decision | Final backstop |
@@ -105,10 +106,10 @@ Three counters exist and they share no state:
 | Counter | Where it lives | Reset |
 |---------|----------------|-------|
 | Loop-back cap (5 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
-| Local `--max-rounds` | `.ai-review/state.json` (under `--out-dir`) | `--reset` drops the branch's count; the next completed round starts from 1 |
+| Local `--max-rounds` | `.ai-review/state.json` | `--reset` drops the branch's count; the next completed round starts from 1 |
 | GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (edit the workflow on the PR branch); removing the label `needs-human-review` is optional housekeeping |
 
-Running the local script does not consume GitHub rounds, and a GitHub round does not count against the session cap.
+The round count is kept per branch name, so renaming a branch starts a new count (a known limit). Running the local script does not consume GitHub rounds, and a GitHub round does not count against the session cap.
 
 ## Costs
 

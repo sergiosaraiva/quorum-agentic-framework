@@ -102,6 +102,7 @@ BLOCKED = [
     "dotnet build -rp:PreBuildEvent=x", "dotnet build /rp:PostBuildEvent=x", "dotnet build -restoreProperty:PreBuildEvent=x",
     "dotnet test -RP PostBuildEvent=x", "dotnet build --Property:PREBUILDEVENT=x", "dotnet build -p: PostBuildEvent=x",
     "dotnet publish -c Release --p PostBuildEvent=x",
+    "dotnet build --p:PreBuildEvent=x", "dotnet test --p:PostBuildEvent=x",  # no ask rule can express `--p:<prop>`; the guard is the only layer
     # brace expansion in an unquoted word
     "git push {--force,origin}", "git push --{force,x}", "git push -{f,u} origin", "{git,push} -f", "{,git} push -f",
     "git push {origin,--force-with-lease} main", "git push {a,{b,--force}}", "rm {-rf,x} y", "echo {a,b}{c,d}; git push -f",

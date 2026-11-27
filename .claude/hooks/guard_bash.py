@@ -52,10 +52,12 @@ Known gaps (not fixed; best effort, not a sandbox):
 - dotnet: a build event set through the environment (`PostBuildEvent=cmd dotnet build`), `Directory.Build.props`, a response file
   (`@x.rsp`) or the project file. Loggers and adapters load code and are not blocked here (they have legitimate uses); the
   settings `ask` list prompts for them: `dotnet <args> -l*`, `/l*`, `-L*`, `-P*`, `/P*`, `-dl*`, `/dl*`, `-distributedlogger*`,
-  `-logger*`, `--logger*` and `--test-adapter-path*`, with the same prompts for any `-p`, `/p`, `--p`, `--property`, `-rp`,
-  `/rp` and `-restoreProperty` option. Not covered by the `ask` list: an option that is the first argument after `dotnet`
-  (`dotnet -l:x` has no subcommand to anchor `dotnet * -l*`), an option set through `@x.rsp`, `MSBUILD*` environment variables or
-  the project file, and spellings beyond those prefixes.
+  `-logger*`, `--logger*` and `--test-adapter-path*`, and for any property option: `-p*`, `/p*`, `--property*`, `--p *`, `--p=*`,
+  `-rp*`, `/rp*` and `-restoreProperty*`. Not covered by the `ask` list: `dotnet build --p:<prop>` for a property that is not a
+  build event (no ask rule can express it: a rule ending in `:*` is a prefix rule in Claude Code, so `dotnet * --p:*` never
+  matches, and `dotnet * --p*` would also prompt for `--project`; the guard blocks the build events in that form), an option
+  that is the first argument after `dotnet` (`dotnet -l:x` has no subcommand to anchor `dotnet * -l*`), an option set through
+  `@x.rsp`, `MSBUILD*` environment variables or the project file, and spellings beyond those prefixes.
 - Destructive commands not covered by RULES: `git update-ref -d`, `git stash clear|drop`, `git worktree remove --force`,
   `git branch -M|-C` (force rename or copy over a branch), `gh api -X DELETE` (the settings `ask` list covers it). `gh pr merge`
   is not blocked here; it is under `ask` in settings.json, so the user is prompted.

@@ -5,8 +5,10 @@ Why: the reviewer job loads the base settings.json, so its allow rules apply; a 
 when its text matches the command. A new allow rule such as `Bash(scripts/run-mutation-tests.sh:*)` without a matching deny
 would let a prompt-injected diff run code from the checked-out PR.
 
-Matching follows https://code.claude.com/docs/en/permissions: `Bash(X:*)` and `Bash(X *)` match the command X or a command
-starting with `X `; a rule with `*` elsewhere is a glob where `*` matches any characters; otherwise an exact match.
+Matching follows https://code.claude.com/docs/en/permissions and the Claude Code source: ANY rule ending in `:*` is a prefix
+rule (regex `^(.+):[*]$`), even when an earlier `*` is present (that earlier part is then literal, so such a rule never matches as
+intended and is forbidden in settings); `Bash(X *)` with no other `*` matches the command X or a command starting with `X `; any
+other rule with `*` is a glob where `*` matches any characters; otherwise an exact match.
 Run: python3 -m unittest discover -s scripts/tests"""
 import json
 import re
@@ -42,9 +44,9 @@ def representative_command(pattern: str) -> str:
 
 
 def pattern_matches(pattern: str, command: str) -> bool:
-    # `X:*` is the legacy prefix form only when X has no `*`; `dotnet * -p:*` is a glob whose last `:*` is a literal colon
-    # followed by a wildcard (it must match `dotnet build -p:Prop=x`). Whether Claude Code reads it that way is unverified here.
-    if pattern.endswith(":*") and "*" not in pattern[:-2]:
+    # Claude Code reads any rule ending in `:*` as a prefix rule (regex `^(.+):[*]$`), so `dotnet * -p:*` means the literal prefix
+    # `dotnet * -p` and never matches `dotnet build -p:X=1`.
+    if pattern.endswith(":*"):
         prefix = pattern[:-2]
         return command == prefix or command.startswith(prefix + " ")
     if pattern.endswith(" *") and "*" not in pattern[:-2]:
@@ -132,7 +134,7 @@ class PermissionRuleTests(unittest.TestCase):
             f"{script} --reset", f"{script} --max-rounds 99 --base origin/main --require", f"{script} --max-rounds=99",
             f"{script} --claude-bin ./x", f"{script} --claude-bin=./x", f"{script} --out-dir .ai-review-2", f"{script} --out-dir=.ai-review-2",
             f"{script} --base origin/main --require --reset",
-            "npm audit --registry=https://r.example fix", "npm audit fix", "npm audit --fix",
+            "npm audit --registry=https://r.example fix", "npm audit fix", "npm audit --force fix",
             "dotnet build /l:X,evil.dll", "dotnet build -l:X,evil.dll", "dotnet test --logger x", "dotnet build -logger:evil.dll",
             "dotnet test --test-adapter-path ./adapters", "dotnet build -dl:X", "dotnet build -distributedlogger:X",
             "dotnet build --p PreBuildEvent=x", "dotnet build --p=PreBuildEvent=x", "dotnet build -p PostBuildEvent=x",
@@ -140,6 +142,7 @@ class PermissionRuleTests(unittest.TestCase):
             "dotnet build -p=PreBuildEvent=x", "dotnet build -P:X=1", "dotnet restore -rp:X=1", "dotnet build /rp:X=1",
             "dotnet build -restoreProperty:X=1",
             "gh api -X DELETE repos/o/r", "gh api repos/o/r -XDELETE", "gh api repos/o/r --method=DELETE", "gh api repos/o/r --method DELETE",
+            "gh api repos/o/r --method=delete", "gh api -X delete repos/o/r",
             "gh pr merge 1",
         )
         for command in commands:
@@ -155,11 +158,44 @@ class PermissionRuleTests(unittest.TestCase):
             "dotnet build Quorum.slnx --no-restore -c Release", "dotnet format Quorum.slnx --verify-no-changes", "dotnet restore",
             f"{script} --base origin/main --require", f"{script} --base origin/main --require --model opus", f"{script} --model opus --base origin/main",
             f"{script} --dry-run", f"{script} --base origin/main --require --timeout 900", "npm audit", "npm audit --json",
-            "gh pr view 1", "gh api repos/o/r", "git log -1",
+            "npm audit --prefix frontend", "gh pr view 1", "gh api repos/o/r", "gh api repos/o/r --jq .delete_branch_on_merge", "git log -1",
         )
         for command in commands:
             with self.subTest(command=command):
                 self.assertFalse(any(pattern_matches(p, command) for p in ask), command)
+
+    def test_the_precise_npm_audit_and_gh_api_ask_rules_prompt_only_for_the_risky_forms(self):
+        ask = self.ask_patterns()
+        for command in ("npm audit fix", "npm audit --force fix", "gh api -X DELETE repos/o/r", "gh api repos/o/r --method=delete"):
+            with self.subTest(ask=command):
+                self.assertTrue(any(pattern_matches(p, command) for p in ask), command)
+        for command in ("npm audit --prefix frontend", "gh api repos/o/r --jq .delete_branch_on_merge"):
+            with self.subTest(no_ask=command):
+                self.assertFalse(any(pattern_matches(p, command) for p in ask), command)
+
+    def test_no_rule_combines_an_inner_wildcard_with_a_trailing_colon_star(self):
+        # Claude Code treats a rule ending in `:*` as a prefix rule and the earlier `*` as literal text, so it never matches.
+        permissions = json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]
+        for kind in ("allow", "ask", "deny"):
+            for rule in permissions[kind]:
+                inner = bash_pattern(rule)
+                if inner is not None and inner.endswith(":*"):
+                    with self.subTest(kind=kind, rule=rule):
+                        self.assertNotIn("*", inner[:-2], f"{rule} would never match as intended; use a glob such as `Bash(a * -x*)`")
+
+    def test_the_inner_wildcard_check_catches_the_never_matching_form(self):
+        self.assertFalse(pattern_matches("dotnet * --p:*", "dotnet build --p:PreBuildEvent=x"))
+
+    def test_the_guard_still_blocks_the_double_dash_property_form_that_no_ask_rule_can_express(self):
+        import subprocess
+        import sys
+        guard = ROOT / ".claude" / "hooks" / "guard_bash.py"
+        for command, blocked in (("dotnet build --p:PreBuildEvent=x", True), ("dotnet build --p:PostBuildEvent=x", True),
+                                 ("dotnet build --p:Configuration=Release", False)):
+            with self.subTest(command=command):
+                payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+                out = subprocess.run([sys.executable, "-I", str(guard)], input=payload, capture_output=True, text=True, check=True).stdout
+                self.assertEqual("deny" in out, blocked, out)
 
     def test_removing_the_git_deny_makes_the_check_fail(self):
         # git log|diff|show --output=<path> writes files, so the allow-listed git rules must stay denied in CI.
@@ -186,8 +222,12 @@ class PermissionRuleTests(unittest.TestCase):
         self.assertTrue(pattern_matches("scripts/*", "scripts/run-mutation-tests.sh --solution x"))
         self.assertFalse(pattern_matches("scripts/*", "xscripts/a"))
         self.assertFalse(pattern_matches("scripts/:*", "scripts/run.sh"))
-        self.assertTrue(pattern_matches("dotnet * -p:*", "dotnet build -p:PreBuildEvent=x"))
-        self.assertFalse(pattern_matches("dotnet * -p:*", "dotnet build -c Release"))
+        # a rule ending in `:*` is a prefix rule whatever precedes it: the inner `*` is literal, so it never matches as intended
+        self.assertFalse(pattern_matches("dotnet * -p:*", "dotnet build -p:PreBuildEvent=x"))
+        self.assertTrue(pattern_matches("dotnet * -p:*", "dotnet * -p"))
+        self.assertTrue(pattern_matches("dotnet * -p:*", "dotnet * -p --x"))
+        self.assertTrue(pattern_matches("dotnet * -p*", "dotnet build -p:PreBuildEvent=x"))
+        self.assertFalse(pattern_matches("dotnet * -p*", "dotnet build -c Release"))
         self.assertTrue(pattern_matches("pwd", "pwd"))
         self.assertFalse(pattern_matches("pwd", "pwd -P"))
 

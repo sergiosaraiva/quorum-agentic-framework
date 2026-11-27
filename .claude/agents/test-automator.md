@@ -27,7 +27,7 @@ Proves behaviour with tests that can fail. Writes only under `tests/` and `*.spe
 | Integration (real HTTP + PostgreSQL) | `writing-integration-tests` | `tests/Api.IntegrationTests/` |
 | Angular components, services | `writing-angular-tests` | `frontend/src/**/*.spec.ts` |
 | Mutation gate | `running-mutation-tests` | `stryker-config.json` at the repo root (shipped; the adopter sets `mutate` to the flagged hot-path files) |
-| E2E (explicit only) | `writing-playwright-e2e-tests` | `e2e/**` (created with the first e2e test) |
+| E2E (explicit only) | `writing-playwright-e2e-tests` | `frontend/e2e/` (created with the first e2e test) |
 | Load (explicit only) | `load-and-performance-testing` | `tests/perf/` (created when first needed) |
 | DB performance (explicit only) | `tuning-postgresql-queries`, `scaling-performance-test-data` | lab dataset |
 

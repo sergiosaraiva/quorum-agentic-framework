@@ -39,7 +39,7 @@ public sealed class ReportService(AppDbContext db, ILogger<ReportService> logger
 {
     public async Task<ReportDto?> GetAsync(Guid id, CancellationToken ct)
     {
-        // project in the query: EF selects only the DTO columns (landed: OrdersService.ToResponse)
+        // inline new Dto(...) in Select: EF selects only these columns (landed OrdersService.ToResponse is a client-side method and fetches the whole entity; Report.Status is a string constant column)
         return await db.Reports.AsNoTracking().Where(r => r.Id == id)
             .Select(r => new ReportDto(r.Id, r.Title, r.PeriodStart, r.PeriodEnd, r.Status)).SingleOrDefaultAsync(ct);
     }

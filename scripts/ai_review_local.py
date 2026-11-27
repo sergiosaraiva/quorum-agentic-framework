@@ -13,9 +13,18 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 failed git diff, model call failure, malformed model output); 3 round cap reached (hand the branch to a human).
 
 The reviewer runs read-only: `--tools` restricts the built-in tools to Read, Grep and Glob, `--disallowedTools`
-denies Bash and the write tools, and `--strict-mcp-config` loads no MCP servers. `--allowedTools` alone would
-only pre-approve those three and leave project allow rules (Bash, Edit) and user MCP servers usable by a
-prompt-injected diff.
+denies Bash, the write tools and every MCP tool (`mcp__*`; `--tools` does not affect MCP tools), and
+`--strict-mcp-config` skips the MCP servers configured in .mcp.json, ~/.claude.json and plugins. claude.ai connectors
+are a separate source, so ENABLE_CLAUDEAI_MCP_SERVERS=false is set for the call as well. `--settings` turns on
+`permissions.blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257 or later; older versions are expected to ignore the
+key, so the repository stays readable but not fenced) so a prompt-injected diff cannot make Read or Grep leave the
+repository (~/.ssh and the like). These flags and keys come from the CLI reference, permissions and settings docs; the
+connector and settings behaviour is documented, not exercised by the tests. `--allowedTools` alone would only
+pre-approve the three tools and leave project allow rules (Bash, Edit) and user MCP servers usable by a prompt-injected diff.
+
+The reviewer role prompts (the pr-review skill, quality-guardian, regression-detective) and the Immutable Rules are read
+from the base revision with `git show <base>:<path>`, not from the working tree, so the branch under review cannot weaken
+its own reviewer. A path that does not exist at base (a first adoption) falls back to the working tree with a notice.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
 Critical, High, Blocker -> blocking, Medium -> warning, Low or Info -> info; anything else -> warning.
@@ -61,13 +70,37 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=REPO_ROOT, encoding="utf-8", errors="replace", capture_output=True, **kw)
 
 
+def _strip_frontmatter(text: str) -> str:
+    text = text.replace("\r\n", "\n")
+    return re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.DOTALL).strip()
+
+
 def read_body(path: Path) -> str:
     """File text without YAML frontmatter; empty string (with a warning) when missing."""
     if not path.exists():
         print(f"warning: {path.relative_to(REPO_ROOT)} not found; skipping", file=sys.stderr)
         return ""
-    text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    return re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.DOTALL).strip()
+    return _strip_frontmatter(path.read_text(encoding="utf-8"))
+
+
+def read_at_base(path: Path, base: str) -> str:
+    """Like read_body, but the file as of `base` (git show), so the branch under review cannot weaken the reviewer
+    prompts it is judged by. Falls back to the working tree, with a notice, only when the path is not readable at base
+    (a first adoption, where the file does not exist there yet)."""
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    proc = run(["git", "show", f"{base}:{rel}"])
+    if proc.returncode == 0:
+        return _strip_frontmatter(proc.stdout)
+    print(f"notice: {rel} is not readable at {base}; using the working tree copy (first adoption?)", file=sys.stderr)
+    return read_body(path)
+
+
+def load_reviewer_prompts(base: str) -> list[str]:
+    """The skill and reviewer role sections of the prompt, read from the base revision."""
+    parts = ["## Review skill\n" + read_at_base(SKILL_PATH, base)]
+    for agent in REVIEWER_AGENTS:
+        parts.append(f"## Reviewer role: {agent}\n" + read_at_base(FRAMEWORK_DIR / "agents" / f"{agent}.md", base))
+    return parts
 
 
 def get_diff(base: str) -> str:
@@ -173,13 +206,8 @@ def _prior_text(prior: list[dict]) -> str:
     return text
 
 
-def build_prompt(chunk: str, idx: int, total: int, context: str, prior: list[dict]) -> str:
-    parts = [
-        "You are performing an independent code review. Apply every reviewer role below to the diff.",
-        "## Review skill\n" + read_body(SKILL_PATH),
-    ]
-    for agent in REVIEWER_AGENTS:
-        parts.append(f"## Reviewer role: {agent}\n" + read_body(FRAMEWORK_DIR / "agents" / f"{agent}.md"))
+def build_prompt(chunk: str, idx: int, total: int, context: str, prior: list[dict], roles: list[str]) -> str:
+    parts = ["You are performing an independent code review. Apply every reviewer role below to the diff.", *roles]
     if context:
         parts.append("## Project rules\n" + context)
     if prior:
@@ -272,9 +300,12 @@ def parse_findings(text: str) -> list[dict]:
 READ_ONLY_FLAGS = [
     "--tools", "Read,Grep,Glob",
     "--allowedTools", "Read,Grep,Glob",
-    "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch",
-    "--strict-mcp-config",  # no --mcp-config given, so no MCP servers at all
+    "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,mcp__*",  # mcp__*: --tools does not affect MCP tools
+    "--strict-mcp-config",  # skips .mcp.json, ~/.claude.json and plugin servers; claude.ai connectors: see REVIEW_ENV
+    # Version 2.1.257 or later; the file tools refuse reads outside the working directories (~/.ssh and the like).
+    "--settings", json.dumps({"permissions": {"blockReadsOutsideWorkingDirectories": True}}),
 ]
+REVIEW_ENV = {"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}  # claude.ai connectors are a source --strict-mcp-config does not cover
 
 
 def call_model(prompt: str, model: str, claude_bin: str, timeout: int) -> str:
@@ -282,7 +313,7 @@ def call_model(prompt: str, model: str, claude_bin: str, timeout: int) -> str:
     # allow rules and user MCP servers would stay usable by a prompt-injected diff. Flag names: verify with
     # `claude --help` for your CLI version.
     cmd = [claude_bin, "-p", "--model", model, *READ_ONLY_FLAGS]
-    proc = run(cmd, input=prompt, timeout=timeout)
+    proc = run(cmd, input=prompt, timeout=timeout, env={**os.environ, **REVIEW_ENV})
     if proc.returncode != 0:
         raise RuntimeError(f"claude exited {proc.returncode}: {proc.stderr.strip()[:500]}")
     return proc.stdout
@@ -372,12 +403,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No diff against {args.base}; nothing to review.")
         return 0
     chunks = split_diff(diff, args.max_chunk_bytes)
-    root_rules = read_body(REPO_ROOT / "CLAUDE.md")
+    root_rules = read_at_base(REPO_ROOT / "CLAUDE.md", args.base)
+    roles = load_reviewer_prompts(args.base)
     rules_match = re.search(r"## Immutable Rules.*?(?=\n## )", root_rules, flags=re.DOTALL)
     context = rules_match.group(0) if rules_match else ""
 
     if args.dry_run:
-        print(build_prompt(chunks[0], 1, len(chunks), context, state["findings"]))
+        print(build_prompt(chunks[0], 1, len(chunks), context, state["findings"], roles))
         print(f"\n[dry-run] {len(chunks)} chunk(s), model {args.model}, round {state['rounds'] + 1}/{args.max_rounds}",
               file=sys.stderr)
         return 0
@@ -400,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"round {rnd}: reviewing chunk {i}/{len(chunks)} with {args.model}...", file=sys.stderr)
         try:
             collected += parse_findings(
-                call_model(build_prompt(chunk, i, len(chunks), context, state["findings"]),
+                call_model(build_prompt(chunk, i, len(chunks), context, state["findings"], roles),
                            args.model, args.claude_bin, args.timeout))
         except (RuntimeError, ValueError, AttributeError, TypeError, OSError, subprocess.TimeoutExpired) as exc:
             print(f"error: chunk {i} failed: {exc}", file=sys.stderr)

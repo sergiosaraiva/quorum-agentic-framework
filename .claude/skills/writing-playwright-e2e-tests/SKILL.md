@@ -31,7 +31,7 @@ API contract without a browser?       -> writing-integration-tests
 ## Example: journey with reused auth
 
 ```typescript
-// e2e/reports.spec.ts
+// frontend/e2e/reports.spec.ts
 import { test, expect } from '@playwright/test';
 
 test.use({ storageState: 'e2e/.auth/user.json' });
@@ -52,10 +52,10 @@ test('creates a report and shows it in the list', async ({ page }) => {
 Playwright recommends a setup project that the test projects depend on (https://playwright.dev/docs/auth, https://playwright.dev/docs/test-global-setup-teardown); it shows in the report and traces, unlike `globalSetup`.
 
 ```typescript
-// e2e/auth.setup.ts
+// frontend/e2e/auth.setup.ts
 import { test as setup } from '@playwright/test';
 
-const authFile = 'e2e/.auth/user.json';   // gitignore e2e/.auth/
+const authFile = 'e2e/.auth/user.json';   // gitignore frontend/e2e/.auth/ (paths are relative to frontend/, where Playwright runs)
 
 setup('authenticate', async ({ page }) => {
   await page.goto('/login');
@@ -82,8 +82,9 @@ test('reports page has no serious accessibility violations', async ({ page }) =>
 ```
 
 ```typescript
-// playwright.config.ts (excerpt; import { defineConfig, devices } from '@playwright/test')
+// frontend/playwright.config.ts (excerpt; testDir: 'e2e'; @playwright/test goes in frontend/package.json; import { defineConfig, devices } from '@playwright/test')
 export default defineConfig({
+  testDir: 'e2e',
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   use: { baseURL: process.env.E2E_BASE_URL, trace: 'on-first-retry' },

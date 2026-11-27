@@ -16,7 +16,7 @@ The script reviews your branch diff with the `claude` CLI and your own sign-in; 
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
 | 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
 
-The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools and web tools, and `--strict-mcp-config` loads no MCP servers, so a prompt-injected diff cannot reach project allow rules or user MCP servers.
+The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json`, `~/.claude.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+; older versions ignore it) so reads cannot leave the repository. A prompt-injected diff cannot reach project allow rules or MCP servers. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read from the base revision with `git show`, falling back to the working tree with a notice when absent at base.
 
 Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
 

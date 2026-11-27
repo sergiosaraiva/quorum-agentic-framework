@@ -11,7 +11,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`.
 
 - DTOs are `record` types: immutable, value equality, concise. Defined in the feature's `Dtos.cs`
 - One request type and one response type per use case. Never reuse one DTO for both directions (a request must not accept a response-only field)
-- Never return an EF Core entity from an endpoint; map to a response DTO by hand. For queries prefer a mapping expression inside the EF `Select` projection (EF selects only the needed columns; landed: private `OrdersService.ToResponse`); a static `FromEntity(...)` next to the DTO is the option for in-memory mapping. No AutoMapper unless the team explicitly chooses it
+- Never return an EF Core entity from an endpoint; map to a response DTO by hand. For queries prefer an inline `new Dto(...)` (or an `Expression<Func<Entity, Dto>>`) inside the EF `Select` so EF selects only the needed columns; a call to a client-side method such as landed private `OrdersService.ToResponse` maps the whole entity and fetches every column (fine for a narrow entity); a static `FromEntity(...)` next to the DTO is the option for in-memory mapping. No AutoMapper unless the team explicitly chooses it
 - No parallel domain/application/API DTO copies, no generic `Result<T>` envelope hierarchy, no validator for a type with no rules
 - Server-side validation is mandatory regardless of client-side checks. DataAnnotations is the default for simple rules: call `Validator.TryValidateObject` in the endpoint, as the landed Orders code does (`OrdersEndpoints.cs`; `CreateOrderRequest` in `Dtos.cs` is the model). `AddValidation()` is not registered in `Program.cs`; an adopter who registers it gets automatic checking; add FluentValidation only for cross-field or conditional rules
 - A limit that mirrors a column length is one named `const` on the entity in `src/Infrastructure` (which does not reference `src/Api`), referenced by the DTO, the validator and the EF configuration (landed: `Order.CustomerNameMaxLength`, used by `OrderConfiguration`, `CreateOrderRequest`, `OrderListFilter`). The Angular form mirrors it as one named constant. Tunable business limits come from Options (`creating-configuration-options`)
@@ -50,6 +50,7 @@ public sealed class CreateReportRequestValidator : AbstractValidator<CreateRepor
     }
 }
 
+// Report.Status is a string column (lowercase string constants, as in the database skill)
 public sealed record ReportDto(Guid Id, string Title, DateOnly PeriodStart, DateOnly PeriodEnd, string Status);
 
 // In the service: project in the query so EF selects only these columns

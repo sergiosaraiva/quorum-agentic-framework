@@ -45,7 +45,7 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--max-rounds` | round cap (default 5); at the cap the script exits with code 3 |
 | `--out-dir` | where `findings.json` and `findings.md` are written (default `.ai-review`); the round state always stays in `.ai-review/state.json` |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
-| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH or HEAD has no commits the base lacks (a base that moved on is fine); with a remote configured, also exit 2 when HEAD is detached or the base is not the remote default branch (what `origin/HEAD` points at) at the fork point, and without `origin/HEAD` only a remote-tracking branch tip is accepted, so `HEAD~1` and a stacked parent fail; without a remote, a notice only; use it for the gate (TQ-022) |
+| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH or HEAD has no commits the base lacks (a base that moved on is fine); with a remote configured, also exit 2 when HEAD is detached, when `<remote>/HEAD` is missing (the message says to run `git remote set-head <remote> -a`) or points at the branch's own ref, or when the base is not the remote default branch (`<remote>/HEAD`, e.g. `origin/main`) at the fork point, so `HEAD~1` and a stacked parent fail; without a remote, a notice only; use it for the gate (TQ-022) |
 | `--reset` | drop the current branch's saved count after a human review; the next completed round starts from 1 |
 | `--dry-run` | print the prompt without calling a model |
 

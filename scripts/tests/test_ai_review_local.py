@@ -558,6 +558,7 @@ class AnchoredBaseTests(unittest.TestCase):
 
     def test_head_minus_one_is_rejected_when_a_remote_exists_even_after_the_branch_is_pushed(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch(push=True)  # origin/feat now contains HEAD~1
         code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
         self.assertEqual(code, 2)
@@ -570,6 +571,7 @@ class AnchoredBaseTests(unittest.TestCase):
 
     def test_the_branchs_own_remote_counterpart_is_rejected_as_a_base(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch(push=True)
         self.commit("f3.txt")
         code, _, err = self.main_code("--base", "origin/feat", "--require", "--dry-run")
@@ -578,21 +580,97 @@ class AnchoredBaseTests(unittest.TestCase):
 
     def test_origin_main_is_accepted(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch(push=True)
         code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
         self.assertEqual(code, 0, err)
 
-    def test_a_local_branch_name_is_refused_without_origin_head_but_its_remote_tracking_ref_is_accepted(self):
-        # Without refs/remotes/origin/HEAD only a base that resolves symbolically to a remote-tracking branch anchors.
+    def test_a_remote_without_origin_head_is_refused_with_the_set_head_hint_whatever_the_base(self):
+        # No symbolic fallback: without refs/remotes/origin/HEAD the integration branch is unknown, so nothing anchors.
         self.with_remote()
         self.feature_branch()
-        code, _, err = self.main_code("--base", "main", "--require", "--dry-run")
+        for base in ("main", "origin/main"):
+            with self.subTest(base=base):
+                code, _, err = self.main_code("--base", base, "--require", "--dry-run")
+                self.assertEqual(code, 2)
+                self.assertIn("git remote set-head origin -a", err)
+                self.assertIn("git remote set-head origin <integration-branch>", err)
+
+    def test_a_pushed_parent_branch_is_refused_without_origin_head(self):
+        self.with_remote()
+        self.feature_branch(push=True)
+        self.git("checkout", "-q", "-b", "feat2")
+        self.commit("g1.txt")
+        code, _, err = self.main_code("--base", "origin/feat", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("set-head", err)
+
+    def test_a_branch_pushed_to_a_temporary_name_cannot_anchor_head_minus_one(self):
+        self.with_remote()
+        self.set_head()
+        self.feature_branch()
+        self.git("push", "-q", "origin", "HEAD~1:refs/heads/tmp")
+        self.assertEqual(self.git("rev-parse", "origin/tmp"), self.git("rev-parse", "HEAD~1"))
+        code, _, err = self.main_code("--base", "origin/tmp", "--require", "--dry-run")
         self.assertEqual(code, 2)
         self.assertIn("not anchored", err)
-        self.assertEqual(self.main_code("--base", "origin/main", "--require", "--dry-run")[0], 0)
+
+    def test_set_head_to_the_branchs_own_remote_counterpart_cannot_re_anchor_the_review(self):
+        self.with_remote()
+        self.feature_branch(push=True)
+        self.git("remote", "set-head", "origin", "feat")  # refs/remotes/origin/HEAD -> origin/feat
+        self.assertEqual(self.git("symbolic-ref", "--short", "refs/remotes/origin/HEAD"), "origin/feat")
+        self.commit("f3.txt")  # HEAD is one commit ahead of origin/feat, so without the check `origin/feat` and HEAD~1 would anchor
+        for base in ("HEAD~1", "origin/feat"):
+            with self.subTest(base=base):
+                code, _, err = self.main_code("--base", base, "--require", "--dry-run")
+                self.assertEqual(code, 2)
+                self.assertIn("not anchored", err)
+                self.assertIn("own remote counterpart", err)
+
+    def test_a_branch_made_with_switch_from_origin_main_is_accepted_when_origin_head_is_set(self):
+        # `git switch -c x origin/main` sets the upstream to origin/main: it must not count as the branch's own ref.
+        self.with_remote()
+        self.set_head()
+        self.git("switch", "-q", "-c", "x", "origin/main")
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}"), "origin/main")
+        self.commit("x1.txt")
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+
+    def test_a_normal_clone_with_a_moved_remote_is_accepted(self):
+        import subprocess
+        self.with_remote()
+        subprocess.run(["git", "--git-dir", str(self.remote), "symbolic-ref", "HEAD", "refs/heads/main"], check=True)  # like a hosted remote
+        clone = Path(self._tmp.name) / "clone"
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(self.remote), str(clone)], check=True, capture_output=True)
+        self.root = clone  # as a developer's own clone
+        self.assertEqual(self.git("symbolic-ref", "--short", "refs/remotes/origin/HEAD"), "origin/main")  # set by `git clone`
+        self.git("switch", "-q", "-c", "feat")
+        self.commit("f1.txt")
+        other = Path(self._tmp.name) / "other"
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(self.remote), str(other)], check=True, capture_output=True)
+        self.root = other
+        self.commit("m1.txt")
+        self.git("push", "-q", "origin", "main")  # main moved on after feat was cut
+        self.root = clone
+        self.git("fetch", "-q", "origin")
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+
+    def test_a_linked_worktree_is_accepted(self):
+        self.with_remote()
+        self.set_head()
+        tree = Path(self._tmp.name) / "tree"
+        self.git("worktree", "add", "-q", "-b", "wt", str(tree))
+        self.root = tree
+        self.commit("w1.txt")
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
 
     def test_a_diverged_base_is_accepted(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch()
         self.git("checkout", "-q", "main")
         self.commit("m1.txt")
@@ -606,6 +684,7 @@ class AnchoredBaseTests(unittest.TestCase):
 
     def test_a_detached_head_is_rejected_under_require(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch()
         self.git("checkout", "-q", "--detach")
         code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
@@ -622,8 +701,9 @@ class AnchoredBaseTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("not anchored", err)
 
-    def test_a_branch_pushed_with_a_different_upstream_name_cannot_anchor_itself_without_origin_head(self):
+    def test_a_branch_pushed_with_a_different_upstream_name_cannot_anchor_itself(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch()
         self.git("push", "-q", "-u", "origin", "HEAD:refs/heads/feature/other")  # upstream is origin/feature/other, not origin/feat
         self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}"), "origin/feature/other")
@@ -684,22 +764,19 @@ class AnchoredBaseTests(unittest.TestCase):
                 for base in ("origin/main~1", "origin/main^", self.fork):
                     code, _, err = self.main_code("--base", base, "--require", "--dry-run")
                     self.assertEqual(code, 2, (base, err))
-                    self.assertIn("not anchored", err)
+                    self.assertIn("not anchored" if with_head else "set-head", err)
 
     def test_the_integration_branch_shows_the_commit_the_branch_reverts_in_the_diff(self):
-        for with_head in (True, False):
-            with self.subTest(origin_head=with_head):
-                self.setUp()
-                self.revert_branch()
-                if with_head:
-                    self.set_head()
-                code, out, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
-                self.assertEqual(code, 0, err)
-                self.assertIn("diff --git a/m1.txt b/m1.txt", out)
-                self.assertIn("deleted file mode", out)
+        self.revert_branch()
+        self.set_head()
+        code, out, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertIn("diff --git a/m1.txt b/m1.txt", out)
+        self.assertIn("deleted file mode", out)
 
     def test_the_error_names_the_integration_branch_and_how_to_change_the_default(self):
         self.with_remote()
+        self.set_head()
         self.feature_branch()
         _, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
         for text in ("integration branch", "origin/main", "stacked branch", "git remote set-head <remote> <branch>"):
@@ -715,6 +792,12 @@ class AnchoredBaseTests(unittest.TestCase):
         for text in ("integration branch the remote's HEAD points at", "origin/main", "stacked branch", "git remote set-head <remote> <branch>"):
             self.assertIn(text, help_text)
         doc = " ".join(air.__doc__.split())
+        for text in ("must exist", "git remote set-head <remote> -a", "own remote counterpart", "There is no fallback", "detached HEAD is refused too"):
+            self.assertIn(text, doc)
+        self.assertIn("own remote counterpart", help_text)
+        for text in (help_text, doc):
+            self.assertIn("only for a non-default integration branch, never this branch or its parent", text)
+        self.assertNotIn("changes the default", help_text + doc)
         self.assertIn("keyed by branch name", doc)
         self.assertIn("renaming or copying the branch", doc)
         self.assertNotIn("only --reset", doc)

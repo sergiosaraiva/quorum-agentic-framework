@@ -25,7 +25,7 @@ Covered, beyond the rules in RULES: `git` global options (`-C`, `-c`, `--git-dir
 dashed git binary (`/usr/lib/git-core/git-push` is `git push`); env assignments and wrappers (sudo, env, command, time, nice,
 ionice, setsid, stdbuf, flock, timeout, xargs, busybox...) including short-option clusters read like getopt (`sudo -Eu root`);
 the comma form of brace expansion in an unquoted word (`git push {--force,origin}`); `dotnet build|test|run|msbuild|publish|pack`
-with `-p:PreBuildEvent=` or `-p:PostBuildEvent=` (they run commands); `sh -c '<script>'`
+(also after `watch`) with `-p:PreBuildEvent=` or `-p:PostBuildEvent=` (they run commands); `sh -c '<script>'`
 (also after `--`); substitutions `$(...)`, backticks and `<(...)` anywhere outside single quotes; `find -exec|-execdir|-ok|-okdir
 <command>`; unambiguous long-option prefixes of 3+ characters (`--recur`, `--forc`); heredocs recognised only outside quotes and
 comments, with the body (or here-string word, `bash <<< '...'`) skipped as data unless it feeds a shell (checked as a script; text fed
@@ -53,9 +53,8 @@ Known gaps (not fixed; best effort, not a sandbox):
   (`@x.rsp`) or the project file. Loggers and adapters load code and are not blocked here (they have legitimate uses); the
   settings `ask` list prompts for them: `dotnet <args> -l*`, `/l*`, `-L*`, `-P*`, `/P*`, `-dl*`, `/dl*`, `-distributedlogger*`,
   `-logger*`, `--logger*` and `--test-adapter-path*`, and for any property option: `-p*`, `/p*`, `--property*`, `--p *`, `--p=*`,
-  `-rp*`, `/rp*` and `-restoreProperty*`. Not covered by the `ask` list: `dotnet build --p:<prop>` for a property that is not a
-  build event (no ask rule can express it: a rule ending in `:*` is a prefix rule in Claude Code, so `dotnet * --p:*` never
-  matches, and `dotnet * --p*` would also prompt for `--project`; the guard blocks the build events in that form), an option
+  `-rp*`, `/rp*` and `-restoreProperty*`. Also asked: `--p:` (`Bash(dotnet * --p:**)`, a glob: a rule ending in `:*` is always a prefix rule,
+  so `dotnet * --p:*` never matches; `dotnet * --p*` would also prompt for `--project`). Not covered by the `ask` list: an option
   that is the first argument after `dotnet` (`dotnet -l:x` has no subcommand to anchor `dotnet * -l*`), an option set through
   `@x.rsp`, `MSBUILD*` environment variables or the project file, and spellings beyond those prefixes.
 - Destructive commands not covered by RULES: `git update-ref -d`, `git stash clear|drop`, `git worktree remove --force`,
@@ -221,12 +220,16 @@ def clean_unforced(config):
 
 
 def dotnet_build_event(args):
-    """`dotnet build|test|run|msbuild|publish|pack` with a property override of PreBuildEvent or PostBuildEvent, which runs
+    """`dotnet [watch] build|test|run|msbuild|publish|pack` with a property override of PreBuildEvent or PostBuildEvent, which runs
     an arbitrary command: -p:X, -p=X, --p X (separated value), -property:, --property:, /p:, and the restore forms -rp:,
     /rp:, -restoreProperty:. After `--` the arguments belong to the application (`dotnet run -- -p:X`)."""
     if "--" in args:
         args = args[:args.index("--")]
-    if next((x for x in args if not x.startswith("-")), "") not in DOTNET_BUILD_COMMANDS:
+    words = [x for x in args if not x.startswith("-")]
+    # `dotnet watch <build command> ...` runs the same build: skip the `watch`; any later word that names a build command counts
+    # (`dotnet watch --project x.csproj run`, where the option's value comes before the subcommand).
+    candidates = words[1:] if words[:1] == ["watch"] else words[:1]
+    if not any(x in DOTNET_BUILD_COMMANDS for x in candidates):
         return False
     for i, arg in enumerate(args):
         option = PROPERTY_OPTION.match(arg)

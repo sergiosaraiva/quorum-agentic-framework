@@ -8,7 +8,8 @@ would let a prompt-injected diff run code from the checked-out PR.
 Matching follows https://code.claude.com/docs/en/permissions and the Claude Code source: ANY rule ending in `:*` is a prefix
 rule (regex `^(.+):[*]$`), even when an earlier `*` is present (that earlier part is then literal, so such a rule never matches as
 intended and is forbidden in settings); `Bash(X *)` with no other `*` matches the command X or a command starting with `X `; any
-other rule with `*` is a glob where `*` matches any characters; otherwise an exact match.
+other rule with `*` is a glob where `*` matches any characters (so a rule ending in `**`, such as `git checkout -- **`, is a glob,
+never a prefix rule); otherwise an exact match.
 Run: python3 -m unittest discover -s scripts/tests"""
 import json
 import re
@@ -44,6 +45,8 @@ def representative_command(pattern: str) -> str:
 
 
 def pattern_matches(pattern: str, command: str) -> bool:
+    if pattern.endswith("**"):  # a glob (`*` matches any characters, also none), never a prefix rule: `dotnet * --p:**`, `git push * :**`
+        return re.fullmatch(".*".join(re.escape(part) for part in pattern.split("*")), command, re.DOTALL) is not None
     # Claude Code reads any rule ending in `:*` as a prefix rule (regex `^(.+):[*]$`), so `dotnet * -p:*` means the literal prefix
     # `dotnet * -p` and never matches `dotnet build -p:X=1`.
     if pattern.endswith(":*"):
@@ -140,8 +143,8 @@ class PermissionRuleTests(unittest.TestCase):
             "dotnet build --p PreBuildEvent=x", "dotnet build --p=PreBuildEvent=x", "dotnet build -p PostBuildEvent=x",
             "dotnet build -p:PreBuildEvent=x", "dotnet build /p:PreBuildEvent=x", "dotnet build --property PreBuildEvent=x",
             "dotnet build -p=PreBuildEvent=x", "dotnet build -P:X=1", "dotnet restore -rp:X=1", "dotnet build /rp:X=1",
-            "dotnet build -restoreProperty:X=1",
-            "gh api -X DELETE repos/o/r", "gh api repos/o/r -XDELETE", "gh api repos/o/r --method=DELETE", "gh api repos/o/r --method DELETE",
+            "dotnet build -restoreProperty:X=1", "dotnet build --p:CustomAfterMicrosoftCommonTargets=/x.targets", "dotnet build --p:X=1",
+            "gh api -X DELETE repos/o/r", "gh api -X=DELETE repos/o/r", "gh api repos/o/r -XDELETE", "gh api repos/o/r --method=DELETE", "gh api repos/o/r --method DELETE",
             "gh api repos/o/r --method=delete", "gh api -X delete repos/o/r",
             "gh pr merge 1",
         )
@@ -154,7 +157,7 @@ class PermissionRuleTests(unittest.TestCase):
         ask = self.ask_patterns()
         script = "python3 scripts/ai_review_local.py"
         commands = (
-            "dotnet test --project x", "dotnet build Quorum.slnx", "dotnet test --solution Quorum.slnx",
+            "dotnet test --project x", "dotnet build --project x.csproj", "dotnet build Quorum.slnx", "dotnet test --solution Quorum.slnx",
             "dotnet build Quorum.slnx --no-restore -c Release", "dotnet format Quorum.slnx --verify-no-changes", "dotnet restore",
             f"{script} --base origin/main --require", f"{script} --base origin/main --require --model opus", f"{script} --model opus --base origin/main",
             f"{script} --dry-run", f"{script} --base origin/main --require --timeout 900", "npm audit", "npm audit --json",
@@ -183,10 +186,43 @@ class PermissionRuleTests(unittest.TestCase):
                     with self.subTest(kind=kind, rule=rule):
                         self.assertNotIn("*", inner[:-2], f"{rule} would never match as intended; use a glob such as `Bash(a * -x*)`")
 
+    def test_no_prefix_rule_ends_in_whitespace(self):
+        # Claude Code collapses runs of whitespace in a command, so `Bash(X :*)` (prefix `X `) can never match: the command is
+        # `X` or `X <args>` with the prefix followed by one space, which a prefix that already ends in a space cannot satisfy.
+        permissions = json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]
+        for kind in ("allow", "ask", "deny"):
+            for rule in permissions[kind]:
+                inner = bash_pattern(rule)
+                if inner is not None and inner.endswith(":*"):
+                    with self.subTest(kind=kind, rule=rule):
+                        self.assertEqual(inner[:-2], inner[:-2].rstrip(), f"{rule} has a prefix ending in whitespace and never matches")
+
     def test_the_inner_wildcard_check_catches_the_never_matching_form(self):
         self.assertFalse(pattern_matches("dotnet * --p:*", "dotnet build --p:PreBuildEvent=x"))
 
-    def test_the_guard_still_blocks_the_double_dash_property_form_that_no_ask_rule_can_express(self):
+    def deny_settings(self) -> list[str]:
+        return [m.group(1) for m in (RULE.match(r) for r in json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["deny"]) if m]
+
+    def test_local_sessions_deny_the_remote_branch_delete_and_the_checkout_discard_forms(self):
+        # `Bash(git push origin :*)` and `Bash(git checkout -- :*)` were prefix rules ending in a space and never matched; the
+        # globs `git push * :**` and `git checkout -- **` do. Ordinary pushes and checkouts must stay allowed.
+        deny = self.deny_settings()
+        for command in ("git push origin :feature", "git checkout -- src/a.cs"):
+            with self.subTest(denied=command):
+                self.assertTrue(any(pattern_matches(p, command) for p in deny), command)
+        for command in ("git push origin main:main", "git push -u origin fix/x", "git checkout -b x", "git checkout main"):
+            with self.subTest(not_denied=command):
+                self.assertFalse(any(pattern_matches(p, command) for p in deny), command)
+
+    def test_a_rule_ending_in_double_star_is_a_glob(self):
+        self.assertTrue(pattern_matches("dotnet * --p:**", "dotnet build --p:X=1"))
+        self.assertFalse(pattern_matches("dotnet * --p:**", "dotnet build --project x.csproj"))
+        self.assertTrue(pattern_matches("git push * :**", "git push origin :feature"))
+        self.assertFalse(pattern_matches("git push * :**", "git push origin main:main"))
+        self.assertTrue(pattern_matches("git checkout -- **", "git checkout -- src/a.cs"))
+        self.assertFalse(pattern_matches("git checkout -- **", "git checkout -b x"))
+
+    def test_the_guard_blocks_the_build_events_in_the_double_dash_property_form_too(self):
         import subprocess
         import sys
         guard = ROOT / ".claude" / "hooks" / "guard_bash.py"

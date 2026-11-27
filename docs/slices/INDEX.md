@@ -43,7 +43,7 @@ Edges point from a prerequisite to the slice that depends on it.
 | VS-004 | TQ-017 | tech-lead | Non-blocking: trigram index and minimum search-term length for the `customerName` search (status `open`, P2) |
 | VS-001, VS-004 | TQ-018 | tech-lead | Non-blocking: whether the Orders endpoints move to `TypedResults` as the backend skill requires (status `open`, P3); the endpoints work and are tested as they are |
 | none (framework) | TQ-019 | tech-lead | Non-blocking: where `ANTHROPIC_API_KEY` lives for the AI PR review (environment secret behind required reviewers recommended; status `open`, P2) |
-| none (framework) | TQ-020 | tech-lead | Non-blocking: accept or gate edits to allow-listed scripts that agents can edit and run unprompted (extends OD-023; status `open`, P2) |
+| none (framework) | TQ-020 | tech-lead | Non-blocking: accept or gate edits to allow-listed scripts, and to project files (`*.csproj`, `*.props`, `*.targets`) that `dotnet build` runs, which agents can edit and then run unprompted (extends OD-023; status `open`, P2) |
 | none (framework) | TQ-021 | tech-lead | Non-blocking: whether the residual bypass list of the Bash guard hook is an accepted risk (status `open`, P3) |
 | none (framework) | TQ-022 | tech-lead | Non-blocking: whether a stacked parent or a non-default integration branch may anchor the `--require` base (no, recommended and applied: such branches use `--base origin/main`; status `open`, P3) |
 

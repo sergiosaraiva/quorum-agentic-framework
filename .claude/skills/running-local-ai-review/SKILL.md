@@ -14,11 +14,11 @@ The script reviews your branch diff with the `claude` CLI and your own sign-in. 
 | 1 | Computes `git diff <base>...HEAD` (default base `origin/main`; a stacked rung too under `--require`, TQ-022; a parent base is fine only without `--require`, not the gate) |
 | 2 | Splits the diff into chunks under `--max-chunk-bytes`; no code is dropped |
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
-| 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
+| 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary; later rounds re-check earlier findings, re-reported only if still present |
 
-The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json`, `~/.claude.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+) so reads cannot leave the repository. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read at the merge-base of `--base` and HEAD (shared history) with `git show`, so a moved base does not change them (working-tree fallback with a notice when absent there). That is the whole protection: the branch's own `CLAUDE.md` files, `.claude/settings.json`, the files the reviewer reads and this script still come from the branch.
+The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+) so reads cannot leave the repository. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read at the merge-base of `--base` and HEAD (shared history) with `git show`, so a moved base does not change them (working-tree fallback with a notice when absent there). That is the whole protection: the branch's own `CLAUDE.md` files, `.claude/settings.json`, the files the reviewer reads and this script still come from the branch.
 
-Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
+Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (incl. malformed model output), 3 round cap reached.
 
 ## Flags
 
@@ -31,8 +31,8 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
-| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH or HEAD has no commits the base lacks (a base that moved on is fine). With a remote configured it also exits 2 when HEAD is detached or the base is not the remote default branch (what `origin/HEAD` points at, `origin/main` by default) at the fork point; without `origin/HEAD` only a remote-tracking branch tip is accepted; `HEAD~1` and a stacked parent fail (TQ-022). No remote: a notice only. Use it for the gate |
-| `--reset` | Drop the current branch's saved round count; the next completed round starts from 1 (use after a human review) |
+| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH or HEAD has no commits the base lacks. With a remote configured it also exits 2 when HEAD is detached, when `<remote>/HEAD` is missing (run `git remote set-head <remote> -a`) or points at the branch's own ref, or when the base is not the remote default branch (`<remote>/HEAD`, e.g. `origin/main`) at the fork point; `HEAD~1` and a stacked parent fail (TQ-022). No remote: a notice only. Use for the gate |
+| `--reset` | Reset the branch's round count (after a human review) |
 | `--dry-run` | Print the first prompt, call no model, spend nothing |
 
 Flags are exact (no abbreviations). A branch rename starts a new round count (known limit). The round number is kept in the fixed `.ai-review/state.json`, even with `--out-dir`; there is no `--round` flag. In `.claude/settings.json`, each of `--reset`, `--max-rounds`, `--claude-bin` and `--out-dir` has its own `ask` rule. Run `python3 scripts/ai_review_local.py --help` to confirm the current flags.

@@ -102,7 +102,10 @@ BLOCKED = [
     "dotnet build -rp:PreBuildEvent=x", "dotnet build /rp:PostBuildEvent=x", "dotnet build -restoreProperty:PreBuildEvent=x",
     "dotnet test -RP PostBuildEvent=x", "dotnet build --Property:PREBUILDEVENT=x", "dotnet build -p: PostBuildEvent=x",
     "dotnet publish -c Release --p PostBuildEvent=x",
-    "dotnet build --p:PreBuildEvent=x", "dotnet test --p:PostBuildEvent=x",  # no ask rule can express `--p:<prop>`; the guard is the only layer
+    "dotnet build --p:PreBuildEvent=x", "dotnet test --p:PostBuildEvent=x",  # the guard blocks the build events here; settings also ask on any `--p:`
+    # dotnet watch runs the same build (the subcommand follows `watch`, possibly after an option and its value)
+    "dotnet watch run -p:PostBuildEvent=x", "dotnet watch build -p:PreBuildEvent=x", "dotnet watch test --p PostBuildEvent=x",
+    "dotnet watch --project x.csproj run /p:PostBuildEvent=x", "dotnet watch -v build --property:PreBuildEvent=x",
     # brace expansion in an unquoted word
     "git push {--force,origin}", "git push --{force,x}", "git push -{f,u} origin", "{git,push} -f", "{,git} push -f",
     "git push {origin,--force-with-lease} main", "git push {a,{b,--force}}", "rm {-rf,x} y", "echo {a,b}{c,d}; git push -f",
@@ -165,6 +168,9 @@ ALLOWED = [
     "dotnet publish -c Release -o out", "dotnet ef migrations list", "dotnet new console -n PostBuildEvent",
     "dotnet build -p Configuration=Release", "dotnet build --p Configuration=Release", "dotnet build -rp:A=1 --p B=2", "dotnet build -p",
     "dotnet test --project x", "dotnet run -- -p:PostBuildEvent=x", "dotnet run -- --p PostBuildEvent=x", "dotnet run -c Release -- -p PreBuildEvent=x",
+    # dotnet watch without build-event properties, or with a non-build subcommand
+    "dotnet watch run", "dotnet watch test", "dotnet watch run -p:Configuration=Release", "dotnet watch --project x.csproj run",
+    "dotnet watch run -- -p:PostBuildEvent=x", "dotnet watch",
     # ten chained two-way brace groups are 1024 words, within the budget
     "echo " + "{a,b}" * 10,
     # braces that are not brace expansion: quoted, escaped, parameter expansion, a group without a comma, reserved words

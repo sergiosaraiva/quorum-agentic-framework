@@ -67,7 +67,7 @@ CLAUDE.md                 root guide (rules, stack, pipeline, delegation)
 .claude/agents/           the twelve agents + _SHARED-PATTERNS.md
 .claude/skills/           39 skills, with SKILL-INDEX.md
 .claude/settings.json     permissions
-.claude/hooks/            pre-commit framework lint
+.claude/hooks/            pre-commit framework lint; guard_bash.py, a PreToolUse guard behind the deny list (best effort, not a sandbox)
 .mcp.json                 registers the two knowledge-base servers
 kb/                       business knowledge base (chunks, schema)
 questions/                Q&A knowledge base (records, schema)

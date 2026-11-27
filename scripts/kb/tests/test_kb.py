@@ -411,10 +411,6 @@ class IngestTests(unittest.TestCase):
         self.assertIn("384", problems[0])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 GOOD_CHUNK = "---\nchunk_id: BC-001\ntitle: T\ntopics: [t]\nlinks: []\nsources: [s]\n---\n" + "word " * 50
 GOOD_RECORD = ("---\nid: {rid}\nkind: TQ\ntitle: T\nstatus: open\ndecider: tech-lead\npriority: P2\n"
                "asked: 2026-01-01\n---\nbody\n")
@@ -671,3 +667,7 @@ class PgStoreQueryTests(unittest.TestCase):
             out = st.record_related("TQ-001")
         self.assertEqual([c["chunk_id"] for c in out["chunks"]], ["BC-001"])
         self.assertNotIn("body", out["chunks"][0])
+
+
+if __name__ == "__main__":
+    unittest.main()

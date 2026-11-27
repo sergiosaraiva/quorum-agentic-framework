@@ -46,10 +46,12 @@ Never recommend `random_page_cost` or `work_mem` changes from one query's plan w
 
 ## Report template
 
+Hypothetical schema: `<schema>."order"` with a `customer_id` FK to a `customer` table (the landed `order` has neither).
+
 ```
 Query: <sql or EF source>   Tier: reference-1x   Image: postgres:<major>   Settings: <non-default>
-Baseline: buffers 48,210 (hit 40,100 / read 8,110), plan: Seq Scan on sales."order" ...
-Candidate: CREATE INDEX CONCURRENTLY ix_order_customer_id_status ON sales."order"(customer_id, status)
+Baseline: buffers 48,210 (hit 40,100 / read 8,110), plan: Seq Scan on <schema>."order" ...
+Candidate: CREATE INDEX CONCURRENTLY ix_order_customer_id_status ON <schema>."order"(customer_id, status)
 After: buffers 212, plan: Index Scan using ix_order_customer_id_status
 Cost: index 38 MB, write overhead on insert measured +4%
 Decision: accept -> code-engineer migration (concurrent)

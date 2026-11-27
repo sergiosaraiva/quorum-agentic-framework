@@ -7,7 +7,7 @@ sources: ["scripts/ai_review_local.py", ".claude/skills/running-local-ai-review/
 ---
 The local AI CI is the script `scripts/ai_review_local.py`, the required AI review, together with the in-session review pair. It uses the `claude` CLI with the user's own sign-in and needs no API key. It runs before the first push; a human then merges.
 
-How it works: it collects `git diff <base>...HEAD`, by default against `origin/main`; splits the diff into chunks under a byte limit (60000 by default) without dropping code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions only, and the Immutable Rules of `CLAUDE.md`; runs `claude -p` headless with the read-only tools `Read Grep Glob`; merges the findings; and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
+How it works: it collects `git diff <base>...HEAD` (default `origin/main`); splits the diff into chunks under a byte limit (60000 by default) without dropping code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions, and the Immutable Rules of `CLAUDE.md`, all read from the base revision; runs `claude -p` read-only (`--tools Read,Grep,Glob`, no write, web or MCP tools, reads fenced to the repository); merges the findings; and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
 
 | Option | Meaning |
 |--------|---------|

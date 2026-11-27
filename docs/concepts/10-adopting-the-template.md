@@ -61,7 +61,7 @@ The business KB, the Q&A records, the slices and the Orders sample code describe
 |------|--------|
 | [ ] | `python3 scripts/kb/remove_examples.py` (dry run) lists every chunk and record marked `example: true`; then run it with `--apply` to delete them, regenerate `kb/TOC.md` and print every remaining citation of a removed id, by file |
 | [ ] | Rewrite or delete each passage that the run lists as still citing a removed id |
-| [ ] | Delete the example slices (`docs/slices/VS-00*.md` and their rows in `docs/slices/INDEX.md`) and `docs/reference/pipeline-trial-findings.md` if you do not want them |
+| [ ] | Delete the example slices (`docs/slices/VS-00*.md` and their rows in `docs/slices/INDEX.md`) (keep `docs/reference/pipeline-trial-findings.md`: framework records and docs cite it) |
 | [ ] | Remove the Orders sample code when your first real feature replaces it: `src/Api/Features/Orders`, the Order entity, configuration and migrations in `src/Infrastructure`, the Orders tests under `tests/`, and `frontend/src/app/features/orders`. Keep it until then: it is the reference pattern the skills cite |
 | [ ] | Run the verification commands in the root `CLAUDE.md` |
 

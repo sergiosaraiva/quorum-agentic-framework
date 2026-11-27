@@ -27,7 +27,7 @@ On-demand router. It recommends; the caller reads the skill and decides.
 | `frontend/src/app/**` components | `frontend`, `managing-state-with-signals` |
 | Angular HTTP clients | `creating-angular-api-clients` |
 | `frontend/**/*.spec.ts` | `writing-angular-tests` |
-| `e2e/**`, Playwright | `writing-playwright-e2e-tests` |
+| `frontend/e2e/**`, Playwright | `writing-playwright-e2e-tests` |
 | `tests/**` .NET | `creating-xunit-tests`, `writing-integration-tests` |
 | Mutation or load tests | `running-mutation-tests`, `load-and-performance-testing` |
 | `.github/workflows/**`, Dockerfile | `deploying-the-application`, `implementing-infrastructure-as-code` |

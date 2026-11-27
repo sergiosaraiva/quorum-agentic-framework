@@ -4,7 +4,11 @@ name: AI PR Review
 # `needs-human-review` and a human reviews.
 #
 # Trust model: reviewer instructions (CLAUDE.md and .claude/**) are read from the BASE branch checkout, never
-# from the PR head, so a PR cannot weaken its own reviewer. The PR head is checked out in a subfolder (pr-head/, stripped of instruction files) as data.
+# from the PR head, so a PR cannot weaken its reviewer's instructions. The PR head is checked out in a subfolder (pr-head/, stripped of instruction files) as data.
+# Limit: on `pull_request` GitHub runs THIS workflow file from the PR's merge ref, so a same-repo PR can edit the
+# workflow itself. Protect .github/workflows/** with CODEOWNERS and required review in branch protection.
+# The reviewer may not run build, test or script commands (--disallowedTools below): the base settings.json allow
+# list would otherwise let a prompt-injected diff execute PR-head code next to the API key.
 # Without the repository secret ANTHROPIC_API_KEY the review job is skipped (the PR stays green); the gate prints a notice.
 # Uses `pull_request` (not `pull_request_target`): fork PRs get no secrets and are skipped on purpose.
 #
@@ -160,6 +164,7 @@ jobs:
             --max-turns 30
             --add-dir ${{ github.workspace }}/pr-head
             --allowedTools "Read,Grep,Glob,Agent,Skill,mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(scripts/:*),Bash(./scripts/:*)"
 
       - name: Record the round
         env:

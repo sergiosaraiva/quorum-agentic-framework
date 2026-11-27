@@ -114,6 +114,8 @@
       "Write(./scripts/*.py)",
       "Edit(./scripts/*/__init__.py)",
       "Write(./scripts/*/__init__.py)",
+      "Edit(./scripts/kb/*.py)",
+      "Write(./scripts/kb/*.py)",
       "Edit(./**/*.*proj)",
       "Write(./**/*.*proj)",
       "Edit(./**/*.props)",

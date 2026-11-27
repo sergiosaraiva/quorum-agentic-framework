@@ -1,5 +1,6 @@
 """Tests for .claude/hooks/guard_bash.py, run as a subprocess with the PreToolUse JSON payload, as Claude Code does.
 Run: python3 -m unittest discover -s scripts/tests"""
+import importlib.util
 import json
 import os
 import subprocess
@@ -280,6 +281,14 @@ def run_command(command: str, tool_name: str = "Bash", cwd: Path | None = ROOT, 
     return run_guard(json.dumps(payload), env)
 
 
+def load_guard():
+    """The hook module itself (it only runs main() under __main__), for unit tests of its helpers."""
+    spec = importlib.util.spec_from_file_location("guard_bash_under_test", GUARD)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def decision_of(result: subprocess.CompletedProcess) -> dict:
     return json.loads(result.stdout)["hookSpecificOutput"]
 
@@ -310,6 +319,36 @@ class GuardBashTests(unittest.TestCase):
                 self.assertEqual(output["hookEventName"], "PreToolUse")
                 self.assertEqual(output["permissionDecision"], "ask", result.stdout)
                 self.assertTrue(output["permissionDecisionReason"].startswith("guard_bash: Output redirection"))
+
+    def test_a_letter_case_variant_of_the_project_path_asks_on_a_case_insensitive_filesystem(self):
+        swapped = str(ROOT).swapcase()
+        if swapped == str(ROOT) or not os.path.exists(swapped) or not os.path.samefile(ROOT, swapped):
+            self.skipTest("the filesystem under the project directory is case-sensitive (or the path has no letters)")
+        for command in (f"git log > {swapped}/scripts/json.py", f"git log > {swapped}/new-dir/x", f"git log > {swapped}"):
+            with self.subTest(command=command):
+                self.assertEqual(decision_of(run_command(command))["permissionDecision"], "ask")
+
+    def test_inside_project_compares_file_identity_so_a_case_insensitive_filesystem_is_handled_on_any_platform(self):
+        guard = load_guard()
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw).resolve()
+            (base / "proj" / "scripts").mkdir(parents=True)
+            (base / "other").mkdir()
+            root = str(base / "proj")
+
+            def insensitive_stat(path):  # emulates a case-insensitive volume: the upper-case spelling names the same directory
+                return os.stat(path.replace("PROJ", "proj").replace("SCRIPTS", "scripts"))
+
+            variant = str(base / "PROJ" / "SCRIPTS" / "json.py")
+            self.assertFalse(guard.inside_project(variant, root), "a case-sensitive filesystem: a different spelling is another path")
+            self.assertTrue(guard.inside_project(variant, root, stat=insensitive_stat))
+            self.assertTrue(guard.inside_project(str(base / "PROJ" / "new" / "deep" / "x"), root, stat=insensitive_stat))
+            self.assertTrue(guard.inside_project(str(base / "PROJ"), root, stat=insensitive_stat))
+            self.assertFalse(guard.inside_project(str(base / "OTHER" / "x"), root, stat=insensitive_stat))
+            self.assertFalse(guard.inside_project(str(base / "other" / "x"), root))
+            self.assertTrue(guard.inside_project(str(base / "proj" / "scripts" / "json.py"), root))
+            self.assertFalse(guard.inside_project(str(base / "proj-sibling" / "x"), root))
+            self.assertFalse(guard.inside_project(str(base / "x"), str(base / "missing")), "an unreadable root is never matched by identity")
 
     def test_redirections_that_cannot_write_in_the_repository_and_non_output_forms_pass(self):
         for command in REDIRECTS_ALLOWED:

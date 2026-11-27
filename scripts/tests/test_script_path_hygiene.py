@@ -2,7 +2,7 @@
 
 Why: `python3 scripts/<x>.py` puts scripts/ first on sys.path, so a planted scripts/json.py, scripts/json/__init__.py, a sourceless
 scripts/json.pyc or an extension module (scripts/json.cpython-312-*.so) would replace a standard library module and run without a
-prompt (the Edit ask rules only cover `scripts/*.py` and `scripts/*/__init__.py`, and a shell redirect can write the other forms).
+prompt (the Edit ask rules cover `scripts/*.py`, `scripts/*/__init__.py` and `scripts/kb/*.py`, and a shell redirect can write the other forms).
 Each script drops its own directory from sys.path as its first statement, before any import (`from __future__` imports a module
 too, so the scripts do not use it). The scripts/kb scripts import their siblings (`lib`, `backends`), so after dropping the directory
 they load those by path and register them under their names. Moving the directory to the END of sys.path is not enough: modules the
@@ -20,6 +20,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from test_permission_rules import path_rule_matches  # the repo's matcher for Edit(...) rule paths
 
 ROOT = Path(__file__).resolve().parents[2]
 SETTINGS = ROOT / ".claude" / "settings.json"
@@ -79,6 +81,19 @@ class ScriptPathHygieneTests(unittest.TestCase):
             for module in directory.glob("*.py"):
                 with self.subTest(module=str(module.relative_to(ROOT))):
                     self.assertNotIn(module.stem, sys.stdlib_module_names)
+
+    def test_every_covered_script_and_every_module_it_loads_by_path_is_gated_by_an_edit_ask_rule(self):
+        # the allow rules `Edit(./scripts/**)` and `Write(./scripts/**)` let an agent edit any script unprompted, and an ask rule beats
+        # an allow rule; an allow-listed script runs its siblings (scripts/kb: lib, backends), so each of them is gated as well
+        rules = json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]
+        for tool in ("Edit", "Write"):
+            ask = [m.group(1) for m in (re.match(rf"^{tool}\((.*)\)$", r) for r in rules) if m]
+            for name in allow_listed_standalone_scripts():
+                directory = (ROOT / "scripts" / name).parent
+                for module in sorted({ROOT / "scripts" / name, *directory.glob("*.py")}):
+                    relative = module.relative_to(ROOT).as_posix()
+                    with self.subTest(tool=tool, module=relative):
+                        self.assertTrue(any(path_rule_matches(p, relative) for p in ask), f"{relative} is not gated by an {tool} ask rule")
 
     def test_planted_standard_library_names_next_to_a_script_do_not_run(self):
         for name in allow_listed_standalone_scripts():

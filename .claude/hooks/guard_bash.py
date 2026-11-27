@@ -773,10 +773,35 @@ def under(path, root):
     return path == root or path.startswith(root + "/")
 
 
+def inside_project(path, root, stat=os.stat):
+    """True when `path` (already resolved through symlinks) is the project directory or below it. Compared by file identity, not by
+    string: on a case-insensitive or normalization-insensitive filesystem (macOS APFS, WSL /mnt/c) `/Users/u/REPO/x` and
+    `/Users/u/repo/x` are the same file, and realpath keeps the case the caller typed. Walks up to the nearest existing ancestors
+    (the target usually does not exist yet) and compares each with the root. `stat` is injectable for tests."""
+    if under(path, root.rstrip(os.sep)):
+        return True
+    try:
+        root_stat = stat(root)
+    except OSError:
+        return False
+    current = path
+    while True:
+        try:
+            if os.path.samestat(stat(current), root_stat):
+                return True
+        except OSError:  # this component does not exist (yet): try its parent
+            pass
+        parent = os.path.dirname(current)
+        if parent == current:
+            return False
+        current = parent
+
+
 def redirect_reason(found, cwd, project):
     """The reason to ask about the first output redirection that is not provably harmless, else None. No action only for exactly
     /dev/null, a descriptor duplication or close, and a path that resolves outside the project directory and is not under
-    /dev or /proc (lexically or after symlinks). Everything else asks."""
+    /dev or /proc (lexically or after symlinks); inside is decided by file identity, so a different letter case on a
+    case-insensitive filesystem is still inside. Everything else asks."""
     for op, target in found.targets:
         if not target or (op == ">&" and DESCRIPTOR_RE.match(target)) or target == NULL_DEVICE:
             continue
@@ -793,7 +818,7 @@ def redirect_reason(found, cwd, project):
             path = os.path.realpath(lexical)
             root = os.path.realpath(project)
             special = any(under(p, r) for p in (lexical, path) for r in SPECIAL_ROOTS)
-            inside = under(path, root.rstrip(os.sep))
+            inside = inside_project(path, root)
         except (OSError, ValueError):  # for example a NUL in the path: cannot be checked
             special, inside, path = False, True, target
         if special:

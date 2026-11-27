@@ -226,14 +226,17 @@ def id_collisions(refs: list[str], qa_dir: Path = lib.QA_DIR, repo: Path | None 
             out.append(f"--against {ref}: a ref must not start with '-'")
             continue
         try:
-            names = [n for n in git("ls-tree", "-r", "--name-only", ref, "--", rel).splitlines() if n.endswith(".md")]
+            # --full-name: paths relative to the repository top, which is what `git show REF:path` reads (plain ls-tree prints them
+            # relative to `repo`, which can be a subdirectory when --root is given)
+            names = [n for n in git("ls-tree", "-r", "--name-only", "--full-name", ref, "--", rel).splitlines() if n.endswith(".md")]
         except ValueError as exc:
             out.append(f"--against {ref}: {exc}")
             continue
         for n in names:
             try:
                 other, _ = lib.parse_frontmatter(git("show", f"{ref}:{n}"))
-            except ValueError:
+            except ValueError as exc:
+                out.append(f"--against {ref}: cannot read {n} ({exc}); its id was not compared")
                 continue
             rid, title = other.get("id"), other.get("title")
             if rid in local and title is not None and title != local[rid].title:

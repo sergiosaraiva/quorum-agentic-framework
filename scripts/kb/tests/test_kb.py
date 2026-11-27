@@ -188,6 +188,34 @@ class IdCollisionTests(unittest.TestCase):
         self.record("TQ-003", "Only here")
         self.assertEqual(check_chunks.id_collisions(["other"], self.qa, self.repo), [])
 
+    def test_root_below_the_repository_top_compares_the_right_files(self):
+        # --root pointing at a subdirectory of the repository: ls-tree must print top-relative paths, which `git show REF:path` reads
+        sub = self.repo / "fixture"
+        (sub / "questions" / "records").mkdir(parents=True)
+        (sub / "questions" / "records" / "TQ-002.md").write_text(
+            "---\nid: TQ-002\nkind: TQ\ntitle: Fixture on main\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n---\nb\n")
+        self.record("TQ-002", "Top-level record")
+        self.git("add", "-A"); self.git("commit", "-qm", "base")
+        self.git("checkout", "-qb", "other")
+        (sub / "questions" / "records" / "TQ-002.md").write_text(
+            "---\nid: TQ-002\nkind: TQ\ntitle: Fixture on other\nstatus: open\ndecider: tech-lead\nasked: 2026-01-01\n---\nb\n")
+        self.git("add", "-A"); self.git("commit", "-qm", "other")
+        self.git("checkout", "-q", "main")
+        out = check_chunks.id_collisions(["other"], sub / "questions", sub)
+        self.assertEqual(len(out), 1, out)
+        self.assertIn("'Fixture on other' there, 'Fixture on main' here", out[0])
+
+    def test_an_unreadable_record_on_the_other_ref_is_reported_not_skipped(self):
+        self.record("TQ-001", "Base")
+        self.git("add", "-A"); self.git("commit", "-qm", "base")
+        self.git("checkout", "-qb", "other")
+        (self.qa / "records" / "TQ-009.md").write_text("no frontmatter here\n")
+        self.git("add", "-A"); self.git("commit", "-qm", "other")
+        self.git("checkout", "-q", "main")
+        out = check_chunks.id_collisions(["other"], self.qa, self.repo)
+        self.assertEqual(len(out), 1, out)
+        self.assertIn("--against other: cannot read questions/records/TQ-009.md", out[0])
+
     def test_ref_starting_with_dash_is_rejected(self):
         out = check_chunks.id_collisions(["--output=x"], self.qa, self.repo)
         self.assertEqual(len(out), 1)

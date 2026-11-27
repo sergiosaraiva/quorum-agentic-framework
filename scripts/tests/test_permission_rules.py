@@ -236,15 +236,17 @@ class PermissionRuleTests(unittest.TestCase):
         # with scripts/ first on sys.path, so a new single-file module (scripts/json.py) or a new regular package
         # (scripts/json/__init__.py, also argparse, yaml) at the top of scripts/ would hijack the stdlib import and run unprompted.
         # Both are gated. A namespace package (a directory without __init__.py) does NOT shadow: a stdlib regular module wins over
-        # a namespace portion (scratch probe: scripts/json/x.py leaves `import json` on the stdlib), so scripts/kb/*.py and
-        # scripts/tests/*.py stay free. MSBuild builds any *.*proj and auto-loads Directory.Build.rsp, *.props, *.targets and
+        # a namespace portion (scratch probe: scripts/json/x.py leaves `import json` on the stdlib), so scripts/kb/tests/ and
+        # scripts/tests/ stay free. The scripts/kb/*.py files are gated too: allow-listed scripts there run the code of lib.py and
+        # backends.py, which they load by path. MSBuild builds any *.*proj and auto-loads Directory.Build.rsp, *.props, *.targets and
         # <Project>.csproj.user. Ask rules beat allow rules.
         gated = ("scripts/json.py", "scripts/argparse.py", "scripts/json/__init__.py", "scripts/argparse/__init__.py",
                  "scripts/yaml/__init__.py", "scripts/kb/__init__.py", "scripts/ai_review_local.py", "scripts/framework_lint.py",
+                 "scripts/kb/lib.py", "scripts/kb/check_chunks.py", "scripts/kb/backends.py",
                  "src/Api/Api.csproj", "src/x.fsproj", "build.proj", "src/Api/Directory.Build.rsp", "src/Api/Api.csproj.user",
                  "Directory.Build.props", "tests/X/X.csproj", "src/Api/Foo.targets", "Directory.Packages.props",
                  "a/b/c/Directory.Build.targets")
-        free = ("scripts/kb/search.py", "scripts/tests/test_x.py", "src/Api/Program.cs", "src/x.xml", "docs/x.md",
+        free = ("scripts/kb/tests/test_kb.py", "scripts/tests/test_x.py", "src/Api/Program.cs", "src/x.xml", "docs/x.md",
                 "scripts/ai_review_local.py.bak", "src/Api/csproj", "scripts/json/x.py", "scripts/kb/tests/__init__.py")
         # Claude Code 2.1.332 applies only `Edit(...)` rules to file permission checks, whichever file tool writes (a `Write(...)`
         # rule is not matched), so the Edit rules are the effective ones. The Write twins are kept because they document intent

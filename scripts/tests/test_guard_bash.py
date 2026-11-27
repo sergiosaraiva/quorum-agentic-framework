@@ -138,7 +138,7 @@ ASKED = [
     "git log > scripts/json.py", "git log >scripts/json.py", "echo x >> src/Api/CLAUDE.md", "git log -1 > src/Api/Directory.Build.rsp",
     "(cd src && git log > Directory.Build.rsp)", "git log > $D/x", "git log > ${D}/x", "git log > $(pwd)/x", "git log > `pwd`/x",
     "git log &> out.txt", "git log &>> out.txt", "git log >| out.txt", "git log 2> err.txt", "git log 1>out.txt", "git log >& out.txt",
-    "git log > ~/x", "git log > scripts/*.py", "git log > scripts/j?on.py", "git log > scripts/[j]son.py", "git log > >(tee x)",
+    "git log > ~/x", "git log > scripts/*.py", "git log > scripts/j?on.py", "git log > scripts/[j]son.py", "git log > {,scripts/json.py}", "git log > {a,b}", "git log > >(tee x)",
     "git log <> scripts/json.py", "git log > './scripts/json.py'", 'git log > "scripts/json.py"', "git log > ./a/../scripts/json.py",
     "git log > " + str(ROOT / "scripts" / "json.py"), "git log > " + str(ROOT), "git log > out.txt", "curl -s u > f && jq . f",
     "echo a > b 2>&1", "cat <<'EOF' > notes.md\nnever run rm -rf x\ngit push --force\nEOF", "cat <<EOF > f\nhello\nEOF",
@@ -341,18 +341,21 @@ class GuardBashTests(unittest.TestCase):
             # the project directory comes from CLAUDE_PROJECT_DIR, else from the payload cwd
             self.assertEqual(decision_of(run_command("git log > x.txt", cwd=project, env=hook_env(None)))["permissionDecision"], "ask")
             self.assertEqual(run_command("git log > /tmp/x.txt", cwd=project, env=hook_env(None)).stdout, "")
+            # a relative path reaches /dev from a cwd of / without any symlink
+            self.assertEqual(decision_of(run_command("git log > dev/fd/3", cwd=Path("/"), env=hook_env(project)))["permissionDecision"], "ask")
+            # brace expansion drops the empty alternative: this writes <project>/x.txt, so it asks from a cwd outside the project too
+            self.assertEqual(decision_of(run_command(f"git log > {{,{project / 'x.txt'}}}", cwd=outside, env=hook_env(project)))["permissionDecision"], "ask")
             # a symlink inside the project that points outside is outside; one outside that points inside is inside
             (outside / "elsewhere").mkdir()
             try:
                 (project / "link").symlink_to(outside / "elsewhere")
                 (outside / "back").symlink_to(project)
+                (outside / "devlink").symlink_to("/dev/fd")
             except OSError:  # no symlink support (Windows without privilege)
-                return
+                self.skipTest("no symlink support")
             self.assertEqual(run_command("git log > link/x.txt", cwd=project, env=hook_env(project)).stdout, "")
-            # a symlink that points into /dev or /proc asks, and so does a relative path that reaches them from a cwd of /
-            (outside / "devlink").symlink_to("/dev/fd")
+            # a symlink that points into /dev or /proc asks
             self.assertEqual(decision_of(run_command("git log > devlink/3", cwd=outside, env=hook_env(project)))["permissionDecision"], "ask")
-            self.assertEqual(decision_of(run_command("git log > dev/fd/3", cwd=Path("/"), env=hook_env(project)))["permissionDecision"], "ask")
             self.assertEqual(decision_of(run_command(f"git log > {outside / 'back' / 'x.txt'}", cwd=outside, env=hook_env(project)))["permissionDecision"], "ask")
 
     def test_a_missing_payload_cwd_falls_back_to_the_process_directory(self):

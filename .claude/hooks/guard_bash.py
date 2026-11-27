@@ -50,8 +50,8 @@ fed to a shell. The rule is conservative: a target needs no action ONLY if it is
     directory (`$CLAUDE_PROJECT_DIR`, else the payload `cwd`; symlinks followed) AND is not under `/dev` or `/proc`, lexically or
     after symlinks.
 Everything else asks: any other `/dev/*` (`/dev/stdout`, `/dev/stderr`, `/dev/fd/N`, `/dev/stdin`: `3<victim >/dev/fd/3` reopens the
-repository file for writing), any `/proc/*` (`/proc/self/fd/N`, `/proc/self/cwd/x`), a target with `$`, a backtick, a glob character
-(`*`, `?`, `[`), a leading `~` or a `<(`/`>(` substitution (it cannot be checked), a relative target in a command that also runs
+repository file for writing), any `/proc/*` (`/proc/self/fd/N`, `/proc/self/cwd/x`), a target with `$`, a backtick, a glob or brace character
+(`*`, `?`, `[`, `{`: `> {,/repo/x}` brace-expands to /repo/x), a leading `~` or a `<(`/`>(` substitution (it cannot be checked), a relative target in a command that also runs
 `cd`, `pushd` or `popd` (the directory is unknown), and a target inside the project directory.
 Not output redirections: heredocs (`<<`, `<<-`), here-strings (`<<<`), input redirection (`<`, `<&`), and `<` or `>` between `[[`
 and `]]`, where they compare strings (`[[ a > b ]]`). The body of a quoted heredoc (`<<'EOF'`) is data; the body of an unquoted one
@@ -150,7 +150,7 @@ OUTPUT_OPERATORS = {">", ">>", ">|", "&>", "&>>", ">&", "<>"}
 NULL_DEVICE = "/dev/null"  # the only device a redirect may name without asking
 SPECIAL_ROOTS = ("/dev", "/proc")  # fd reopen paths (`/dev/fd/3`, `/proc/self/fd/3`, `/proc/self/cwd/x`) can reach any file
 DESCRIPTOR_RE = re.compile(r"^(\d+-?|-)$")  # `>&2`, `>&1-` (move) and `>&-` (close) duplicate or close a descriptor, no file
-DYNAMIC_CHARS = re.compile(r"[$`*?\[]")
+DYNAMIC_CHARS = re.compile(r"[$`*?\[{]")  # `{` is brace expansion: `> {,/repo/x}` writes /repo/x, `> {a,b}` writes two files
 CHDIR_COMMANDS = {"cd", "pushd", "popd"}
 
 
@@ -782,7 +782,7 @@ def redirect_reason(found, cwd, project):
             continue
         if DYNAMIC_CHARS.search(target) or target.startswith(("~", "<(", ">(")):
             return (f"Output redirection to {target} has a target the guard cannot check (it contains $, a backtick, a glob "
-                    "character, ~ or a substitution). Redirect to a literal path outside the repository, or use the Edit tool "
+                    "character, a brace, ~ or a substitution). Redirect to a literal path outside the repository, or use the Edit tool "
                     "so ask rules apply.")
         if not os.path.isabs(target) and found.chdir:
             return (f"Output redirection to {target} is relative and the command changes directory, so the guard cannot tell "

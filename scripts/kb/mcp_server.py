@@ -8,13 +8,19 @@ Backend: --backend local (default, Markdown files) or pg (needs DATABASE_URL); e
 Implements: initialize, notifications/initialized, ping, tools/list, tools/call. Read-only.
 Logs go to stderr only; stdout carries protocol messages exclusively.
 """
-from __future__ import annotations
+import sys  # builtin: cannot be shadowed. Nothing else is imported before the next statement (not even `from __future__`, which imports a module)
+if __name__ == "__main__" and not sys.flags.isolated and not getattr(sys.flags, "safe_path", False) and sys.path and sys.path[0]:
+    _here = sys.path.pop(0)  # the script directory: a planted scripts/kb/<stdlib-name>.* must not shadow the standard library (OD-032); not even last on the path (nt, psycopg ... are imported when absent)
+    import importlib.util  # the sibling modules are loaded by path and registered under their names, so `import lib` below finds them
+    for _name in ("lib", "backends"):
+        _spec = importlib.util.spec_from_file_location(_name, _here + "/" + _name + ".py")
+        sys.modules[_name] = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(sys.modules[_name])
 
 import argparse
 import io
 import json
 import os
-import sys
 
 import backends
 import lib

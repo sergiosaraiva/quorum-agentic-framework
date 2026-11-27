@@ -1,6 +1,9 @@
 """Unit tests. Run from the repo root: python3 -m unittest discover -s scripts/kb/tests"""
+import contextlib
+import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -85,6 +88,27 @@ class EmbeddingTests(unittest.TestCase):
 class LintTests(unittest.TestCase):
     def test_shipped_kb_and_records_are_clean(self):
         self.assertEqual(check_chunks.lint(), [])
+
+    def test_write_toc_does_not_warn_that_the_toc_it_rewrites_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shutil.copytree(FIXTURES, root, dirs_exist_ok=True)
+            (root / "kb" / "TOC.md").write_text("outdated\n", encoding="utf-8")
+
+            def run_main(*argv):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    code = check_chunks.main(["--root", str(root), *argv])
+                return code, out.getvalue()
+
+            code, out = run_main()
+            self.assertEqual(code, 0, out)
+            self.assertIn("kb/TOC.md is stale", out)
+            code, out = run_main("--write-toc")
+            self.assertEqual(code, 0, out)
+            self.assertNotIn("stale", out)
+            self.assertIn("wrote kb/TOC.md", out)
+            self.assertEqual(check_chunks.stale_toc(root / "kb"), [])
 
     def test_detects_dangling_link_and_duplicate(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -106,6 +106,9 @@ BLOCKED = [
     # dotnet watch runs the same build (the subcommand follows `watch`, possibly after an option and its value)
     "dotnet watch run -p:PostBuildEvent=x", "dotnet watch build -p:PreBuildEvent=x", "dotnet watch test --p PostBuildEvent=x",
     "dotnet watch --project x.csproj run /p:PostBuildEvent=x", "dotnet watch -v build --property:PreBuildEvent=x",
+    # watch always builds, even with no build subcommand word (the default subcommand is run)
+    "dotnet watch --property:PostBuildEvent=x", "dotnet watch /p:PostBuildEvent=x", "dotnet watch -p:PreBuildEvent=x",
+    "dotnet watch --project x.csproj --property:PreBuildEvent=x",
     # brace expansion in an unquoted word
     "git push {--force,origin}", "git push --{force,x}", "git push -{f,u} origin", "{git,push} -f", "{,git} push -f",
     "git push {origin,--force-with-lease} main", "git push {a,{b,--force}}", "rm {-rf,x} y", "echo {a,b}{c,d}; git push -f",

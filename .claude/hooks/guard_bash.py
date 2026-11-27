@@ -220,16 +220,16 @@ def clean_unforced(config):
 
 
 def dotnet_build_event(args):
-    """`dotnet [watch] build|test|run|msbuild|publish|pack` with a property override of PreBuildEvent or PostBuildEvent, which runs
+    """`dotnet [watch] build|test|run|msbuild|publish|pack` or any `dotnet watch ...` (watch always builds; its default
+    subcommand is run) with a property override of PreBuildEvent or PostBuildEvent, which runs
     an arbitrary command: -p:X, -p=X, --p X (separated value), -property:, --property:, /p:, and the restore forms -rp:,
     /rp:, -restoreProperty:. After `--` the arguments belong to the application (`dotnet run -- -p:X`)."""
     if "--" in args:
         args = args[:args.index("--")]
     words = [x for x in args if not x.startswith("-")]
-    # `dotnet watch <build command> ...` runs the same build: skip the `watch`; any later word that names a build command counts
-    # (`dotnet watch --project x.csproj run`, where the option's value comes before the subcommand).
-    candidates = words[1:] if words[:1] == ["watch"] else words[:1]
-    if not any(x in DOTNET_BUILD_COMMANDS for x in candidates):
+    # `dotnet watch ...` always builds (the default subcommand is run, and the option values come before the subcommand in
+    # `dotnet watch --project x.csproj run`), so every watch command counts as a build; otherwise the first word must be one.
+    if words[:1] != ["watch"] and not any(x in DOTNET_BUILD_COMMANDS for x in words[:1]):
         return False
     for i, arg in enumerate(args):
         option = PROPERTY_OPTION.match(arg)

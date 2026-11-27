@@ -1,12 +1,22 @@
 """Tests for scripts/ai_review_local.py. Run: python3 -m unittest discover -s scripts/tests"""
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import ai_review_local as air  # noqa: E402
+
+
+def setUpModule():
+    """The temp repositories must not depend on the developer's git configuration (branch.autoSetupMerge, init.defaultBranch,
+    aliases, hooks path): the script's own git calls inherit this environment too."""
+    patcher = mock.patch.dict(os.environ, {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
 
 
 def make_diff(path: str, lines: list[str], hunks: int = 1) -> str:
@@ -625,18 +635,65 @@ class AnchoredBaseTests(unittest.TestCase):
             with self.subTest(base=base):
                 code, _, err = self.main_code("--base", base, "--require", "--dry-run")
                 self.assertEqual(code, 2)
-                self.assertIn("not anchored", err)
+                self.assertIn("you are on the integration branch", err)
                 self.assertIn("own remote counterpart", err)
 
     def test_a_branch_made_with_switch_from_origin_main_is_accepted_when_origin_head_is_set(self):
         # `git switch -c x origin/main` sets the upstream to origin/main: it must not count as the branch's own ref.
         self.with_remote()
         self.set_head()
-        self.git("switch", "-q", "-c", "x", "origin/main")
+        self.git("switch", "-q", "-c", "x", "--track", "origin/main")  # explicit: does not depend on branch.autoSetupMerge
         self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}"), "origin/main")
         self.commit("x1.txt")
         code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
         self.assertEqual(code, 0, err)
+
+    def own_ref_attack(self):
+        """The branch `feat` is pushed, the remote HEAD is pointed at origin/feat, and HEAD is one commit ahead of it, so
+        `--base HEAD~1` equals origin/feat: only the own-ref check stops it from anchoring."""
+        self.with_remote()
+        self.feature_branch(push=True)
+        self.git("remote", "set-head", "origin", "feat")
+        self.commit("f3.txt")
+
+    def assert_head_minus_one_refused(self):
+        code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        self.assertEqual(code, 2, err)
+        self.assertIn("own remote counterpart", err)
+
+    def test_a_local_branch_named_origin_feat_cannot_hide_the_own_remote_counterpart(self):
+        # With refs/heads/origin/feat present, `symbolic-ref --short refs/remotes/origin/HEAD` prints `remotes/origin/feat`,
+        # which an abbreviated-name comparison would not recognise as `origin/feat`.
+        self.own_ref_attack()
+        self.git("branch", "origin/feat", "HEAD~1")
+        self.assertEqual(self.git("symbolic-ref", "--short", "refs/remotes/origin/HEAD"), "remotes/origin/feat")
+        self.assert_head_minus_one_refused()
+
+    def test_a_tag_named_like_the_branch_cannot_hide_the_own_remote_counterpart(self):
+        # With a tag `feat`, `rev-parse --abbrev-ref HEAD` prints `heads/feat`, so `origin/feat` would not be excluded.
+        self.own_ref_attack()
+        self.git("tag", "feat")
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "HEAD"), "heads/feat")
+        self.assert_head_minus_one_refused()
+
+    def test_the_round_state_key_is_the_branch_name_even_when_a_tag_has_the_same_name(self):
+        self.with_remote()
+        self.feature_branch()
+        self.git("tag", "feat")
+        with mock.patch.object(air, "REPO_ROOT", self.root):
+            self.assertEqual(air.current_branch(), "feat")
+            self.git("checkout", "-q", "--detach")
+            self.assertEqual(air.current_branch(), "HEAD")
+
+    def test_committing_on_the_integration_branch_is_told_to_create_a_branch(self):
+        self.with_remote()
+        self.set_head()
+        self.commit("m2.txt")  # a commit on local main, ahead of origin/main
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("you are on the integration branch", err)
+        self.assertIn("git switch -c <name>", err)
+        self.assertNotIn("for example origin/main", err)
 
     def test_a_normal_clone_with_a_moved_remote_is_accepted(self):
         import subprocess

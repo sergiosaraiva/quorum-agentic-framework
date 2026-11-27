@@ -155,9 +155,11 @@ def _git_line(*args: str) -> str:
 
 
 def _own_remote_refs() -> set[str]:
-    """Remote-tracking names that are this branch's own counterpart, `<remote>/<local name>`, and so must not be the remote's
-    HEAD. The upstream is not included: `git switch -c x origin/main` sets it to the integration branch itself."""
-    return {f"{remote}/{current_branch()}" for remote in run(["git", "remote"]).stdout.split()}
+    """Full names of this branch's own remote counterparts, `refs/remotes/<remote>/<local name>`, which must not be the remote's
+    HEAD. Full ref names are compared, never abbreviated ones: `git branch origin/feat` or a tag named like the branch makes the
+    short forms ambiguous (`remotes/origin/feat`, `heads/feat`). The upstream is not included: `git switch -c x origin/main`
+    sets it to the integration branch itself."""
+    return {f"refs/remotes/{remote}/{current_branch()}" for remote in run(["git", "remote"]).stdout.split()}
 
 
 def _anchor_problem(merge_base: str) -> str | None:
@@ -173,12 +175,17 @@ def _anchor_problem(merge_base: str) -> str | None:
         return ("--require: no `refs/remotes/<remote>/HEAD` is set, so the integration branch is unknown; run "
                 f"`git remote set-head {remotes[0]} -a` (or `git remote set-head {remotes[0]} <integration-branch>`) and retry")
     own = _own_remote_refs()
+    on_own_ref = False
     for ref in heads:
-        if _git_line("symbolic-ref", "--short", ref) in own:
-            continue  # the remote HEAD points at this branch's own counterpart: it cannot anchor the branch to itself
+        if _git_line("symbolic-ref", "-q", ref) in own:
+            on_own_ref = True  # the remote HEAD points at this branch's own counterpart: it cannot anchor the branch to itself
+            continue
         fork = run(["git", "merge-base", ref, "HEAD"])
         if fork.returncode == 0 and fork.stdout.strip() == merge_base:
             return None
+    if on_own_ref:
+        return ("--require: you are on the integration branch (the remote's HEAD points at this branch's own remote counterpart), "
+                "so there is no branch to review; create a branch first (git switch -c <name>) and commit there")
     return ("--require: the base is not anchored to shared history: under --require the base must be the integration branch "
             "the remote's HEAD points at (for example origin/main, after `git fetch`); it would otherwise review only part of this "
             "branch. A stacked branch, or a branch whose integration branch is not the remote's default, also uses it "
@@ -445,8 +452,10 @@ def render_markdown(findings: list[dict], rnd: int, model: str, base: str) -> st
 
 
 def current_branch() -> str:
-    proc = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    return (proc.stdout.strip() if proc.returncode == 0 else "") or "HEAD"
+    """The checked-out branch name from the full ref `refs/heads/<name>`, or "HEAD" when detached. Not `rev-parse --abbrev-ref`:
+    a tag named like the branch makes that print `heads/<name>`, which would also start a new round count."""
+    ref = _git_line("symbolic-ref", "-q", "HEAD")
+    return ref.removeprefix("refs/heads/") if ref.startswith("refs/heads/") else "HEAD"
 
 
 def state_path() -> Path:

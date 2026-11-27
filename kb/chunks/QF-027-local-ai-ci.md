@@ -14,7 +14,7 @@ How it works: it collects `git diff <base>...HEAD`; splits the diff into chunks,
 | `--base` | Diff base, default `origin/main`; a stacked rung uses `origin/main` too under `--require` (TQ-022), a parent base is fine only without `--require` (not the gate) |
 | `--model` | Model alias or id, default `sonnet` |
 | `--max-rounds` | Round cap, default 5 |
-| `--require` | Exit 2 instead of skipping when `claude` is missing or HEAD has no new commits; with a remote, also when HEAD is detached, when `<remote>/HEAD` is missing (run `git remote set-head <remote> -a`) or points at the branch's own ref, or when the base is not the remote default branch (`<remote>/HEAD`, e.g. `origin/main`) at the fork point, so `HEAD~1` fails; without a remote, a notice only; use it for the gate |
+| `--require` | Exit 2 instead of skipping when `claude` is missing, HEAD has no new commits or, with a remote, HEAD is detached or the base is not the remote default branch (`origin/main`) at the fork point (`git remote set-head <remote> -a` if `<remote>/HEAD` is missing); use it for the gate. Flags are exact; reads are fenced to the repository |
 | `--reset` | Reset the round counter after a human review; each of `--reset`, `--max-rounds`, `--claude-bin` and `--out-dir` has its own `ask` rule in settings |
 | `--dry-run` | Print the first prompt, no model call |
 

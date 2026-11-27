@@ -5,7 +5,7 @@ description: Runs scripts/ai_review_local.py, the required local AI review of th
 
 # Running the local AI review
 
-The script reviews your branch diff with the `claude` CLI and your own sign-in. It is the required AI review: together with the in-session pair `quality-guardian || regression-detective` over the whole branch (Pre-Push Branch Gate) it is the gate, and a human then merges. The GitHub review (`pr-review`) is an optional, stronger second gate that runs only when `ANTHROPIC_API_KEY` is set; without the key its job is skipped and the green check is not a review. The script does not replace tests.
+The script reviews your branch diff with the `claude` CLI and your own sign-in. It is the required AI review: together with the in-session pair `quality-guardian || regression-detective` over the whole branch (Pre-Push Branch Gate) it is the gate, and a human then merges. The GitHub review (`pr-review`) is an optional, stronger second gate that runs only when `AI_REVIEW_ENABLED` is `true` (TQ-019); otherwise its job is skipped and the green check is not a review. The script does not replace tests.
 
 ## What it does
 
@@ -69,10 +69,10 @@ The script also accepts severities from the reviewer agents, case-insensitively:
 
 ## Counters
 
-Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt or old-format state file exits 2 until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch). See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
+Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt or old-format state file exits 2 until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS` through its own PR to the integration branch). See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
 
 ## Order
 
 1. Build, tests and format green locally.
 2. In-session pair over the whole branch, then this script with `--require`, up to 5 rounds (`--model opus` for risky changes).
-3. Push and open the PR; a human merges. If `ANTHROPIC_API_KEY` is set, the GitHub review (`pr-review`) also runs as an optional second gate.
+3. Push and open the PR; a human merges. If `AI_REVIEW_ENABLED` is `true`, the GitHub review (`pr-review`) also runs as an optional second gate.

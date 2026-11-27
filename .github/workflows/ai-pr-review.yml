@@ -6,13 +6,26 @@ name: AI PR Review
 # Trust model: reviewer instructions (CLAUDE.md and .claude/**) are read from the BASE branch checkout, never
 # from the PR head, so a PR cannot weaken its reviewer's instructions. The PR head is checked out in a subfolder (pr-head/, stripped of instruction files) as data.
 # Limit: on `pull_request` GitHub runs THIS workflow file from the PR's merge ref, so a same-repo branch can edit the
-# workflow itself, and the edited copy runs with repository secrets before anyone reviews it (CODEOWNERS and branch
-# protection only gate the merge). Only people with push access can do this. To keep the key from them, store it
-# as an environment secret behind required reviewers and add `environment: <name>` to the review job (TQ-019).
+# workflow itself, and the edited copy runs with the secrets it can reach before anyone reviews it (CODEOWNERS and branch
+# protection only gate the merge). Only people with push access can do this (TQ-019).
+# Turn on: set the repository variable AI_REVIEW_ENABLED=true and store ANTHROPIC_API_KEY as an environment secret of the
+# `ai-review` environment (the review job declares it). Without the variable the review job does not run: no environment,
+# no deployment entry, no approval wait. To switch the review off, unset AI_REVIEW_ENABLED.
+# Protection: the environment needs required reviewers and "prevent self-review". Create it and set both before the first
+# run, otherwise GitHub auto-creates `ai-review` unprotected. Required reviewers are offered on public repositories on all
+# plans, but on private or internal repositories only on GitHub Enterprise; on other plans the environment does not protect
+# the key (same as a repository secret: anyone with push access can read it through an edited workflow). On GitHub Free,
+# private repositories get no environment secrets at all (Pro, Team or Enterprise needed), so the only option there is a
+# repository secret, readable by anyone with push access (TQ-019).
+# Approvers: with required reviewers every run waits for approval. Approve only `pull_request` runs of `ai-pr-review.yml`
+# and reject any other workflow or event that requests `ai-review` (a pushed workflow can request the environment with no PR
+# to check). Before approving, check the PR's files and reject the run if it changes `.github/**`. Turn off administrator bypass of the environment protection rules if it is enabled.
+# Delete any repository- or organisation-level ANTHROPIC_API_KEY once the environment secret exists: an edited workflow
+# that drops `environment:` would read it.
 # The reviewer may not run build, test, script or git commands (--disallowedTools below): the base settings.json allow
 # list would otherwise let a prompt-injected diff execute PR-head code next to the API key (git log|diff|show
 # --output=<path> writes files, e.g. a core.fsmonitor entry that the next git command runs). It reads the diff with gh.
-# Without the repository secret ANTHROPIC_API_KEY the review job is skipped (the PR stays green); the gate prints a notice.
+# Enabled but without the secret ANTHROPIC_API_KEY (environment or repository) the review job skips all its steps (the PR stays green, no model call, no round recorded) and prints a notice.
 # Uses `pull_request` (not `pull_request_target`): fork PRs get no secrets and are skipped on purpose.
 #
 # Optional extensions NOT implemented in this template (the pr-review skill lists them as ideas): diff
@@ -48,21 +61,17 @@ jobs:
     permissions:
       pull-requests: write   # read PR comments, add the label, post the cap comment
     outputs:
-      has_key: ${{ steps.key.outputs.has_key }}
       proceed: ${{ steps.count.outputs.proceed }}
       round: ${{ steps.count.outputs.round }}
     steps:
-      # Without the secret the review is skipped (green check, no model call). Add ANTHROPIC_API_KEY to turn it on.
-      - name: Check for the API key
-        id: key
+      - name: Say when the AI review is off
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_REVIEW_ENABLED: ${{ vars.AI_REVIEW_ENABLED }}
+        shell: bash
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "has_key=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_key=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=AI review skipped::Repository secret ANTHROPIC_API_KEY is not set, so no review ran."
+          # GitHub's `==` ignores case, bash does not: lower-case the value so both agree.
+          if [ "${AI_REVIEW_ENABLED,,}" != "true" ]; then
+            echo "::notice title=AI review off::Set the repository variable AI_REVIEW_ENABLED=true and the ANTHROPIC_API_KEY secret of environment ai-review to turn it on."
           fi
 
       - name: Count review rounds from PR comments
@@ -97,15 +106,31 @@ jobs:
   review:
     name: AI review (round ${{ needs.gate.outputs.round }})
     needs: gate
-    if: needs.gate.outputs.proceed == 'true' && needs.gate.outputs.has_key == 'true'
+    if: needs.gate.outputs.proceed == 'true' && vars.AI_REVIEW_ENABLED == 'true'
+    # Protected environment holding the API key (TQ-019); the gate job cannot read an environment secret, so the key check is the first step here.
+    environment: ai-review
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write   # summary comment, inline comments, round marker
     steps:
+      # Without the secret the review is skipped (green check, no model call, no round recorded). Add ANTHROPIC_API_KEY to turn it on.
+      - name: Check for the API key
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=AI review skipped::ANTHROPIC_API_KEY is not set (neither as an environment secret of ai-review nor as a repository secret), so no review ran."
+          fi
+
       # 1. BASE branch is the working directory: Claude Code loads CLAUDE.md and .claude/** from here.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
+        if: steps.key.outputs.has_key == 'true'
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 1
@@ -114,6 +139,7 @@ jobs:
       # 2. PR head, as untrusted data to review, in pr-head/ (actions/checkout refuses paths outside the workspace) so Claude Code never auto-loads its
       #    CLAUDE.md, .claude/ or .mcp.json as trusted instructions.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803   # v6
+        if: steps.key.outputs.has_key == 'true'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: ${{ github.workspace }}/pr-head
@@ -122,6 +148,7 @@ jobs:
 
       # Remove anything Claude Code could treat as configuration.
       - name: Strip PR-controlled instruction files from the head checkout
+        if: steps.key.outputs.has_key == 'true'
         env:
           HEAD_DIR: ${{ github.workspace }}/pr-head
         run: |
@@ -129,6 +156,7 @@ jobs:
           rm -rf "$HEAD_DIR/.claude" "$HEAD_DIR/.mcp.json"
 
       - name: Review with the reviewer agents
+        if: steps.key.outputs.has_key == 'true'
         uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c   # v1.0.290
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -173,6 +201,7 @@ jobs:
             --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(git:*),Bash(scripts/*),Bash(./scripts/*),Bash(scripts/run-mutation-tests.sh:*)"
 
       - name: Record the round
+        if: steps.key.outputs.has_key == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}

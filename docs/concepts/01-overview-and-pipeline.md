@@ -67,7 +67,7 @@ The framework scales process to risk. The orchestrating session states the lane 
 | Iterate | Small, low-risk increments: a small diff (the shared patterns give an example threshold of about 150 added lines and 5 files; tune it to your team) touching no high-risk path | Requirements and architecture skipped; one review pair per batch instead of per change; cheap checks (build, format, affected tests) always run |
 | Spike | The owner explicitly asks for a throwaway exploration of a screen or layout | Local only, no reviews, never merged |
 
-Iterate is forced back to Full by triggers: migrations, entity changes, authentication or authorization, tenancy, integrity safeguards, secrets. Never waived in any lane: the Immutable Rules and the grounding rule. Outside the Trivial and Spike lanes: the pre-push gate and the local AI review (plus the GitHub AI review when `ANTHROPIC_API_KEY` is set).
+Iterate is forced back to Full by triggers: migrations, entity changes, authentication or authorization, tenancy, integrity safeguards, secrets. Never waived in any lane: the Immutable Rules and the grounding rule. Outside the Trivial and Spike lanes: the pre-push gate and the local AI review (plus the GitHub AI review when `AI_REVIEW_ENABLED` is `true` and the `ai-review` environment holds the key (TQ-019)).
 
 ## Loop-back and the five re-loop cap
 

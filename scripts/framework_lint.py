@@ -36,12 +36,13 @@ Agents and skills live in `.claude/`. A fresh template checkout keeps them in `c
 move them; the default root falls back to that folder with a notice. Files starting with `_` (for
 example agents/_SHARED-PATTERNS.md) are shared documents, not agents: they are size-checked only.
 """
-from __future__ import annotations
+import sys  # builtin: cannot be shadowed. Nothing else is imported before the next statement (not even `from __future__`, which imports a module)
+if __name__ == "__main__" and not sys.flags.isolated and not getattr(sys.flags, "safe_path", False) and sys.path and sys.path[0]:
+    del sys.path[0]  # the script directory: a planted scripts/<stdlib-name>.* must not shadow the standard library (OD-032)
 
 import argparse
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

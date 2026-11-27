@@ -10,6 +10,7 @@ rule (regex `^(.+):[*]$`), even when an earlier `*` is present (that earlier par
 intended and is forbidden in settings); `Bash(X *)` with no other `*` matches the command X or a command starting with `X `; any
 other rule with `*` is a glob where `*` matches any characters (so a rule ending in `**`, such as `git checkout -- **`, is a glob,
 never a prefix rule); otherwise an exact match.
+Edit and Write rules are gitignore patterns relative to the working directory (`./path`); `path_rule_matches` mirrors that.
 Run: python3 -m unittest discover -s scripts/tests"""
 import json
 import re
@@ -33,6 +34,35 @@ def bash_pattern(rule: str) -> str | None:
     """The inner text of a `Bash(...)` rule, else None (Read, Edit, mcp__..., Agent(...) rules)."""
     match = RULE.match(rule.strip())
     return match.group(1) if match else None
+
+
+def path_rule_matches(pattern: str, path: str) -> bool:
+    """Does the path part of an `Edit(...)`/`Write(...)` rule match `path` (relative to the working directory)?
+
+    gitignore syntax (https://code.claude.com/docs/en/permissions, "How path patterns match"): `./` anchors at the working
+    directory; `*` and `?` stay inside one path segment; `**/` matches zero or more directories, so `./**/x` also matches a
+    root-level `x`; a bare name (no slash) matches at any depth. Only the forms the settings use are handled (no `[]`, no `!`)."""
+    anchored = pattern.startswith("./")
+    pattern = pattern[2:] if anchored else pattern
+    anchored = anchored or "/" in pattern.rstrip("/")
+    regex, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            regex += "(?:.*/)?"
+            i += 3
+        elif pattern.startswith("/**", i) and i + 3 == len(pattern):
+            regex += "/.*"
+            i += 3
+        elif pattern[i] == "*":
+            regex += "[^/]*"
+            i += 1
+        elif pattern[i] == "?":
+            regex += "[^/]"
+            i += 1
+        else:
+            regex += re.escape(pattern[i])
+            i += 1
+    return re.fullmatch(regex if anchored else f"(?:.*/)?{regex}", path) is not None
 
 
 def representative_command(pattern: str) -> str:
@@ -196,6 +226,53 @@ class PermissionRuleTests(unittest.TestCase):
                 if inner is not None and inner.endswith(":*"):
                     with self.subTest(kind=kind, rule=rule):
                         self.assertEqual(inner[:-2], inner[:-2].rstrip(), f"{rule} has a prefix ending in whitespace and never matches")
+
+    def path_ask_patterns(self, tool: str) -> list[str]:
+        rules = json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]
+        return [m.group(1) for m in (re.match(rf"^{tool}\((.*)\)$", r) for r in rules) if m]
+
+    def test_local_sessions_ask_before_editing_the_gate_scripts_and_msbuild_project_files(self):
+        # TQ-020 option 1 and OD-032: `Edit(./scripts/**)` and `Edit(./src/**)` are allowed, but the allow-listed gate scripts run
+        # with scripts/ first on sys.path, so a new single-file module (scripts/json.py) or a new regular package
+        # (scripts/json/__init__.py, also argparse, yaml) at the top of scripts/ would hijack the stdlib import and run unprompted.
+        # Both are gated. A namespace package (a directory without __init__.py) does NOT shadow: a stdlib regular module wins over
+        # a namespace portion (scratch probe: scripts/json/x.py leaves `import json` on the stdlib), so scripts/kb/*.py and
+        # scripts/tests/*.py stay free. MSBuild builds any *.*proj and auto-loads Directory.Build.rsp, *.props, *.targets and
+        # <Project>.csproj.user. Ask rules beat allow rules.
+        gated = ("scripts/json.py", "scripts/argparse.py", "scripts/json/__init__.py", "scripts/argparse/__init__.py",
+                 "scripts/yaml/__init__.py", "scripts/kb/__init__.py", "scripts/ai_review_local.py", "scripts/framework_lint.py",
+                 "src/Api/Api.csproj", "src/x.fsproj", "build.proj", "src/Api/Directory.Build.rsp", "src/Api/Api.csproj.user",
+                 "Directory.Build.props", "tests/X/X.csproj", "src/Api/Foo.targets", "Directory.Packages.props",
+                 "a/b/c/Directory.Build.targets")
+        free = ("scripts/kb/search.py", "scripts/tests/test_x.py", "src/Api/Program.cs", "src/x.xml", "docs/x.md",
+                "scripts/ai_review_local.py.bak", "src/Api/csproj", "scripts/json/x.py", "scripts/kb/tests/__init__.py")
+        # Claude Code 2.1.332 applies only `Edit(...)` rules to file permission checks, whichever file tool writes (a `Write(...)`
+        # rule is not matched), so the Edit rules are the effective ones. The Write twins are kept because they document intent
+        # and cost nothing; this test keeps both sets in step. A shell redirect from an allow-listed command is checked against
+        # Edit allow rules only, never ask rules, so .claude/hooks/guard_bash.py asks for redirects into the repository (OD-032).
+        for tool in ("Edit", "Write"):
+            ask = self.path_ask_patterns(tool)
+            for path in gated:
+                with self.subTest(tool=tool, ask=path):
+                    self.assertTrue(any(path_rule_matches(p, path) for p in ask), path)
+            for path in free:
+                with self.subTest(tool=tool, no_ask=path):
+                    self.assertFalse(any(path_rule_matches(p, path) for p in ask), path)
+
+    def test_the_path_matcher_follows_gitignore_semantics(self):
+        self.assertTrue(path_rule_matches("./**/*.props", "Directory.Build.props"))   # `**/` matches zero directories
+        self.assertTrue(path_rule_matches("./**/*.props", "src/Directory.Build.props"))
+        self.assertFalse(path_rule_matches("./**/*.props", "src/x.props/y"))
+        self.assertTrue(path_rule_matches("./src/**", "src/Api/Program.cs"))
+        self.assertFalse(path_rule_matches("./src/**", "other/src/a.cs"))
+        self.assertTrue(path_rule_matches("./scripts/framework_lint.py", "scripts/framework_lint.py"))
+        self.assertFalse(path_rule_matches("./scripts/framework_lint.py", "x/scripts/framework_lint.py"))
+        self.assertFalse(path_rule_matches("./scripts/*.py", "scripts/kb/a.py"))   # `*` stays inside one segment
+        self.assertTrue(path_rule_matches("./scripts/*/__init__.py", "scripts/json/__init__.py"))
+        self.assertFalse(path_rule_matches("./scripts/*/__init__.py", "scripts/kb/tests/__init__.py"))
+        self.assertTrue(path_rule_matches("./**/*.*proj", "build.proj"))
+        self.assertTrue(path_rule_matches("./**/*.*proj", "src/x.fsproj"))
+        self.assertFalse(path_rule_matches("./**/*.*proj", "src/a.proj/b.cs"))
 
     def test_the_inner_wildcard_check_catches_the_never_matching_form(self):
         self.assertFalse(pattern_matches("dotnet * --p:*", "dotnet build --p:PreBuildEvent=x"))

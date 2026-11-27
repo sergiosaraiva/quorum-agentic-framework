@@ -11,12 +11,13 @@ Several Cobertura files (unit and integration projects) are merged: a line count
 Changed `.cs` files under `src/` that no report mentions are listed in `not_measured`, not counted as 0 or 100.
 A figure is context, never the goal (`test-automator`, "Coverage").
 """
-from __future__ import annotations
+import sys  # builtin: cannot be shadowed. Nothing else is imported before the next statement (not even `from __future__`, which imports a module)
+if __name__ == "__main__" and not sys.flags.isolated and not getattr(sys.flags, "safe_path", False) and sys.path and sys.path[0]:
+    del sys.path[0]  # the script directory: a planted scripts/<stdlib-name>.* must not shadow the standard library (OD-032)
 
 import argparse
 import json
 import subprocess
-import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 

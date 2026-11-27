@@ -155,6 +155,6 @@ Selection rule: the findings marked "done" below (A1, A2, E1, E12 in the PR for 
 | More than one slice | One slice (VS-004 R1); the Docker/WSL integration test run worked once, on one slice (trial log) |
 | Registered agents | Agents ran as general-purpose subagents reading the agent files; registered agent types, their tool allowlists and their frontmatter model and effort were not exercised |
 | KB MCP servers | Never exercised; the command-line tools were used (see A1 to A3) |
-| GitHub AI review | Not run: no `ANTHROPIC_API_KEY` in the trial (trial log); only the local review path applies (`docs/concepts/08-ai-ci-local-and-github.md`) |
+| GitHub AI review | Not run: no `ANTHROPIC_API_KEY` and no `AI_REVIEW_ENABLED` in the trial (trial log); only the local review path applies (`docs/concepts/08-ai-ci-local-and-github.md`) |
 | Multiple people | One owner played every role, so decider routing, hand-offs and approval separation were not tested |
 | Real domain | The Acme Orders domain and its KB are invented, so KB noise and gaps on a real domain were not measured |

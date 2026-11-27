@@ -47,7 +47,7 @@ Notes:
 | A task that failed twice on Sonnet | Opus once, then return to Sonnet | Pay for judgment only where it is needed. |
 | Hardest long-horizon work (large refactor plan, migration strategy, incident root cause) | Fable 5.2 | Highest capability. At $8 / $40 per MTok it is twice Opus input price, so reserve it. |
 | Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 5 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
-| GitHub AI CI on every PR (optional, needs `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
+| GitHub AI CI on every PR (optional, needs `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
 
 Rule of thumb: spend on the checker, save on the maker. Reviewer errors cost an escaped defect. Implementer errors cost a review round.
 
@@ -121,7 +121,7 @@ The default pipeline runs two Opus reviewers in parallel (quality-guardian and r
 
 ## 8. Subscription plans versus API billing
 
-Claude Code can run on a subscription plan or on API billing. A plan limits usage by allowance rather than by dollars per token, and the allowance differs by plan and changes over time. For CI you normally use an API key stored as a repository secret (`ANTHROPIC_API_KEY`) so that cost is metered per run. Check your plan's current terms before you rely on it for automation.
+Claude Code can run on a subscription plan or on API billing. A plan limits usage by allowance rather than by dollars per token, and the allowance differs by plan and changes over time. For CI you normally use an API key stored as an environment secret (`ANTHROPIC_API_KEY` on the `ai-review` environment) so that cost is metered per run. Check your plan's current terms before you rely on it for automation.
 
 ## 9. Keep this page current
 

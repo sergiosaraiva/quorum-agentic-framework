@@ -1,6 +1,6 @@
 # 08. AI CI: local and GitHub
 
-Quorum reviews every change with AI before a human merges it. The required review is local: the in-session reviewer pair plus `scripts/ai_review_local.py`, which uses the `claude` CLI with the user's own sign-in and needs no API key. A second, optional review runs on the pull request when the repository secret `ANTHROPIC_API_KEY` is set; without it that job is skipped and its green check is not a review. They use the same idea (an independent reviewer reads the diff and reports evidence) but sit at different points in the flow and have different strengths. The scripts are the source of truth; verify details in `scripts/ai_review_local.py` and `.github/workflows/ai-pr-review.yml`. Anything described below as an optional extension is not implemented in the template.
+Quorum reviews every change with AI before a human merges it. The required review is local: the in-session reviewer pair plus `scripts/ai_review_local.py`, which uses the `claude` CLI with the user's own sign-in and needs no API key. A second, optional review runs on the pull request when the repository variable `AI_REVIEW_ENABLED` is `true` (the key is an environment secret on `ai-review`); otherwise that job is skipped and its green check is not a review. They use the same idea (an independent reviewer reads the diff and reports evidence) but sit at different points in the flow and have different strengths. The scripts are the source of truth; verify details in `scripts/ai_review_local.py` and `.github/workflows/ai-pr-review.yml`. Anything described below as an optional extension is not implemented in the template.
 
 ## Purpose of each
 
@@ -13,9 +13,9 @@ Quorum reviews every change with AI before a human merges it. The required revie
 | Model | Default `sonnet` (`--model` overrides; `opus` for risky changes) | Default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
 | Reviewers run | `quality-guardian` and `regression-detective` prompts only | the same two reviewer agents |
 | Cost control | Cheaper model; capped rounds | Round cap in the workflow; escalation label |
-| Role | The required gate with the in-session pair: catches problems before the push. Capped at 5 rounds, then a human | Optional, stronger second gate when `ANTHROPIC_API_KEY` is set: visible to the team, the record of review |
+| Role | The required gate with the in-session pair: catches problems before the push. Capped at 5 rounds, then a human | Optional, stronger second gate when `AI_REVIEW_ENABLED` is `true`: visible to the team, the record of review |
 
-The local loop exists because a CI round costs minutes, tokens and reviewer attention. Catching the blocking defects before pushing keeps the PR history clean and the cap unused for real surprises. The GitHub loop exists because local review depends on discipline; with the key set, the PR check is a second gate nobody can forget.
+The local loop exists because a CI round costs minutes, tokens and reviewer attention. Catching the blocking defects before pushing keeps the PR history clean and the cap unused for real surprises. The GitHub loop exists because local review depends on discipline; when enabled (`AI_REVIEW_ENABLED`), the PR check is a second gate nobody can forget.
 
 ## Flow
 
@@ -25,8 +25,8 @@ flowchart TD
   L -->|findings| F[Producer fixes]
   F --> L
   L -->|clean| PUSH[Push and open PR]
-  PUSH -->|no key| H
-  PUSH -->|only with ANTHROPIC_API_KEY| G[GitHub AI CI, optional]
+  PUSH -->|off or no key| H
+  PUSH -->|only with AI_REVIEW_ENABLED| G[GitHub AI CI, optional]
   G -->|findings as comments| F2[Producer fixes and pushes]
   F2 --> PUSH
   G -->|clean round| H[Human merge decision]
@@ -66,7 +66,7 @@ The workflow has two jobs. The gate job counts review rounds; the review job run
 | Aspect | Design |
 |--------|--------|
 | Findings | One sticky summary comment (the reviewer's final message) and up to 20 inline comments, with severity (Blocker, Warning, Info), evidence and fix direction. Only a Blocker blocks. On later rounds the reviewer re-checks earlier findings and says which are fixed |
-| Reviewer instructions | The first checkout is the base branch and is the working directory, so `CLAUDE.md` and `.claude/**` are read from it. The PR head is checked out into `pr-head/` inside the workspace (actions/checkout refuses paths outside it) as data only, and a step deletes its `CLAUDE.md` files, `.claude/` and `.mcp.json`. A PR therefore cannot weaken the reviewer's instructions; its changes to those files are reviewed as code through the diff. The workflow file is the exception: on `pull_request` GitHub runs it from the PR's merge ref, so a same-repo branch can edit it, and the edited copy runs with repository secrets before review (CODEOWNERS and branch protection only gate the merge). To keep the key from people with push access, store it as an environment secret behind required reviewers and add `environment:` to the review job (TQ-019) |
+| Reviewer instructions | The first checkout is the base branch and is the working directory, so `CLAUDE.md` and `.claude/**` are read from it. The PR head is checked out into `pr-head/` inside the workspace (actions/checkout refuses paths outside it) as data only, and a step deletes its `CLAUDE.md` files, `.claude/` and `.mcp.json`. A PR therefore cannot weaken the reviewer's instructions; its changes to those files are reviewed as code through the diff. The workflow file is the exception: on `pull_request` GitHub runs it from the PR's merge ref, so a same-repo branch can edit it, and the edited copy runs before review (CODEOWNERS and branch protection only gate the merge). To keep the key from people with push access, the review job declares `environment: ai-review` and the key is stored as an environment secret behind required reviewers (TQ-019). Hardening the review step further (subprocess environment scrub plus bubblewrap) is deferred until after the first successful CI run |
 | Knowledge bases | The reviewer has no KB MCP server in CI. It reads `kb/chunks/` and `questions/records/` directly |
 | Action pinning | Every action is pinned to a full commit SHA with the tag in a trailing comment. When you bump an action, re-resolve the SHA and keep the tag comment |
 | Round counter | After each review a workflow step posts one marker comment `<!-- ai-review-round -->` as `github-actions[bot]`; only comments from that author count. The gate counts them (round = count + 1) and compares with `MAX_ROUNDS` in the workflow `env` (default 5; edit it there) |
@@ -81,7 +81,7 @@ The workflow has two jobs. The gate job counts review rounds; the review job run
 
 | Item | Rule |
 |------|------|
-| Model API key | A repository or organisation secret (`${{ secrets.ANTHROPIC_API_KEY }}` or your name for it); when unset, the review job is skipped with a notice; never committed |
+| Model API key and switch | Set up in this order. First create the environment `ai-review` with required reviewers and "prevent self-review", with administrator bypass off. Second, store `ANTHROPIC_API_KEY` there as an environment secret. Third, set the repository variable `AI_REVIEW_ENABLED` to `true`. Set the variable last: if the review runs before the environment exists, GitHub creates `ai-review` automatically and unprotected. While the variable is not `true` the review job is skipped entirely, the gate prints a notice, and no environment, deployment or approval wait is created; if the review is enabled but no key exists, the review steps are skipped with a notice. GitHub offers required reviewers on public repositories on all plans, but on private or internal repositories only on GitHub Enterprise ([GitHub documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)); on other plans the environment does not protect the key, which is then exposed as a repository secret is. Approvers approve only `pull_request` runs of `ai-pr-review.yml` and reject any other workflow or event that requests `ai-review`, and any run that changes `.github/**`. On GitHub Free private repositories environment secrets are unavailable (they need Pro, Team or Enterprise), so the only option there is a repository secret, readable by anyone with push access. Delete any repository- or organization-level `ANTHROPIC_API_KEY` once the environment secret exists. With required reviewers every run waits for approval; to switch the review off, unset `AI_REVIEW_ENABLED`. Never committed |
 | Token permissions | Least privilege, set per job; the top level is `permissions: {}`. The gate job has `pull-requests: write` (read comments, add the label, post the cap comment). The review job has `contents: read` and `pull-requests: write` (summary, inline comments, round marker). Neither has `id-token` or `issues`; the action uses the workflow token (`github_token`) instead of an OIDC exchange |
 | Cloud access | Where the workflow needs cloud access, use short-lived federated credentials, no long-lived keys |
 | Forks | Secrets are not exposed to PRs from forks; the workflow must either skip them or use a safe trigger design (verify the trigger choice before enabling on a public repository) |
@@ -107,7 +107,7 @@ Three counters exist and they share no state:
 |---------|----------------|-------|
 | Loop-back cap (5 rounds per gate chain in a session) | the session's own loop, in no file | each new gate chain |
 | Local `--max-rounds` | `.ai-review/state.json` | `--reset` drops the branch's count; the next completed round starts from 1 |
-| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (edit the workflow on the PR branch); removing the label `needs-human-review` is optional housekeeping |
+| GitHub `MAX_ROUNDS` | the `<!-- ai-review-round -->` marker comments on the PR | rounds resume when a human deletes the marker comments or raises `MAX_ROUNDS` (land the change on the integration branch through its own pull request, because approvers reject runs that change `.github/**`); removing the label `needs-human-review` is optional housekeeping |
 
 The round count is kept per branch name, so renaming a branch starts a new count (a known limit). Running the local script does not consume GitHub rounds, and a GitHub round does not count against the session cap.
 
@@ -121,8 +121,8 @@ Each round costs the tokens of the diff plus context in, and the findings out. T
 |---------|-------|--------|
 | Speed of feedback | Seconds to minutes, before pushing | Minutes after each push |
 | Visible record for the team | No | Yes: comments, threads, labels |
-| Cannot be skipped | Required by the Pre-Push Branch Gate; enforced by process, not CI | Only with `ANTHROPIC_API_KEY` and a required check; skipped otherwise |
+| Cannot be skipped | Required by the Pre-Push Branch Gate; enforced by process, not CI | Only with `AI_REVIEW_ENABLED`, the key and a required check; skipped otherwise |
 | Clean PR history | Yes, fixes happen before the PR | Fixes appear as follow-up commits |
 | Independent of the producer's machine | No | Yes: clean checkout, clean context |
 
-Use local as the required gate (and to avoid wasting a PR round); add GitHub as an optional second gate and the team record when you set `ANTHROPIC_API_KEY`. Neither replaces the in-session pair of reviewers ([07](07-independent-validation.md)) or the human merge decision.
+Use local as the required gate (and to avoid wasting a PR round); add GitHub as an optional second gate and the team record when you enable it with `AI_REVIEW_ENABLED`. Neither replaces the in-session pair of reviewers ([07](07-independent-validation.md)) or the human merge decision.

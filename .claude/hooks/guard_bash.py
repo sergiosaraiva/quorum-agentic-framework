@@ -13,7 +13,10 @@ doesn't match"; compound commands are split on && || ; | |& & newline). This hoo
 Contract (https://code.claude.com/docs/en/hooks, "PreToolUse input" and "Exit code output"): the hook gets JSON on stdin
 with `tool_name` and `tool_input.command`. To block it prints on stdout, exit 0:
   {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}
-The reason is shown to the model. Printing nothing and exiting 0 leaves the normal permission flow in charge.
+The deny reason is shown to the model. Printing nothing and exiting 0 leaves the normal permission flow in charge. The same
+shape with "permissionDecision": "ask" makes Claude Code prompt the user even when an allow rule matches; the ask reason is shown
+to the user, not to the model. The hook uses ask for output redirections that are not provably harmless (below). A deny always
+wins over an ask when both apply to one command.
 
 Platform: Linux, macOS and WSL Bash. It does not cover the Windows PowerShell tool. Fail open: a malformed payload exits 0
 with a stderr note, and a missing python3 interpreter does not block anything either (`onFailure` is not set in
@@ -33,14 +36,47 @@ to python, perl, node... is data, only a download piped into it is blocked) or t
 closing delimiter never appears (then the rest is checked as commands in the same parser); downloads piped into a shell or
 interpreter, including `/dev/stdin`, `-`, `sh -c "$(cat)"`, `busybox sh` and a `( ... )` wrapper; ANSI-C quoting `$'...'`
 (decoded: \n \t \' \\ \xHH and the other common escapes) and locale quoting `$"..."`; arithmetic `$(( ))`, `(( ))` and
-`$[ ]` (opaque, so `1 << 2` is a shift, not a heredoc); reserved words that hide the command (`if then elif else do while
+`$[ ]` (opaque, so `1 << 2` is a shift, not a heredoc; substitutions inside are lexed); reserved words that hide the command (`if then elif else do while
 until ! coproc function {`, and `fi done esac }` as terminators), so `for f in a; do git push -f; done` is checked.
 
+Output redirection (OD-032, OD-033): Claude Code checks the target of `cmd > file` against Edit *allow* rules but not against Edit *ask*
+rules, so `git log > scripts/json.py` (allow-listed `git log`) would write a gated file without a prompt. The hook looks at every
+output redirection (`>`, `>>`, `>|`, `&>`, `&>>`, `n>`, `n>>`, `>& file`, and `<>`, which creates the file) of the command, of a
+subshell or compound command, of a substitution (also inside `$(( ))`, `(( ))`, `$[ ]` and unquoted heredoc bodies) and of a script
+fed to a shell. The rule is conservative: a target needs no action ONLY if it is
+  - exactly `/dev/null`;
+  - a pure descriptor duplication or close: `>&N`, `N>&M`, `>&-`, `N>&M-`;
+  - a path (absolute, or relative to the payload `cwd`, else this process's working directory) that resolves outside the project
+    directory (`$CLAUDE_PROJECT_DIR`, else the payload `cwd`; symlinks followed) AND is not under `/dev` or `/proc`, lexically or
+    after symlinks.
+Everything else asks: any other `/dev/*` (`/dev/stdout`, `/dev/stderr`, `/dev/fd/N`, `/dev/stdin`: `3<victim >/dev/fd/3` reopens the
+repository file for writing), any `/proc/*` (`/proc/self/fd/N`, `/proc/self/cwd/x`), a target with `$`, a backtick, a glob character
+(`*`, `?`, `[`), a leading `~` or a `<(`/`>(` substitution (it cannot be checked), a relative target in a command that also runs
+`cd`, `pushd` or `popd` (the directory is unknown), and a target inside the project directory.
+Not output redirections: heredocs (`<<`, `<<-`), here-strings (`<<<`), input redirection (`<`, `<&`), and `<` or `>` between `[[`
+and `]]`, where they compare strings (`[[ a > b ]]`). The body of a quoted heredoc (`<<'EOF'`) is data; the body of an unquoted one
+expands `$(...)` and backticks, which are lexed like any substitution.
+
 Known gaps (not fixed; best effort, not a sandbox):
-- Commands built at runtime (`$VAR`, `eval`, `source /dev/stdin`, `bash <(curl u)`, `sh -c "$(curl u)"`); commands inside
-  `$(( ))`, `(( ))` and `$[ ]` arithmetic, including substitutions such as `(( $(git push -f) ))` (blocked before the
-  arithmetic spans became opaque, which fixed `1 << 2` being read as a heredoc), and inside unquoted-heredoc bodies; a
-  quoted `((` or `))` inside arithmetic, which shifts where the span is taken to end; `for ((...)) do` without a `;`;
+- Commands that write files themselves are not inspected (accepted residual, OD-033; the repository-code routes are OD-032). A
+  command such as `tee`, `cp`, `mv`, `sed -i`, `dd of=` or `python3 -c` is not covered by any allow rule on its own, so it prompts
+  (Claude Code matches each part of a compound command separately); the allow-listed commands known to write where an option
+  says are: `dotnet build|test|format|restore|list` (`-o`, `--artifacts-path`, `--results-directory`, `--packages`, the binary log
+  `-bl:<file>`, the file logger `-flp:logfile=<file>`, `-targets:<file>`, `-getResultOutputFile:<file>`, `dotnet test
+  --diagnostic-output-directory`, `dotnet format --report`, `dotnet restore --lock-file-path`, none of which the settings `ask`
+  list covers; `dotnet format` rewrites source files in place), `dotnet ef migrations script -o|--output <file>`, `dotnet dotnet-stryker` (report folders), `dotnet tool restore`,
+  `npm run build|test|lint`, `npx ng build|test` and `npx playwright test` (package scripts, `--output-path`, report paths),
+  `python3 scripts/kb/check_chunks.py --write-toc` (rewrites kb/TOC.md) and the gate scripts' own outputs
+  (`ai_review_local.py --out-dir` and `--reset` are under `ask`). `scripts/run-mutation-tests.sh`, `python3 -m unittest`,
+  `python3 scripts/kb/*.py` and `dotnet test` run repository code, including files the Edit tool may create under tests/,
+  scripts/kb/ or frontend/. Such a write can overwrite `.claude/hooks/guard_bash.py` itself, and a hook that fails (syntax error,
+  crash) fails open, so the guard can be disabled this way. This list is what was found, not a proof that it is complete. Claude
+  Code's own built-in read-only command list is outside this repository's control.
+- A redirect whose target another part of the same command creates at runtime (a symlink made earlier in the command resolves to
+  the old target), and `cd` through a variable or `eval`: the relative-target-after-`cd` rule asks, but a target already given as
+  an absolute path is resolved as written.
+- Commands built at runtime (`$VAR`, `eval`, `source /dev/stdin`, `bash <(curl u)`, `sh -c "$(curl u)"`); a quoted `((` or `))`
+  inside arithmetic, which shifts where the span is taken to end; `for ((...)) do` without a `;`;
   a NUL inside `$'...'` (Bash cuts the word there, e.g. `$'--force\0x'`); scripts that run a destructive command internally
   and heredoc bodies or here-strings fed to interpreters (`python3 - <<EOF`), which are not inspected at all; nesting deeper than
   MAX_NEST or MAX_DEPTH (blocked, fail closed).
@@ -57,6 +93,8 @@ Known gaps (not fixed; best effort, not a sandbox):
   so `dotnet * --p:*` never matches; `dotnet * --p*` would also prompt for `--project`). Not covered by the `ask` list: an option
   that is the first argument after `dotnet` (`dotnet -l:x` has no subcommand to anchor `dotnet * -l*`), an option set through
   `@x.rsp`, `MSBUILD*` environment variables or the project file, and spellings beyond those prefixes.
+  Files MSBuild loads automatically (`Directory.Build.rsp`, `*.user`, project files) can inject switches the guard never sees on the
+  command line; the settings ask rules cover the common names (OD-032).
 - Destructive commands not covered by RULES: `git update-ref -d`, `git stash clear|drop`, `git worktree remove --force`,
   `git branch -M|-C` (force rename or copy over a branch), `gh api -X DELETE` (the settings `ask` list covers it). `gh pr merge`
   is not blocked here; it is under `ask` in settings.json, so the user is prompted.
@@ -107,6 +145,13 @@ DOTNET_BUILD_COMMANDS = {"build", "test", "run", "msbuild", "publish", "pack"}
 PROPERTY_OPTION = re.compile(r"^(--?|/)(p|property|rp|restoreproperty)([:=]|$)", re.IGNORECASE)
 BUILD_EVENT_VALUE = re.compile(r"(pre|post)buildevent", re.IGNORECASE)
 GIT_FALSE_VALUES = {"false", "no", "off", "0", ""}
+# Redirection operators that create or write the target file (`>&` only when the word is not a descriptor, see redirect_reason).
+OUTPUT_OPERATORS = {">", ">>", ">|", "&>", "&>>", ">&", "<>"}
+NULL_DEVICE = "/dev/null"  # the only device a redirect may name without asking
+SPECIAL_ROOTS = ("/dev", "/proc")  # fd reopen paths (`/dev/fd/3`, `/proc/self/fd/3`, `/proc/self/cwd/x`) can reach any file
+DESCRIPTOR_RE = re.compile(r"^(\d+-?|-)$")  # `>&2`, `>&1-` (move) and `>&-` (close) duplicate or close a descriptor, no file
+DYNAMIC_CHARS = re.compile(r"[$`*?\[]")
+CHDIR_COMMANDS = {"cd", "pushd", "popd"}
 
 
 def has_flag(args, short, *long):
@@ -263,7 +308,7 @@ RULES = [
      "Discarding working-tree changes (checkout . or -- <paths>, switch -f, restore . or --source or --worktree) is blocked. Ask the user."),
     ("git --output", lambda c, a: c == "git" and a[:1] in (["log"], ["diff"], ["show"], ["whatchanged"])
      and git_output_option(a[1:]),
-     "git log|diff|show --output=<path> writes files (for example .git/config) and is blocked. Redirect stdout instead."),
+     "git log|diff|show --output=<path> writes files (for example .git/config) and is blocked. Use the Edit tool for a file in the repository, or write outside the repository (a shell redirect into the repository asks first)."),
     ("rm -rf", lambda c, a: c == "rm" and rm_force_recursive(a),
      "rm with recursive and force together is blocked. Delete specific paths one by one, or ask the user."),
     ("dotnet build event", lambda c, a: c == "dotnet" and dotnet_build_event(a),
@@ -297,11 +342,20 @@ class TooDeep(Exception):
 
 
 class Seg:
-    """One simple command: its words, whether it is piped into the next command, and the heredoc bodies it receives."""
-    __slots__ = ("words", "piped", "bodies")
+    """One simple command: its words, whether it is piped into the next command, the heredoc bodies it receives and its output
+    redirections as (operator, target word) pairs."""
+    __slots__ = ("words", "piped", "bodies", "redirects")
 
     def __init__(self):
-        self.words, self.piped, self.bodies = [], False, []
+        self.words, self.piped, self.bodies, self.redirects = [], False, [], []
+
+
+class Found:
+    """What a check sees that does not block but makes the guard ask: output-redirection targets as (operator, word) pairs
+    and whether the command changes directory (`cd`, `pushd`, `popd`), which leaves a relative target without a known base."""
+
+    def __init__(self):
+        self.targets, self.chdir = [], False
 
 
 class Parser:
@@ -317,6 +371,7 @@ class Parser:
         self.extra = [] if extra is None else extra
         self.segs, self.cur, self.pending = [], Seg(), []
         self.word, self.has_word, self.skip_word, self.herestring = [], False, False, False
+        self.redirect_op = ""  # the operator whose target word is next, while skip_word is set
         self.unclosed = set()  # heredoc (delimiter, strip_tabs) pairs already known to have no closing line
 
     def add(self, text):
@@ -332,13 +387,16 @@ class Parser:
             self.cur.words.extend(v.translate(BRACE_RESTORE) for v in variants)
         elif self.has_word and self.herestring:  # `bash <<< 'script'`: the word is data for the command, like a heredoc body
             self.cur.bodies.append(text.translate(BRACE_RESTORE))
+        elif self.has_word and self.redirect_op in OUTPUT_OPERATORS:  # the target is a file name, not an argument
+            self.cur.redirects.append((self.redirect_op, text.translate(BRACE_RESTORE)))
         if self.has_word:
             self.skip_word = self.herestring = False
+            self.redirect_op = ""
         self.word, self.has_word = [], False
 
     def end_seg(self, piped=False):
         self.end_word()
-        self.cur.piped, self.skip_word, self.herestring = piped, False, False
+        self.cur.piped, self.skip_word, self.herestring, self.redirect_op = piped, False, False, ""
         self.segs.append(self.cur)
         self.cur = Seg()
 
@@ -377,11 +435,10 @@ class Parser:
                 self.legacy_arithmetic()
             elif c == "(" and s.startswith("((", self.i) and not self.has_word and self.arithmetic_end(self.i) > 0:
                 end = self.arithmetic_end(self.i)  # `((x = 1 << 2))` and `for ((...))`: opaque, not heredocs
-                self.add(s[self.i:end])
-                self.i = end
+                self.opaque(self.i, end, 2, 2)
             elif c == "`" or s.startswith("$(", self.i) or s.startswith(("<(", ">("), self.i):
                 self.substitution()
-            elif c in "<>" or (c == "&" and s[self.i + 1:self.i + 2] == ">"):
+            elif (c in "<>" or (c == "&" and s[self.i + 1:self.i + 2] == ">")) and not self.in_conditional():
                 self.redirect()
             elif c == "(":
                 parens += 1
@@ -444,8 +501,28 @@ class Parser:
             self.add("$")
             self.i += 1
         else:
-            self.add(s[self.i:k])
-            self.i = k
+            self.opaque(self.i, k, 2, 1)
+
+    def opaque(self, start, end, head, tail):
+        """Add the opaque span s[start:end] (arithmetic: `1<<y` is a shift, not a heredoc) as raw text, and lex the substitutions
+        inside it like any other: `$(( $(git push -f) ))` runs the command. `head` and `tail` are the lengths of its delimiters."""
+        self.add(self.s[start:end])
+        self.scan_substitutions(self.s[start + head:end - tail])
+        self.i = end
+
+    def scan_substitutions(self, text):
+        """Lex every `$(...)` and backtick substitution in `text` (an opaque span or an unquoted heredoc body), whose segments
+        join `extra`; a backslash-escaped `$` or backtick is data."""
+        scanner, k = self.nested(text), 0
+        while k < len(text):
+            if text[k] == "\\":
+                k += 2
+            elif text[k] == "`" or text.startswith("$(", k):
+                scanner.i = k
+                scanner.substitution()
+                k = max(scanner.i, k + 1)
+            else:
+                k += 1
 
     def double_quoted(self):
         s = self.s
@@ -483,9 +560,7 @@ class Parser:
             self.add(s[i:j + 1])
             self.i = j + 1
         elif s.startswith("$((", i) and self.arithmetic_end(i + 1) > 0:
-            end = self.arithmetic_end(i + 1)
-            self.add(s[i:end])  # arithmetic is opaque: `1<<y` is a shift here, not a heredoc
-            self.i = end
+            self.opaque(i, self.arithmetic_end(i + 1), 3, 2)  # `1<<y` is a shift here, not a heredoc
         else:
             sub = self.nested(start=i + 2)
             self.extra.extend(sub.run(in_subst=True))
@@ -503,6 +578,14 @@ class Parser:
         # A quote or backslash in the span can hide a paren from this raw matcher: lex it as commands (fail closed).
         return -1 if any(q in self.s[i:close] for q in "'\"\\") else close + 1
 
+    def in_conditional(self):
+        """Inside `[[ ... ]]`, where `<` and `>` compare strings and are not redirections (`[[ a > b ]]`). A reserved word before
+        `[[` (`if [[ ... ]]`) is skipped; once `]]` has been seen, a following `>` redirects again."""
+        words, k = self.cur.words, 0
+        while k < len(words) and words[k] in RESERVED_WORDS:
+            k += 1
+        return words[k:k + 1] == ["[["] and "]]" not in words[k:] and "".join(self.word) != "]]"
+
     def redirect(self):
         s, i = self.s, self.i
         if s.startswith("<<", i) and not s.startswith("<<<", i):
@@ -515,6 +598,7 @@ class Parser:
         self.i += len(op)
         self.skip_word = True  # the redirect target is a file name, not an argument
         self.herestring = op == "<<<"
+        self.redirect_op = op
 
     def heredoc_operator(self):
         s, i = self.s, self.i + 2
@@ -522,9 +606,10 @@ class Parser:
         i += strip_tabs
         while s[i:i + 1] in (" ", "\t") and i < len(s):
             i += 1
-        delim = []
+        delim, quoted = [], False  # a quoted delimiter (`<<'EOF'`, `<<\\EOF`) makes the body literal; otherwise it expands
         while i < len(s) and s[i] not in " \t\r\n;&|()<>":
             c = s[i]
+            quoted = quoted or c in "'\"\\"
             if c in "'\"":
                 end = s.find(c, i + 1)
                 end = len(s) if end < 0 else end
@@ -539,11 +624,11 @@ class Parser:
         self.i = i
         self.end_word()
         if delim:
-            self.pending.append((self.cur, "".join(delim), strip_tabs))
+            self.pending.append((self.cur, "".join(delim), strip_tabs, quoted))
 
     def read_heredocs(self):
         s = self.s
-        for seg, delim, strip_tabs in self.pending:
+        for seg, delim, strip_tabs, quoted in self.pending:
             key = (delim, strip_tabs)
             match = None
             if key not in self.unclosed:
@@ -558,6 +643,8 @@ class Parser:
                 return
             body = s[self.i:match.start()]
             seg.bodies.append(body[:-1] if body.endswith("\n") else body)
+            if not quoted:  # an unquoted heredoc body expands `$(...)` and backticks: they run
+                self.scan_substitutions(body)
             self.i = match.end() + 1
         self.pending = []
 
@@ -632,22 +719,25 @@ def find_exec_commands(args):
     return found
 
 
-def check(command, depth=0):
-    """Return the reason string if the command must be blocked, else None."""
+def check(command, depth=0, found=None):
+    """Return the reason string if the command must be blocked, else None. Output redirections and directory changes are
+    recorded in `found` (a Found) for the caller to turn into an ask."""
     try:
-        return check_segments(parse(command), depth)
+        return check_segments(parse(command), depth, Found() if found is None else found)
     except TooDeep:
         return DEEP_REASON
 
 
-def check_segments(segs, depth):
+def check_segments(segs, depth, found):
     if depth > MAX_DEPTH:
         return DEEP_REASON
     downloaded, carried = False, []  # carried: heredoc bodies of the previous command when it is piped into this one
     for seg in segs:
+        found.targets.extend(seg.redirects)  # also when the segment has no words: `(cd x; ls) > f`
         if not seg.words:  # a `(` or newline after a pipe: keep the pipe state (`curl u | (sh)`)
             continue
         cmd, args, config = normalise(seg.words)
+        found.chdir = found.chdir or cmd in CHDIR_COMMANDS
         is_shell, is_script_reader = bool(SHELL_RE.match(cmd)), bool(SHELL_RE.match(cmd) or INTERP_RE.match(cmd))
         script = shell_script(args) if is_shell else None
         if downloaded and is_script_reader and reads_stdin(args, is_shell):
@@ -665,13 +755,13 @@ def check_segments(segs, depth):
         if is_shell and reads_stdin(args, is_shell):  # heredoc or piped text that a shell runs; text fed to an interpreter is data
             inner_scripts += seg.bodies + carried
         for text in inner_scripts:
-            inner = check(text, depth + 1)
+            inner = check(text, depth + 1, found)
             if inner:
                 return inner
         for words in find_exec_commands(args) if cmd == "find" else []:
             exec_seg = Seg()
             exec_seg.words = words
-            inner = check_segments([exec_seg], depth + 1)
+            inner = check_segments([exec_seg], depth + 1, found)
             if inner:
                 return inner
         downloaded = (downloaded or cmd in ("curl", "wget")) if seg.piped else False
@@ -679,17 +769,69 @@ def check_segments(segs, depth):
     return None
 
 
+def under(path, root):
+    return path == root or path.startswith(root + "/")
+
+
+def redirect_reason(found, cwd, project):
+    """The reason to ask about the first output redirection that is not provably harmless, else None. No action only for exactly
+    /dev/null, a descriptor duplication or close, and a path that resolves outside the project directory and is not under
+    /dev or /proc (lexically or after symlinks). Everything else asks."""
+    for op, target in found.targets:
+        if not target or (op == ">&" and DESCRIPTOR_RE.match(target)) or target == NULL_DEVICE:
+            continue
+        if DYNAMIC_CHARS.search(target) or target.startswith(("~", "<(", ">(")):
+            return (f"Output redirection to {target} has a target the guard cannot check (it contains $, a backtick, a glob "
+                    "character, ~ or a substitution). Redirect to a literal path outside the repository, or use the Edit tool "
+                    "so ask rules apply.")
+        if not os.path.isabs(target) and found.chdir:
+            return (f"Output redirection to {target} is relative and the command changes directory, so the guard cannot tell "
+                    "where it writes. Use an absolute path outside the repository, or the Edit tool so ask rules apply.")
+        try:
+            lexical = os.path.normpath(os.path.join(cwd, target))
+            lexical = "/" + lexical.lstrip("/")  # normpath keeps a leading `//`
+            path = os.path.realpath(lexical)
+            root = os.path.realpath(project)
+            special = any(under(p, r) for p in (lexical, path) for r in SPECIAL_ROOTS)
+            inside = under(path, root.rstrip(os.sep))
+        except (OSError, ValueError):  # for example a NUL in the path: cannot be checked
+            special, inside, path = False, True, target
+        if special:
+            return (f"Output redirection to {target} names a device or /proc path (for example /dev/fd/3 reopens a descriptor and "
+                    "can overwrite a repository file); only /dev/null is accepted. Redirect to a regular path outside the "
+                    "repository, or use the Edit tool so ask rules apply.")
+        if inside:
+            return (f"Output redirection writes {path} inside the repository; edits there go through the Edit tool so ask rules "
+                    "apply. Use the Edit tool, or write outside the repository (for example /tmp).")
+    return None
+
+
+def decision(kind, reason):
+    return json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": kind,
+                                             "permissionDecisionReason": f"guard_bash: {reason}"}})
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
         command = payload["tool_input"]["command"] if payload.get("tool_name") == "Bash" else ""
+        payload_cwd = payload.get("cwd")
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         print(f"guard_bash: ignoring malformed hook payload ({exc}); failing open", file=sys.stderr)
         return 0
-    reason = check(command) if isinstance(command, str) else None
-    if reason:
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                                                 "permissionDecisionReason": f"guard_bash: {reason}"}}))
+    found = Found()
+    reason = check(command, found=found) if isinstance(command, str) else None
+    if reason:  # a deny wins over an ask
+        print(decision("deny", reason))
+        return 0
+    try:
+        cwd = payload_cwd if isinstance(payload_cwd, str) and os.path.isabs(payload_cwd) else os.getcwd()
+    except OSError:  # the working directory was removed
+        cwd = os.sep
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or cwd
+    ask = redirect_reason(found, cwd, project)
+    if ask:
+        print(decision("ask", ask))
     return 0
 
 

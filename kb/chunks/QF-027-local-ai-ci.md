@@ -7,7 +7,7 @@ sources: ["scripts/ai_review_local.py", ".claude/skills/running-local-ai-review/
 ---
 The local AI CI is the script `scripts/ai_review_local.py`, the required AI review together with the in-session review pair. It uses the `claude` CLI with the user's sign-in.
 
-How it works: it collects `git diff <base>...HEAD`; splits the diff into chunks, dropping no code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions and the Immutable Rules, read at the merge-base; runs `claude -p` read-only; merges the findings (on later rounds it re-checks earlier findings and re-reports one only if still present); and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
+How it works: it collects `git diff <base>...HEAD`; splits the diff into chunks, dropping no code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions and the Immutable Rules, read at the merge-base; runs `claude -p` read-only (`--strict-mcp-config` skips `.mcp.json`, user and plugin MCP servers); merges the findings (on later rounds it re-checks earlier findings and re-reports one only if still present); and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
 
 | Option | Meaning |
 |--------|---------|
@@ -24,4 +24,4 @@ Exit codes: 0 no blocking findings, or skipped when `claude` is missing without 
 
 Use the default Sonnet for routine branches and `--model opus` for risky changes (authentication, data model, migrations, money, core logic).
 
-It does not replace the in-session pair or the human merge. The GitHub AI review is an optional second gate needing `ANTHROPIC_API_KEY`.
+It does not replace the in-session pair or the human merge. The GitHub AI review is an optional second gate needing `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY`.

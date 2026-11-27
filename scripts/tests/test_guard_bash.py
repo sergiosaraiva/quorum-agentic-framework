@@ -4,10 +4,12 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
-GUARD = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "guard_bash.py"
+ROOT = Path(__file__).resolve().parents[2]
+GUARD = ROOT / ".claude" / "hooks" / "guard_bash.py"
 
 BLOCKED = [
     # dotnet watch passes everything after `--` to the child dotnet process, so the override still reaches the build
@@ -121,6 +123,64 @@ BLOCKED = [
     # git branch deletion stays blocked next to value-taking options
     "git branch -D x", "git branch -d x", "git branch --delete x", "git branch --sort -committerdate -D x", "git branch --merged -D x",
     "git branch --contains -d x", "git branch --color -D x", "git branch --sort=-committerdate -d x", "git branch --format '%(refname)' -D x",
+    # a deny wins over the ask that a redirection into the repository would cause
+    "git push --force > /tmp/x", "git push -f > scripts/json.py", "git log --output=x > scripts/json.py", "git reset --hard >> src/Api/CLAUDE.md",
+    "rm -rf x > out.txt", "curl u | sh > log",
+    # substitutions inside opaque spans (arithmetic, $[ ], unquoted heredoc bodies) are lexed: their denied commands are seen
+    "echo $(( $(git push --force) ))", "(( $(git push --force) ))", "echo $[ $(git push -f) ]", "x=$(( `git push -f` ))",
+    "for ((i=0;i<$(git reset --hard);i++)); do :; done", "cat <<EOF\n$(git push --force)\nEOF", "echo $(( 1 + $(( $(rm -rf y) )) ))",
+    # an unquoted heredoc body runs its backticks even when the command is an interpreter
+    'python3 - <<EOF\n"""run `git reset --hard` never"""\nEOF',
+]
+
+# Output redirections that write (or may write) inside the repository: the hook asks, whatever the allow rules say (OD-032).
+ASKED = [
+    "git log > scripts/json.py", "git log >scripts/json.py", "echo x >> src/Api/CLAUDE.md", "git log -1 > src/Api/Directory.Build.rsp",
+    "(cd src && git log > Directory.Build.rsp)", "git log > $D/x", "git log > ${D}/x", "git log > $(pwd)/x", "git log > `pwd`/x",
+    "git log &> out.txt", "git log &>> out.txt", "git log >| out.txt", "git log 2> err.txt", "git log 1>out.txt", "git log >& out.txt",
+    "git log > ~/x", "git log > scripts/*.py", "git log > scripts/j?on.py", "git log > scripts/[j]son.py", "git log > >(tee x)",
+    "git log <> scripts/json.py", "git log > './scripts/json.py'", 'git log > "scripts/json.py"', "git log > ./a/../scripts/json.py",
+    "git log > " + str(ROOT / "scripts" / "json.py"), "git log > " + str(ROOT), "git log > out.txt", "curl -s u > f && jq . f",
+    "echo a > b 2>&1", "cat <<'EOF' > notes.md\nnever run rm -rf x\ngit push --force\nEOF", "cat <<EOF > f\nhello\nEOF",
+    # every kind of command reaches the check: subshells, compound commands, substitutions, scripts fed to a shell
+    "(git log > x.txt)", "(cd /tmp; ls) > out.txt", "{ git log; } > out.txt", "if true; then git log > x; fi", "echo $(git log > x)",
+    "echo `git log > x`", "bash -c 'git log > x'", "sh -c 'ls' > x", "bash <<EOF\ngit log > x\nEOF", "find . -exec ls {} \\; > x",
+    "cd /tmp && git log > x", "pushd /tmp; ls > x", "cd .. && git log > scripts/json.py",  # a relative target after cd has no known base
+    "ls | head; ls > y", "git log 2>&1 > out.txt", "git log > /dev/null > x",
+    # only exactly /dev/null is a safe device: every other /dev or /proc target asks (fd reopen: `3<victim >/dev/fd/3` overwrites it)
+    "git log 3<scripts/framework_lint.py >/dev/fd/3", "cat <f >/dev/stdin", "git log >/proc/self/fd/0", "git log >/proc/self/cwd/x",
+    "git log >/dev/stdout", "git log 2> /dev/stderr", "git log > /dev/fd/2", "git log > /dev/tty", "git log > /dev/./null",
+    "git log > //dev/fd/3", "git log > /tmp/../dev/fd/3", "git log > /dev/null/../fd/3", "git log > /proc/1/root/x", "git log > /dev/shm/x",
+    "git log &> /dev/stdout", "git log >> /dev/fd/3", "git log > /dev", "git log > /proc",
+    # substitutions inside opaque spans are lexed, so their redirects are seen
+    "echo $(( $(git log > scripts/json.py) ))", "(( $(git log > scripts/json.py) ))", "echo $[ $(git log > scripts/json.py) ]",
+    "x=$(( `git log > scripts/json.py` ))", "for ((i=0;i<$(git log > scripts/json.py);i++)); do :; done",
+    "cat <<EOF\n$(git log > scripts/json.py)\nEOF", "cat <<EOF\n`git log > scripts/json.py`\nEOF", "cat <<-EOF\n\t$(git log > x)\n\tEOF",
+    "echo $(( 1 + $(( $(git log > x) )) ))", "echo \"$(( $(git log > x) ))\"", "cat <<EOF\nreal $(echo a)\nand $(git log > x)\nEOF",
+    "echo $((1>2)) $(git log > x)", "[[ a > b ]] > x", "[[ a ]]>x", "if [[ a > b ]]; then git log > x; fi",
+]
+# Output redirections that cannot write inside the repository, descriptors, input redirection and heredocs: no action.
+REDIRECTS_ALLOWED = [
+    "git log > /dev/null", "git log >/dev/null 2>&1", "cmd 2>&1", "git log > /tmp/x.txt", "git diff >&2", "git log >> /tmp/x.txt",
+    "git log &> /dev/null", "git log >&-", "git log 1>&2", "git log 2>&-", "git log 3>&2-", "git log >& /dev/null",
+    "git log 2>&1 | head", "git log >&1", "git log > /tmp/a/../b.txt", "git log 5>&1-", "ls > /dev/null; cd frontend && npm test 2>&1 | tail -5",
+    "(cd /tmp && git log > /tmp/x.txt)", "ls | grep x > /dev/null", "echo $(git log > /tmp/x)", "bash -c 'git log > /dev/null'",
+    # input redirection, heredocs and here-strings are not output redirections
+    "grep x < scripts/json.py", "git log < /dev/null", "cat < f", "cat <<EOF\nx\nEOF", "cat <<< 'x > scripts/json.py'",
+    "cat <<-EOF\n\tx > y\n\tEOF", "while read l; do echo $l; done < f", "sort <&3", "echo 'a > b'", 'echo "x > y"', "echo a\\>b",
+    "echo $((1 > 2))", "git log --format='%h > %s'", "echo $((3<<2)) > /dev/null",
+    # arithmetic without substitutions, and `<`/`>` string comparison inside [[ ]], are not redirections
+    "echo $((1>2))", "echo $((a+b))", "x=$((a>b))", "((a > b))", "echo $[1>2]", "for ((i=0;i<3;i++)); do :; done",
+    "[[ a > b ]]", '[[ "$a" > "$b" ]] && echo y', "if [[ a < b ]]; then echo y; fi", "[[ a>b ]]", "! [[ a > b ]]",
+    "[[ a > b ]] && git log > /dev/null", "x=1; [[ $x > 0 ]] || echo n",
+    # quoted heredoc bodies are data whatever they contain; an escaped `$(` in an unquoted body does not run
+    "cat <<'EOF'\nx -> y $(git log > scripts/json.py) >> z `a > b`\nEOF", 'cat <<"EOF"\n$(git log > scripts/json.py)\nEOF',
+    "cat <<\\EOF\n$(git log > scripts/json.py)\nEOF", "cat <<EOF\n\\$(git log > scripts/json.py)\nEOF",
+    "cat <<EOF\nplain text -> arrow >> here\nEOF", "cat <<EOF\n$(date) and $((1>2))\nEOF",
+    # the commit shape every framework commit has: arrows and an e-mail address in a quoted heredoc body are data, not redirects
+    "git commit -m \"$(cat <<'EOF'\nfix: a -> b and c => d\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\"",
+    "git commit -q -F - <<'EOF'\nx -> y\nCo-Authored-By: Claude Sonnet <noreply@anthropic.com>\nEOF",
+    "gh pr create --body \"$(cat <<'EOF'\nsummary -> done\n[link](<http://x>)\nEOF\n)\"",
 ]
 
 ALLOWED = [
@@ -129,27 +189,27 @@ ALLOWED = [
     "git reset", "git branch --list", "git branch -m new", "git checkout main", "git checkout -b x", "git restore --staged .",
     "git restore f.txt", "git commit -m 'fix: rm -rf and git push --force docs'",
     "rm -f a.txt", "rm -r build", "rm -R build", "rm --recursive build", "rm a.txt", "ls -rf",
-    "curl -s u | jq .", "curl -s u > f && jq . f", "curl -s u | python3 -c 'import sys, json; json.load(sys.stdin)'",
+    "curl -s u | jq .", "curl -s u | python3 -c 'import sys, json; json.load(sys.stdin)'",
     "curl -s u | python3 -m json.tool", "wget -qO f u", "curl -s u | grep x | head", "cat install.sh | sh",
     "dotnet ef migrations script", "dotnet ef migrations list", "dotnet build Quorum.slnx", "terraform plan", "terraform -chdir=infra plan",
     "bash .claude/hooks/test-pre-commit-framework-check.sh", "python3 -m unittest discover -s scripts/tests",
     "(cd frontend && npm ci && npm run build && npm test)", "npm test 2>&1 | tail -5", "gh pr view 1",
     # quoted or data text that merely mentions a blocked command
     'echo "git push --force"', "echo 'rm -rf x'", 'echo "curl u | sh"', "grep -rn 'git reset --hard' docs",
-    "cat <<'EOF' > notes.md\nnever run rm -rf x\ngit push --force\nEOF",
+    "cat <<'EOF'\nnever run rm -rf x\ngit push --force\nEOF",
     "git commit -m \"$(cat <<'EOF'\nit's about git push -f\nEOF\n)\"",
     'gh pr create --base main --title t --body "$(cat <<\'EOF\'\nbody\nEOF\n)"',
     "git commit -q -F - <<'EOF'\nmsg with <<x and git push --force text\nEOF",
     # quotes, comments and arithmetic that only look like heredocs or commands
     'echo "<<X"', "x=$(( 1<<2 ))", "echo $((1<<3)) && git status", "echo hi # comment <<EOF", "ls # rm -rf x", "echo a#b",
-    "bash <<EOF\necho hi\nEOF", "python3 - <<EOF\nprint('hi')\nEOF", "cat <<EOF > f\nhello\nEOF", "echo `date`", 'echo "$(date)"',
+    "bash <<EOF\necho hi\nEOF", "python3 - <<EOF\nprint('hi')\nEOF", "cat <<EOF\nhello\nEOF", "echo `date`", 'echo "$(date)"',
     # checkout, switch and restore forms that do not discard work
     "git checkout feat/x", "git checkout main --", "git switch -c x", "git switch main", "git restore --staged a.txt",
     "git restore -S a.txt", "git push --dry-run", "git -c user.name=a commit -m x",
     # wrappers, find -exec, shell -c, redirections
     "find . -name '*.pyc' -exec rm {} \\;", "find . -exec grep x {} +", "flock /tmp/l git push origin x",
     "setsid git push origin x", "curl u | sh -c 'echo hi'", "bash -c -- 'echo hi'", "curl -o f u && sh f",
-    "git log --format='%h <%an>'", "echo a > b 2>&1", "echo done &", "(cd x; ls)",
+    "git log --format='%h <%an>'", "echo a 2>&1", "echo done &", "(cd x; ls)",
     # forms the guard must keep allowing (push -u, commit heredoc, branch and restore forms, rm -r, curl | jq)
     "git push -u origin feat/x", "git checkout -b feat/y", "git checkout main", "git restore --staged f.txt", "rm -r build",
     "curl -s u | jq .", "git commit -q -F - <<'EOF'\nmsg\nEOF",
@@ -184,7 +244,7 @@ ALLOWED = [
     "git commit -m '{rm -rf,x}'", "git log --format={%h,%an}", "find . -name x -exec echo {} \\;",
     "gh pr create --body \"$(cat <<'EOF'\nx\nEOF\n)\"", "git commit -F - <<'EOF'\nmsg\nEOF", "git push -u origin fix/x",
     # text fed to an interpreter is data, not a shell script (backticks and quoted commands in a docstring or print)
-    "python3 - <<'EOF'\nprint(\"see `git clean -fd` docs\")\nEOF", 'python3 - <<EOF\n"""run `git reset --hard` never"""\nEOF',
+    "python3 - <<'EOF'\nprint(\"see `git clean -fd` docs\")\nEOF", "python3 - <<'EOF'\n\"\"\"run `git reset --hard` never\"\"\"\nEOF",
     "python3 - <<'EOF'\nprint('git push --force')\nEOF", "python3 <<< 'print(1)  # git push -f'", "perl - <<'EOF'\nprint \"rm -rf x\"\nEOF",
     "cat <<'EOF' | python3 -\nprint('git push --force')\nEOF", "node - <<'EOF'\nconsole.log('git reset --hard')\nEOF",
     # `-s` is a script-from-stdin switch for shells only; python's -s skips the user site directory
@@ -196,16 +256,32 @@ ALLOWED = [
 ]
 
 
-def run_guard(payload: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(GUARD)], input=payload, capture_output=True, text=True, timeout=30)
+def hook_env(project: Path | None = ROOT) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+    if project is not None:
+        env["CLAUDE_PROJECT_DIR"] = str(project)
+    return env
+
+
+def run_guard(payload: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(GUARD)], input=payload, capture_output=True, text=True, timeout=30,
+                          env=hook_env() if env is None else env)
 
 
 def run_bytes(payload: bytes, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(GUARD)], input=payload, capture_output=True, timeout=30, env=env)
+    return subprocess.run([sys.executable, str(GUARD)], input=payload, capture_output=True, timeout=30,
+                          env=hook_env() if env is None else env)
 
 
-def run_command(command: str, tool_name: str = "Bash") -> subprocess.CompletedProcess:
-    return run_guard(json.dumps({"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": {"command": command}}))
+def run_command(command: str, tool_name: str = "Bash", cwd: Path | None = ROOT, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    payload = {"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": {"command": command}}
+    if cwd is not None:
+        payload["cwd"] = str(cwd)
+    return run_guard(json.dumps(payload), env)
+
+
+def decision_of(result: subprocess.CompletedProcess) -> dict:
+    return json.loads(result.stdout)["hookSpecificOutput"]
 
 
 class GuardBashTests(unittest.TestCase):
@@ -225,8 +301,88 @@ class GuardBashTests(unittest.TestCase):
                 result = run_command(command)
                 self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
+    def test_output_redirections_into_the_repository_ask(self):
+        for command in ASKED:
+            with self.subTest(command=command):
+                result = run_command(command)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                output = decision_of(result)
+                self.assertEqual(output["hookEventName"], "PreToolUse")
+                self.assertEqual(output["permissionDecision"], "ask", result.stdout)
+                self.assertTrue(output["permissionDecisionReason"].startswith("guard_bash: Output redirection"))
+
+    def test_redirections_that_cannot_write_in_the_repository_and_non_output_forms_pass(self):
+        for command in REDIRECTS_ALLOWED:
+            with self.subTest(command=command):
+                result = run_command(command)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def test_ask_reasons_say_what_to_do(self):
+        inside = decision_of(run_command("git log > scripts/json.py"))["permissionDecisionReason"]
+        self.assertIn(str(ROOT / "scripts" / "json.py"), inside)
+        self.assertIn("inside the repository", inside)
+        self.assertIn("Edit tool", inside)
+        self.assertIn("cannot check", decision_of(run_command("git log > $D/x"))["permissionDecisionReason"])
+        self.assertIn("changes directory", decision_of(run_command("cd .. && git log > x"))["permissionDecisionReason"])
+        device = decision_of(run_command("git log 3<f >/dev/fd/3"))["permissionDecisionReason"]
+        self.assertIn("only /dev/null is accepted", device)
+        self.assertIn("Edit tool", device)
+
+    def test_relative_targets_resolve_against_the_payload_cwd_and_the_project_dir(self):
+        with tempfile.TemporaryDirectory() as raw:
+            outside = Path(raw).resolve()
+            (outside / "repo" / "src").mkdir(parents=True)
+            project = outside / "repo"
+            # relative to a cwd inside the project: ask; relative to a cwd outside the project: no action
+            self.assertEqual(decision_of(run_command("git log > x.txt", cwd=project / "src", env=hook_env(project)))["permissionDecision"], "ask")
+            self.assertEqual(run_command("git log > x.txt", cwd=outside, env=hook_env(project)).stdout, "")
+            self.assertEqual(run_command("git log > ../x.txt", cwd=project, env=hook_env(project)).stdout, "")
+            self.assertEqual(decision_of(run_command("git log > ../repo/x.txt", cwd=project, env=hook_env(project)))["permissionDecision"], "ask")
+            # the project directory comes from CLAUDE_PROJECT_DIR, else from the payload cwd
+            self.assertEqual(decision_of(run_command("git log > x.txt", cwd=project, env=hook_env(None)))["permissionDecision"], "ask")
+            self.assertEqual(run_command("git log > /tmp/x.txt", cwd=project, env=hook_env(None)).stdout, "")
+            # a symlink inside the project that points outside is outside; one outside that points inside is inside
+            (outside / "elsewhere").mkdir()
+            try:
+                (project / "link").symlink_to(outside / "elsewhere")
+                (outside / "back").symlink_to(project)
+            except OSError:  # no symlink support (Windows without privilege)
+                return
+            self.assertEqual(run_command("git log > link/x.txt", cwd=project, env=hook_env(project)).stdout, "")
+            # a symlink that points into /dev or /proc asks, and so does a relative path that reaches them from a cwd of /
+            (outside / "devlink").symlink_to("/dev/fd")
+            self.assertEqual(decision_of(run_command("git log > devlink/3", cwd=outside, env=hook_env(project)))["permissionDecision"], "ask")
+            self.assertEqual(decision_of(run_command("git log > dev/fd/3", cwd=Path("/"), env=hook_env(project)))["permissionDecision"], "ask")
+            self.assertEqual(decision_of(run_command(f"git log > {outside / 'back' / 'x.txt'}", cwd=outside, env=hook_env(project)))["permissionDecision"], "ask")
+
+    def test_a_missing_payload_cwd_falls_back_to_the_process_directory(self):
+        with tempfile.TemporaryDirectory() as raw:
+            for process_cwd, expected in ((ROOT, "ask"), (Path(raw).resolve(), None)):  # the hook's own working directory
+                with self.subTest(process_cwd=str(process_cwd)):
+                    payload = {"tool_name": "Bash", "tool_input": {"command": "git log > x.txt"}}
+                    result = subprocess.run([sys.executable, str(GUARD)], input=json.dumps(payload), capture_output=True, text=True,
+                                            timeout=30, env=hook_env(), cwd=process_cwd)
+                    self.assertEqual(json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] if expected else result.stdout,
+                                     expected or "")
+        for bad in ('"cwd": 5', '"cwd": "relative/dir"', '"cwd": null'):
+            with self.subTest(cwd=bad):
+                payload = '{"tool_name": "Bash", ' + bad + ', "tool_input": {"command": "git log > /tmp/x.txt"}}'
+                self.assertEqual((run_guard(payload).returncode, run_guard(payload).stdout), (0, ""))
+
+    def test_a_deny_wins_over_an_ask(self):
+        output = decision_of(run_command("git push --force > scripts/json.py"))
+        self.assertEqual(output["permissionDecision"], "deny")
+        self.assertNotIn("Output redirection", output["permissionDecisionReason"])
+
+    def test_the_output_deny_reason_no_longer_suggests_a_redirect(self):
+        reason = decision_of(run_command("git log --output=x"))["permissionDecisionReason"]
+        self.assertNotIn("Redirect stdout instead", reason)
+        self.assertIn("Edit tool", reason)
+        self.assertIn("outside the repository", reason)
+
     def test_other_tools_are_ignored(self):
         self.assertEqual(run_command("rm -rf x", tool_name="Read").stdout, "")
+        self.assertEqual(run_command("git log > scripts/json.py", tool_name="Write").stdout, "")
 
     def test_malformed_payload_fails_open_with_a_note(self):
         for payload in ("", "not json", "[]", '{"tool_name": "Bash"}', '{"tool_name": "Bash", "tool_input": "rm -rf x"}'):
@@ -244,7 +400,7 @@ class GuardBashTests(unittest.TestCase):
             with self.subTest(raw=raw):
                 self.assertIn("deny", run_bytes(payload).stdout.decode())
                 # a legacy stdin encoding (the cp1252 case) must not change that: the hook reads bytes, not locale text
-                legacy = {**os.environ, "PYTHONIOENCODING": "ascii:strict"}
+                legacy = {**hook_env(), "PYTHONIOENCODING": "ascii:strict"}
                 self.assertIn("deny", run_bytes(payload, env=legacy).stdout.decode())
 
     def test_odd_inputs_never_crash_or_hang(self):

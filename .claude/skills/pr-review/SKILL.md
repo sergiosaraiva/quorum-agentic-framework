@@ -6,14 +6,14 @@ disable-model-invocation: true
 
 # PR review
 
-Reviewers are read-only and independent of the author. Build and tests are CI's job. The workflow is `.github/workflows/ai-pr-review.yml`; the local review, the required gate, is `scripts/ai_review_local.py` (`running-local-ai-review`); the workflow is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set.
+Reviewers are read-only and independent of the author. Build and tests are CI's job. The workflow is `.github/workflows/ai-pr-review.yml`; the local review, the required gate, is `scripts/ai_review_local.py` (`running-local-ai-review`); the workflow is an optional second gate that runs only when the repository variable `AI_REVIEW_ENABLED` is `true` (TQ-019).
 
 ## What the workflow does
 
 | Step | Detail |
 |------|--------|
 | Round gate | Counts earlier rounds as comments authored by `github-actions[bot]` that contain the marker `<!-- ai-review-round -->`; one marker comment is posted per finished round. At `MAX_ROUNDS` (env in the workflow, default 5) it adds the label `needs-human-review` once and stops reviewing |
-| Reviewer instructions | `CLAUDE.md` and `.claude/**` are read from the BASE branch checkout, not the PR head, so a PR cannot weaken its reviewer's instructions. The workflow file itself runs from the PR's merge ref with repository secrets before review (CODEOWNERS gates only the merge); to keep the key from people with push access use an environment secret behind required reviewers (TQ-019) |
+| Reviewer instructions | `CLAUDE.md` and `.claude/**` are read from the BASE branch checkout, not the PR head, so a PR cannot weaken its reviewer's instructions. The workflow file itself runs from the PR's merge ref with repository secrets before review (CODEOWNERS gates only the merge); the review job uses `environment: ai-review`: create it with required reviewers and "prevent self-review" and keep the key there as an environment secret (TQ-019); required reviewers need GitHub Enterprise on private or internal repositories, elsewhere the key is as exposed as a repository secret; approvers approve only `pull_request` runs of `ai-pr-review.yml`, reject other workflows or events requesting `ai-review` and runs that change `.github/**`; Free private repos have no environment secrets; turn off admin bypass, delete repo- and org-level keys |
 | Model | Default `opus`; the repository variable `AI_REVIEW_MODEL` overrides it |
 | Review | Runs the `quality-guardian` and `regression-detective` subagents on the PR diff |
 | Output | One summary comment plus up to 20 inline comments on exact diff lines. How the inline-comment tool handles a line outside the diff is the action's behaviour (verify it); the template does not implement a fallback |
@@ -52,7 +52,7 @@ On later rounds, re-check the findings of earlier rounds and say which are fixed
 
 ## Round cap and escalation
 
-- The round counter is the marker comments described above, not the summary text. Rounds are counted only from marker comments authored by `github-actions[bot]`, so a human resets the count by deleting those comments or by raising `MAX_ROUNDS` in the workflow. The label `needs-human-review` does not gate anything: it only stops the workflow posting the cap comment a second time, so removing it is optional housekeeping (and keeping it means a later cap hit posts no new comment).
+- The round counter is the marker comments described above, not the summary text. Rounds are counted only from marker comments authored by `github-actions[bot]`, so a human resets the count by deleting those comments or by raising `MAX_ROUNDS` in the workflow on the integration branch through its own PR (approvers reject runs that change `.github/**`). The label `needs-human-review` does not gate anything: it only stops the workflow posting the cap comment a second time, so removing it is optional housekeeping (and keeping it means a later cap hit posts no new comment).
 - After the cap with Blockers open, the workflow labels the PR `needs-human-review` and posts one comment. A human takes over.
 - The author never resolves a reviewer thread without a fix or a written reason; threads are resolved by people (the workflow does not resolve them).
 

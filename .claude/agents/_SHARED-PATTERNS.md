@@ -99,7 +99,7 @@ What blocks. This table is the only place that decides blocking; other files def
 | `quality-guardian`, `regression-detective`, `security-engineer` | Critical, High | Medium, Low, Info |
 | `ux-usability-specialist` | Blocker, Major | Minor, Note |
 | `documentation-reviewer` | status `ungrounded`, `fabricated-citation`, `stale`, `conflict` or `gate-failure` (reported at confidence >= 0.8) | other statuses, style findings |
-| AI review (`pr-review` skill; local, and GitHub when `ANTHROPIC_API_KEY` is set) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
+| AI review (`pr-review` skill; local, and GitHub when `AI_REVIEW_ENABLED` is `true`) | `blocking` (local) / Blocker (GitHub) | Warning, Info |
 
 - Never skip a stage an earlier iteration passed.
 - Cap (OD-031): 5 re-loops per gate chain. Still failing: stop, surface the pattern once, batched. Framework docs: one budget of 5 across both gates.
@@ -129,7 +129,7 @@ Field `unverified` (optional list, every reviewer contract; defined here): one s
 
 ## Pre-Push Branch Gate (Mandatory)
 
-Outside the Trivial and Spike lanes, before a branch's first push and after any later change run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code per its lane row. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 5, then a human). The pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set (else skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
+Outside the Trivial and Spike lanes, before a branch's first push and after any later change run `quality-guardian` || `regression-detective` over the whole branch diff against the base plus the alignment result, then `test-automator` for code per its lane row. Then the local AI review (`python3 scripts/ai_review_local.py --base origin/main --require`, skill `running-local-ai-review`: no API key, `--model opus` for risky changes, cap 5, then a human). The pair plus local review is the gate; a human merges. The GitHub AI review (skill `pr-review`) is an optional second gate that runs only when `AI_REVIEW_ENABLED` is `true` (else skipped; green is not a review); fix its findings (`MAX_ROUNDS`, label `needs-human-review`).
 
 ## Citation Format (Mandatory)
 

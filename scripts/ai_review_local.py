@@ -6,7 +6,7 @@ builds one review prompt per chunk from the pr-review skill plus the quality-gua
 regression-detective instructions only, runs `claude -p` headless with the user's own `claude` sign-in
 (no API key; default model: sonnet, use --model opus for risky changes), merges the findings and writes
 them to `.ai-review/`. With the in-session reviewer pair it is the required review gate; the GitHub AI
-review is an optional second gate that runs only when ANTHROPIC_API_KEY is set.
+review is an optional second gate that runs only when the repository variable AI_REVIEW_ENABLED is true (TQ-019).
 
 Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and
 --require is not set; 1 blocking findings; 2 usage or environment error (bad or option-like --base,
@@ -59,7 +59,9 @@ Critical, High, Blocker -> blocking, Medium -> warning, Low or Info -> info; any
 
 Standard library only. Use --dry-run to print the prompt without calling the model.
 """
-from __future__ import annotations
+import sys  # builtin: cannot be shadowed. Nothing else is imported before the next statement (not even `from __future__`, which imports a module)
+if __name__ == "__main__" and not sys.flags.isolated and not getattr(sys.flags, "safe_path", False) and sys.path and sys.path[0]:
+    del sys.path[0]  # the script directory: a planted scripts/<stdlib-name>.* must not shadow the standard library (OD-032)
 
 import argparse
 import json
@@ -67,7 +69,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 

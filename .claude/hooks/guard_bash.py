@@ -223,8 +223,10 @@ def dotnet_build_event(args):
     """`dotnet [watch] build|test|run|msbuild|publish|pack` or any `dotnet watch ...` (watch always builds; its default
     subcommand is run) with a property override of PreBuildEvent or PostBuildEvent, which runs
     an arbitrary command: -p:X, -p=X, --p X (separated value), -property:, --property:, /p:, and the restore forms -rp:,
-    /rp:, -restoreProperty:. After `--` the arguments belong to the application (`dotnet run -- -p:X`)."""
-    if "--" in args:
+    /rp:, -restoreProperty:. After `--` the arguments belong to the application (`dotnet run -- -p:X`), except under
+    `dotnet watch`, which passes everything after `--` to the child dotnet process (`dotnet watch -- run -p:X` builds with
+    it), so watch scans every argument."""
+    if "--" in args and args[:1] != ["watch"]:
         args = args[:args.index("--")]
     words = [x for x in args if not x.startswith("-")]
     # `dotnet watch ...` always builds (the default subcommand is run, and the option values come before the subcommand in

@@ -185,7 +185,8 @@ def _anchor_problem(merge_base: str) -> str | None:
             return None
     if on_own_ref:
         return ("--require: you are on the integration branch (the remote's HEAD points at this branch's own remote counterpart), "
-                "so there is no branch to review; create a branch first (git switch -c <name>) and commit there")
+                "so there is no branch to review; create a branch first (git switch -c <name>) and commit there. If this is not "
+                "your integration branch, point the remote HEAD back at it: git remote set-head <remote> -a")
     return ("--require: the base is not anchored to shared history: under --require the base must be the integration branch "
             "the remote's HEAD points at (for example origin/main, after `git fetch`); it would otherwise review only part of this "
             "branch. A stacked branch, or a branch whose integration branch is not the remote's default, also uses it "

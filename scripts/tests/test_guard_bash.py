@@ -10,6 +10,9 @@ from pathlib import Path
 GUARD = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "guard_bash.py"
 
 BLOCKED = [
+    # dotnet watch passes everything after `--` to the child dotnet process, so the override still reaches the build
+    "dotnet watch -- run -p:PostBuildEvent=x", "dotnet watch -- build /p:PreBuildEvent=x",
+    "dotnet watch --project x.csproj -- run -p:PostBuildEvent=x", "dotnet watch run -- -p:PostBuildEvent=x",
     # a quoted or escaped paren must not make subshells look like arithmetic
     '((true "(" ); (git push -f; echo ")"))',
     "((true \\( ); (git push -f origin main; echo \\)))",
@@ -173,7 +176,7 @@ ALLOWED = [
     "dotnet test --project x", "dotnet run -- -p:PostBuildEvent=x", "dotnet run -- --p PostBuildEvent=x", "dotnet run -c Release -- -p PreBuildEvent=x",
     # dotnet watch without build-event properties, or with a non-build subcommand
     "dotnet watch run", "dotnet watch test", "dotnet watch run -p:Configuration=Release", "dotnet watch --project x.csproj run",
-    "dotnet watch run -- -p:PostBuildEvent=x", "dotnet watch",
+    "dotnet watch",
     # ten chained two-way brace groups are 1024 words, within the budget
     "echo " + "{a,b}" * 10,
     # braces that are not brace expansion: quoted, escaped, parameter expansion, a group without a comma, reserved words

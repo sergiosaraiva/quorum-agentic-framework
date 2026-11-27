@@ -50,7 +50,12 @@ Known gaps (not fixed; best effort, not a sandbox):
   watch...).
 - Brace sequences (`{a..b}`) are not expanded, and a brace expansion that yields over MAX_BRACE words is blocked (fail closed).
 - dotnet: a build event set through the environment (`PostBuildEvent=cmd dotnet build`), `Directory.Build.props`, a response file
-  (`@x.rsp`) or the project file; `-l:`/`--logger`/`--test-adapter-path` load code (the settings `ask` list covers them).
+  (`@x.rsp`) or the project file. Loggers and adapters load code and are not blocked here (they have legitimate uses); the
+  settings `ask` list prompts for them: `dotnet <args> -l*`, `/l*`, `-L*`, `-P*`, `/P*`, `-dl*`, `/dl*`, `-distributedlogger*`,
+  `-logger*`, `--logger*` and `--test-adapter-path*`, with the same prompts for any `-p`, `/p`, `--p`, `--property`, `-rp`,
+  `/rp` and `-restoreProperty` option. Not covered by the `ask` list: an option that is the first argument after `dotnet`
+  (`dotnet -l:x` has no subcommand to anchor `dotnet * -l*`), an option set through `@x.rsp`, `MSBUILD*` environment variables or
+  the project file, and spellings beyond those prefixes.
 - Destructive commands not covered by RULES: `git update-ref -d`, `git stash clear|drop`, `git worktree remove --force`,
   `git branch -M|-C` (force rename or copy over a branch), `gh api -X DELETE` (the settings `ask` list covers it). `gh pr merge`
   is not blocked here; it is under `ask` in settings.json, so the user is prompted.
@@ -96,7 +101,10 @@ BRACE_MARKS = {"{": "\ue000", ",": "\ue001", "}": "\ue002"}
 BRACE_OPEN, BRACE_COMMA, BRACE_CLOSE = BRACE_MARKS.values()
 BRACE_RESTORE = str.maketrans({v: k for k, v in BRACE_MARKS.items()})
 DOTNET_BUILD_COMMANDS = {"build", "test", "run", "msbuild", "publish", "pack"}
-BUILD_EVENT_PROPERTY = re.compile(r"^(--?|/)(p|property):.*(pre|post)buildevent", re.IGNORECASE | re.DOTALL)
+# A property option of dotnet/msbuild (-p, --p, -property, /p, and the restore forms -rp, -restoreProperty); the value follows a
+# `:` or `=`, or is the next token. A build event in the value runs a command.
+PROPERTY_OPTION = re.compile(r"^(--?|/)(p|property|rp|restoreproperty)([:=]|$)", re.IGNORECASE)
+BUILD_EVENT_VALUE = re.compile(r"(pre|post)buildevent", re.IGNORECASE)
 GIT_FALSE_VALUES = {"false", "no", "off", "0", ""}
 
 
@@ -148,33 +156,35 @@ def takes_value(option, value_options):
     return False
 
 
-def expand_braces(word, budget=None):
+def expand_braces(word):
     """Comma brace expansion of a word whose unquoted braces and commas are BRACE_MARKS: `--{force,x}` -> `--force`, `--x`.
-    The leftmost group with a top-level comma is expanded, recursively. `{a..b}` sequences are not expanded (Known gaps).
-    Raises TooDeep past MAX_BRACE results."""
-    budget = [MAX_BRACE] if budget is None else budget
-    budget[0] -= 1
-    if budget[0] < 0:
-        raise TooDeep
-    if BRACE_COMMA not in word:
-        return [word]
-    stack, best = [], None
-    for k, ch in enumerate(word):
-        if ch == BRACE_OPEN:
-            stack.append((k, []))
-        elif ch == BRACE_COMMA and stack:
-            stack[-1][1].append(k)
-        elif ch == BRACE_CLOSE and stack:
-            opened, commas = stack.pop()
-            if commas and (best is None or opened < best[0]):
-                best = (opened, k, commas)
-    if best is None:
-        return [word]
-    opened, closed, commas = best
-    bounds = [opened, *commas, closed]
-    out = []
-    for lo, hi in zip(bounds, bounds[1:]):
-        out += expand_braces(word[:opened] + word[lo + 1:hi] + word[closed + 1:], budget)
+    The leftmost group with a top-level comma is expanded first. `{a..b}` sequences are not expanded (Known gaps).
+    Raises TooDeep when the result would pass MAX_BRACE words (counted by result words, so ten chained `{a,b}` groups, 1024
+    words, are fine and eleven are blocked). Iterative, so a deeply nested group cannot hit the recursion limit."""
+    out, pending = [], [word]
+    while pending:
+        current = pending.pop()
+        best = None
+        if BRACE_COMMA in current:
+            stack = []
+            for k, ch in enumerate(current):
+                if ch == BRACE_OPEN:
+                    stack.append((k, []))
+                elif ch == BRACE_COMMA and stack:
+                    stack[-1][1].append(k)
+                elif ch == BRACE_CLOSE and stack:
+                    opened, commas = stack.pop()
+                    if commas and (best is None or opened < best[0]):
+                        best = (opened, k, commas)
+        if best is None:
+            out.append(current)
+        else:
+            opened, closed, commas = best
+            bounds = [opened, *commas, closed]
+            # reversed, so the stack yields the alternatives in order
+            pending.extend(current[:opened] + current[lo + 1:hi] + current[closed + 1:] for lo, hi in reversed(list(zip(bounds, bounds[1:]))))
+        if len(out) + len(pending) > MAX_BRACE:  # every pending word yields at least one result
+            raise TooDeep
     return out
 
 
@@ -210,12 +220,20 @@ def clean_unforced(config):
 
 def dotnet_build_event(args):
     """`dotnet build|test|run|msbuild|publish|pack` with a property override of PreBuildEvent or PostBuildEvent, which runs
-    an arbitrary command (-p:, /p:, -property:, --property:)."""
+    an arbitrary command: -p:X, -p=X, --p X (separated value), -property:, --property:, /p:, and the restore forms -rp:,
+    /rp:, -restoreProperty:. After `--` the arguments belong to the application (`dotnet run -- -p:X`)."""
     if "--" in args:
         args = args[:args.index("--")]
     if next((x for x in args if not x.startswith("-")), "") not in DOTNET_BUILD_COMMANDS:
         return False
-    return any(BUILD_EVENT_PROPERTY.match(x) for x in args)
+    for i, arg in enumerate(args):
+        option = PROPERTY_OPTION.match(arg)
+        if not option:
+            continue
+        value = arg[option.end():] or "".join(args[i + 1:i + 2])  # no attached value: the next token is the value
+        if BUILD_EVENT_VALUE.search(value):
+            return True
+    return False
 
 
 def rm_force_recursive(args):

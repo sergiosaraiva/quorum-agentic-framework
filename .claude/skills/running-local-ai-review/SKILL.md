@@ -16,7 +16,7 @@ The script reviews your branch diff with the `claude` CLI and your own sign-in; 
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
 | 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
 
-The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json`, `~/.claude.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+; older versions ignore it) so reads cannot leave the repository. A prompt-injected diff cannot reach project allow rules or MCP servers. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read from the base revision with `git show` (working-tree fallback with a notice when absent at base). That is the whole protection: the branch's own `CLAUDE.md` files, `.claude/settings.json`, the files the reviewer reads and this script still come from the branch.
+The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json`, `~/.claude.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+) so reads cannot leave the repository. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read at the merge-base of `--base` and HEAD (shared history) with `git show`, so a moved base does not change them (working-tree fallback with a notice when absent there). That is the whole protection: the branch's own `CLAUDE.md` files, `.claude/settings.json`, the files the reviewer reads and this script still come from the branch.
 
 Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
 
@@ -31,11 +31,11 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
-| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH, when HEAD has no commits the base lacks (a base that moved on is fine), and, with a remote configured, when the base is not anchored to shared history (a remote-tracking ref such as `origin/main`, or a branch cut from one; `HEAD~1` fails); use it for the gate |
+| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH, when HEAD is detached, when HEAD has no commits the base lacks (a base that moved on is fine), and, with a remote configured, when the base is not anchored to shared history (a remote-tracking ref such as `origin/main`, or a branch cut from one; `HEAD~1` fails). The branch's own upstream is excluded as an anchor; `origin/HEAD` is used when present. Use it for the gate |
 | `--reset` | Drop the current branch's saved round count; the next completed round starts from 1 (use after a human review) |
 | `--dry-run` | Print the first prompt, call no model, spend nothing |
 
-The round number is kept in `.ai-review/state.json`; there is no `--round` flag. Run `python3 scripts/ai_review_local.py --help` to confirm the current flags.
+Flags are exact (no abbreviations). The round number is kept in the fixed `.ai-review/state.json`, even with `--out-dir`; there is no `--round` flag. In `.claude/settings.json`, `--reset`, `--max-rounds`, `--claude-bin` and `--out-dir` are behind `ask`. Run `python3 scripts/ai_review_local.py --help` to confirm the current flags.
 
 ```bash
 python3 scripts/ai_review_local.py --dry-run                       # inspect the prompt
@@ -69,7 +69,7 @@ The script also accepts severities from the reviewer agents, case-insensitively:
 
 ## Counters
 
-Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch; removing the label `needs-human-review` is optional housekeeping). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
+Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
 
 ## Order
 

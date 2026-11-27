@@ -150,10 +150,11 @@ class StateTests(unittest.TestCase):
         import contextlib
         import io
         import tempfile
+        from unittest import mock
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "state.json").write_text("{not json", encoding="utf-8")
             err = io.StringIO()
-            with contextlib.redirect_stderr(err):
+            with mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), contextlib.redirect_stderr(err):
                 code = air.main(["--out-dir", tmp, "--base", "HEAD"])
             self.assertEqual(code, 2)
             self.assertIn("--reset", err.getvalue())
@@ -164,6 +165,7 @@ class StateTests(unittest.TestCase):
         import tempfile
         from unittest import mock
         with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), \
                 mock.patch.object(air, "get_diff", return_value="diff --git a/x b/x\n+x\n"), \
                 mock.patch.object(air, "current_branch", return_value="t"):
             args = ["--out-dir", tmp, "--claude-bin", "no-such-claude-binary"]
@@ -203,6 +205,7 @@ class StateTests(unittest.TestCase):
             def run_on(branch: str) -> str:
                 err = io.StringIO()
                 with mock.patch.object(air, "get_diff", return_value=diff), \
+                        mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), \
                         mock.patch.object(air, "current_branch", return_value=branch), \
                         contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
                     self.assertEqual(air.main(args), 0)
@@ -220,10 +223,36 @@ class StateTests(unittest.TestCase):
             args = ["--out-dir", tmp, "--base", "origin/main", "--dry-run"]  # no --max-rounds: the default applies
             err = io.StringIO()
             with mock.patch.object(air, "get_diff", return_value=make_diff("a.cs", ["x"])), \
+                    mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), \
                     mock.patch.object(air, "current_branch", return_value="feature/c"), \
                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
                 self.assertEqual(air.main(args), 0)
             self.assertIn("round 1/5", err.getvalue())
+
+
+class OptionTests(unittest.TestCase):
+    def test_abbreviated_options_are_rejected_with_exit_2(self):
+        # `--res` must not act as `--reset`, `--max-r 99` as `--max-rounds`, `--cl x` as `--claude-bin`: the ask rules in
+        # .claude/settings.json match the full spelling only.
+        import contextlib
+        import io
+        for args in (["--res"], ["--max-r", "99"], ["--cl", "x"], ["--out", "d"], ["--max-rounds=2", "--res"]):
+            with self.subTest(args=args), contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(SystemExit) as raised:
+                    air.main([*args, "--dry-run"])
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn("unrecognized arguments", err.getvalue())
+
+    def test_the_full_spellings_are_still_accepted(self):
+        import contextlib
+        import io
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), \
+                mock.patch.object(air, "get_diff", return_value=""), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(air.main(["--reset", "--max-rounds", "9", "--out-dir", tmp, "--claude-bin", "x"]), 0)
 
 
 class SeverityMappingTests(unittest.TestCase):
@@ -258,6 +287,7 @@ class SeverityMappingTests(unittest.TestCase):
         reply = json.dumps({"findings": [{"severity": severity, "file": "a.py", "line": 1, "title": "t",
                                           "scenario": "s", "fix": "f"}]})
         with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(air, "state_path", return_value=Path(tmp) / "state.json"), \
                 mock.patch.object(air, "get_diff", return_value=make_diff("a.py", ["x"])), \
                 mock.patch.object(air, "current_branch", return_value="t"), \
                 mock.patch.object(air.shutil, "which", return_value="/bin/claude"), \
@@ -568,6 +598,68 @@ class AnchoredBaseTests(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(self.main_code("--base", "main", "--require", "--dry-run")[0], 0)
 
+    def set_head(self):
+        self.git("remote", "set-head", "origin", "main")  # refs/remotes/origin/HEAD, as every clone has it
+
+    def test_a_detached_head_is_rejected_under_require(self):
+        self.with_remote()
+        self.feature_branch()
+        self.git("checkout", "-q", "--detach")
+        code, _, err = self.main_code("--base", "origin/main", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("detached", err)
+        self.assertEqual(self.main_code("--base", "origin/main", "--dry-run")[0], 0)  # without --require: today's behaviour
+
+    def test_a_branch_pushed_under_another_name_cannot_anchor_head_minus_one_when_origin_head_is_set(self):
+        self.with_remote()
+        self.set_head()
+        self.feature_branch()
+        self.git("push", "-q", "origin", "HEAD:refs/heads/feature/other")  # origin/feature/other now contains HEAD~1
+        code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("not anchored", err)
+
+    def test_a_branch_pushed_with_a_different_upstream_name_cannot_anchor_itself_without_origin_head(self):
+        self.with_remote()
+        self.feature_branch()
+        self.git("push", "-q", "-u", "origin", "HEAD:refs/heads/feature/other")  # upstream is origin/feature/other, not origin/feat
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "@{upstream}"), "origin/feature/other")
+        code, _, err = self.main_code("--base", "HEAD~1", "--require", "--dry-run")
+        self.assertEqual(code, 2)
+        self.assertIn("not anchored", err)
+
+    def test_the_integration_branch_is_accepted_when_origin_head_is_set(self):
+        self.with_remote()
+        self.set_head()
+        self.feature_branch(push=True)
+        for base in ("origin/main", "main"):
+            with self.subTest(base=base):
+                code, _, err = self.main_code("--base", base, "--require", "--dry-run")
+                self.assertEqual(code, 0, err)
+
+    def test_a_diverged_base_is_accepted_when_origin_head_is_set(self):
+        self.with_remote()
+        self.set_head()
+        self.feature_branch()
+        self.git("checkout", "-q", "main")
+        self.commit("m1.txt")
+        self.git("push", "-q", "origin", "main")  # main moved on after feat was cut
+        self.git("checkout", "-q", "feat")
+        for base in ("origin/main", "main"):
+            with self.subTest(base=base):
+                code, _, err = self.main_code("--base", base, "--require", "--dry-run")
+                self.assertEqual(code, 0, err)
+
+    def test_a_branch_of_a_branch_is_rejected_when_origin_head_is_set(self):
+        # feat2 is cut from feat, which is not on the integration branch: base `feat` would review only feat2's own commits.
+        self.with_remote()
+        self.set_head()
+        self.feature_branch(push=True)
+        self.git("checkout", "-q", "-b", "feat2")
+        self.commit("g1.txt")
+        self.assertEqual(self.main_code("--base", "feat", "--require", "--dry-run")[0], 2)
+        self.assertEqual(self.main_code("--base", "origin/main", "--require", "--dry-run")[0], 0)
+
     def test_a_remote_without_fetched_branches_cannot_anchor_a_base(self):
         import subprocess
         subprocess.run(["git", "init", "-q", "--bare", str(self.remote)], check=True, capture_output=True)
@@ -605,6 +697,50 @@ class AnchoredBaseTests(unittest.TestCase):
             self.assertEqual(air.review_revision("origin/main"), self.fork)
         self.assertIn("SKILL v1", out.getvalue())
         self.assertNotIn("moved on", out.getvalue())
+
+
+class StateLocationTests(unittest.TestCase):
+    """The round state is `<repo>/.ai-review/state.json` whatever --out-dir says, so a new --out-dir cannot reset the cap (OD-031)."""
+    GIT = ReviewerPromptsFromBaseTests.GIT
+    main_code = RequireRealBaseTests.main_code
+    setUp = RequireRealBaseTests.setUp
+
+    def branch(self) -> str:
+        return self.git("rev-parse", "--abbrev-ref", "HEAD")
+
+    def write_state(self, rounds: int) -> Path:
+        path = self.root / ".ai-review" / "state.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"branches": {self.branch(): {"rounds": rounds, "findings": []}}}), encoding="utf-8")
+        return path
+
+    def test_a_new_out_dir_does_not_reset_the_round_cap(self):
+        self.write_state(rounds=5)
+        for out in (str(Path(self._tmp.name) / "fresh"), "elsewhere", "."):
+            with self.subTest(out_dir=out):
+                code, stdout, _ = self.main_code("--base", self.first, "--out-dir", out)
+                self.assertEqual(code, 3)
+                self.assertIn("Round cap 5 reached", stdout)
+
+    def test_the_state_is_written_to_the_fixed_path_and_findings_to_out_dir(self):
+        from unittest import mock
+        with mock.patch.object(air, "call_model", return_value='{"findings": []}'), \
+                mock.patch.object(air.shutil, "which", return_value="/bin/claude"):
+            code, _, err = self.main_code("--base", self.first)
+        self.assertEqual(code, 0, err)
+        state = json.loads((self.root / ".ai-review" / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["branches"][self.branch()]["rounds"], 1)
+        self.assertTrue((Path(self.out) / "findings.json").exists())
+        self.assertFalse((Path(self.out) / "state.json").exists())
+
+    def test_reset_drops_the_fixed_state_whatever_out_dir_is(self):
+        from unittest import mock
+        path = self.write_state(rounds=5)
+        with mock.patch.object(air, "call_model", return_value='{"findings": []}'), \
+                mock.patch.object(air.shutil, "which", return_value="/bin/claude"):
+            code, _, err = self.main_code("--base", self.first, "--reset")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["branches"][self.branch()]["rounds"], 1)
 
 
 class ExtractJsonObjectTests(unittest.TestCase):

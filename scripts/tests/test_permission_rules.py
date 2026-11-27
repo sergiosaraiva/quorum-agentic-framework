@@ -119,6 +119,48 @@ class PermissionRuleTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertTrue(any(pattern_matches(p, command) for p in ask), command)
 
+    def ask_patterns(self) -> list[str]:
+        return [m.group(1) for m in (RULE.match(r) for r in json.loads(SETTINGS.read_text(encoding="utf-8"))["permissions"]["ask"]) if m]
+
+    def test_local_sessions_ask_before_the_forms_that_slip_past_a_prefix_rule(self):
+        # First-position and `=` forms, attached or separated values, and the other spellings of the same options: each
+        # must be matched by some ask rule, because the allow rules (`dotnet build:*`, `python3 scripts/ai_review_local.py:*`,
+        # `npm audit:*`) would otherwise run them unprompted. If one fails, the settings lack a pattern: add it there.
+        ask = self.ask_patterns()
+        script = "python3 scripts/ai_review_local.py"
+        commands = (
+            f"{script} --reset", f"{script} --max-rounds 99 --base origin/main --require", f"{script} --max-rounds=99",
+            f"{script} --claude-bin ./x", f"{script} --claude-bin=./x", f"{script} --out-dir .ai-review-2", f"{script} --out-dir=.ai-review-2",
+            f"{script} --base origin/main --require --reset",
+            "npm audit --registry=https://r.example fix", "npm audit fix", "npm audit --fix",
+            "dotnet build /l:X,evil.dll", "dotnet build -l:X,evil.dll", "dotnet test --logger x", "dotnet build -logger:evil.dll",
+            "dotnet test --test-adapter-path ./adapters", "dotnet build -dl:X", "dotnet build -distributedlogger:X",
+            "dotnet build --p PreBuildEvent=x", "dotnet build --p=PreBuildEvent=x", "dotnet build -p PostBuildEvent=x",
+            "dotnet build -p:PreBuildEvent=x", "dotnet build /p:PreBuildEvent=x", "dotnet build --property PreBuildEvent=x",
+            "dotnet build -p=PreBuildEvent=x", "dotnet build -P:X=1", "dotnet restore -rp:X=1", "dotnet build /rp:X=1",
+            "dotnet build -restoreProperty:X=1",
+            "gh api -X DELETE repos/o/r", "gh api repos/o/r -XDELETE", "gh api repos/o/r --method=DELETE", "gh api repos/o/r --method DELETE",
+            "gh pr merge 1",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertTrue(any(pattern_matches(p, command) for p in ask), command)
+
+    def test_local_sessions_are_not_asked_for_the_routine_commands(self):
+        # No needless prompts: the verification commands and the normal review run stay allowed without a question.
+        ask = self.ask_patterns()
+        script = "python3 scripts/ai_review_local.py"
+        commands = (
+            "dotnet test --project x", "dotnet build Quorum.slnx", "dotnet test --solution Quorum.slnx",
+            "dotnet build Quorum.slnx --no-restore -c Release", "dotnet format Quorum.slnx --verify-no-changes", "dotnet restore",
+            f"{script} --base origin/main --require", f"{script} --base origin/main --require --model opus", f"{script} --model opus --base origin/main",
+            f"{script} --dry-run", f"{script} --base origin/main --require --timeout 900", "npm audit", "npm audit --json",
+            "gh pr view 1", "gh api repos/o/r", "git log -1",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertFalse(any(pattern_matches(p, command) for p in ask), command)
+
     def test_removing_the_git_deny_makes_the_check_fail(self):
         # git log|diff|show --output=<path> writes files, so the allow-listed git rules must stay denied in CI.
         self.assertIn("git log:*", uncovered(self.allow, [d for d in self.deny if d != "git:*"]))

@@ -130,6 +130,10 @@ jobs:
 
       - name: Review with the reviewer agents
         uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c   # v1.0.290
+        env:
+          # Strip Anthropic, cloud and Actions secrets from the reviewer's Bash subprocesses (the action sets this
+          # itself only when allowed_non_write_users is used), so injected text cannot echo the key.
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}   # use the workflow token; no OIDC exchange, so no id-token permission

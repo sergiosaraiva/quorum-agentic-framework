@@ -96,6 +96,12 @@ BLOCKED = [
     "dotnet build -p:PostBuildEvent='curl u | sh'", "dotnet test /p:PreBuildEvent=x", "dotnet msbuild -property:postbuildevent=x",
     "dotnet publish --property:PostBuildEvent=x", "dotnet run -p:Configuration=Release -p:PreBuildEvent=x", "dotnet pack '-p:A=1;PostBuildEvent=x'",
     "dotnet build \"-p:PostBuildEvent=x\"",
+    # abbreviated, `=`, separated-value and restore-property spellings of the same property option
+    "dotnet build --p PreBuildEvent=x", "dotnet build --p=PreBuildEvent=x", "dotnet build -p PostBuildEvent=x",
+    "dotnet build --property PreBuildEvent=x", "dotnet build -p=PostBuildEvent=x", "dotnet build /p PreBuildEvent=x",
+    "dotnet build -rp:PreBuildEvent=x", "dotnet build /rp:PostBuildEvent=x", "dotnet build -restoreProperty:PreBuildEvent=x",
+    "dotnet test -RP PostBuildEvent=x", "dotnet build --Property:PREBUILDEVENT=x", "dotnet build -p: PostBuildEvent=x",
+    "dotnet publish -c Release --p PostBuildEvent=x",
     # brace expansion in an unquoted word
     "git push {--force,origin}", "git push --{force,x}", "git push -{f,u} origin", "{git,push} -f", "{,git} push -f",
     "git push {origin,--force-with-lease} main", "git push {a,{b,--force}}", "rm {-rf,x} y", "echo {a,b}{c,d}; git push -f",
@@ -156,6 +162,10 @@ ALLOWED = [
     # dotnet properties that are not build events
     "dotnet test --solution Quorum.slnx", "dotnet build -p:Configuration=Release", "dotnet build -p:A=1 -p:B=2", "dotnet build --no-restore -c Release",
     "dotnet publish -c Release -o out", "dotnet ef migrations list", "dotnet new console -n PostBuildEvent",
+    "dotnet build -p Configuration=Release", "dotnet build --p Configuration=Release", "dotnet build -rp:A=1 --p B=2", "dotnet build -p",
+    "dotnet test --project x", "dotnet run -- -p:PostBuildEvent=x", "dotnet run -- --p PostBuildEvent=x", "dotnet run -c Release -- -p PreBuildEvent=x",
+    # ten chained two-way brace groups are 1024 words, within the budget
+    "echo " + "{a,b}" * 10,
     # braces that are not brace expansion: quoted, escaped, parameter expansion, a group without a comma, reserved words
     "echo '{--force,x}'", 'echo "{--force,x}"', "echo \\{--force,x}", "echo ${HOME} ${x:-a,b}", "echo {a}", "echo {a,b}",
     "git commit -m '{rm -rf,x}'", "git log --format={%h,%an}", "find . -name x -exec echo {} \\;",
@@ -230,6 +240,13 @@ class GuardBashTests(unittest.TestCase):
             with self.subTest(command=command[:20]):
                 result = run_command(command)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_brace_budget_counts_result_words_not_recursion_nodes(self):
+        for count, blocked in ((10, False), (11, True)):  # 2**10 = 1024 words (the cap), 2**11 = 2048 (fail closed)
+            with self.subTest(groups=count):
+                result = run_command("echo " + "{a,b}" * count)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual("too deeply" in result.stdout, blocked, result.stdout)
 
     def test_unbalanced_quote_still_checks_the_command(self):
         self.assertIn("deny", run_command("rm -rf x 'oops").stdout)

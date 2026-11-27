@@ -34,9 +34,19 @@ With --require the review must be a real one: exit 2 when HEAD has no commits th
 (base equal to or ahead of HEAD: nothing to compare). A base that moved on after the branch was cut is fine, because the
 diff is taken from the merge-base. The base must also be anchored to shared history, so the producer of a branch cannot
 narrow the review with `--base HEAD~1`: it must resolve to a remote-tracking ref (`origin/main`), or its merge-base with
-HEAD must be contained in a remote-tracking branch other than this branch's own (`git branch -r --contains`). A repository
-with no remote at all keeps today's behaviour (a notice is printed). Without --require an empty diff just reports
-"nothing to review" and exits 0.
+HEAD must be contained in a remote-tracking branch other than this branch's own (`git branch -r --contains`). "This branch's
+own" is `<remote>/<local name>`, the branch's upstream (`@{upstream}`) and its push target (`@{push}`), so a branch pushed as
+`HEAD:feature/other` with `-u` cannot anchor itself. When `refs/remotes/<remote>/HEAD` exists (every clone has it; for a
+repository made with `git init` run `git remote set-head <remote> -a`) the base is anchored to the integration branch
+instead: the merge-base of base and HEAD must be an ancestor of it, which also closes `git push origin HEAD:feature/other`
+without `-u`. A detached HEAD is refused under --require (there is no branch to exclude). Remaining limit: this reads
+local refs, so a locally forged `refs/remotes/*` ref (`git update-ref refs/remotes/origin/x HEAD~1`) still anchors a base; the
+check stops accidents and the easy shortcut, not a determined producer. A repository with no remote at all keeps today's
+behaviour (a notice is printed). Without --require an empty diff just reports "nothing to review" and exits 0.
+
+The round state is always `<repository>/.ai-review/state.json`, whatever --out-dir says (--out-dir only moves findings.json
+and findings.md), so a new --out-dir cannot reset the round cap (OD-031); only --reset does. Options are exact: argparse
+abbreviations are off (`--res` is an error, not `--reset`), which keeps the `ask` rules in .claude/settings.json matching.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
 Critical, High, Blocker -> blocking, Medium -> warning, Low or Info -> info; anything else -> warning.
@@ -132,11 +142,33 @@ def get_diff(base: str) -> str:
     return proc.stdout
 
 
-def _anchored_to_remote(base: str, merge_base: str) -> bool:
-    """True when `base` is a remote-tracking ref (other than this branch's own counterpart), or the merge-base is contained
-    in a remote-tracking branch other than this branch's own. The branch's own remote counterpart is excluded because a
-    pushed branch contains its own earlier commits: `--base HEAD~1` would otherwise pass after the push."""
+def _git_line(*args: str) -> str:
+    """Trimmed stdout of a git command, or "" when it fails (for example no upstream is configured)."""
+    proc = run(["git", *args])
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _own_remote_refs() -> set[str]:
+    """Remote-tracking names that are this branch's own counterpart and so must not anchor it: `<remote>/<local name>`, the
+    branch's upstream and its push target (a branch pushed as `HEAD:feature/other` with -u has that name as upstream)."""
     own = {f"{remote}/{current_branch()}" for remote in run(["git", "remote"]).stdout.split()}
+    for spec in ("@{upstream}", "@{push}"):
+        name = _git_line("rev-parse", "--abbrev-ref", "--symbolic-full-name", spec)
+        if name:
+            own.add(name)
+    return own
+
+
+def _anchored_to_remote(base: str, merge_base: str) -> bool:
+    """True when the review base is anchored to shared history. With `refs/remotes/<remote>/HEAD` present, the merge-base must
+    be an ancestor of that integration branch. Otherwise `base` must be a remote-tracking ref, or the merge-base must be
+    contained in a remote-tracking branch, other than this branch's own (see _own_remote_refs): a pushed branch contains its
+    own earlier commits, so `--base HEAD~1` would otherwise pass after the push."""
+    candidates = [f"refs/remotes/{remote}/HEAD" for remote in run(["git", "remote"]).stdout.split()]
+    heads = [ref for ref in candidates if run(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]).returncode == 0]
+    if heads:
+        return any(run(["git", "merge-base", "--is-ancestor", merge_base, ref]).returncode == 0 for ref in heads)
+    own = _own_remote_refs()
     symbolic = run(["git", "rev-parse", "--symbolic-full-name", base]).stdout.strip()
     if symbolic.startswith("refs/remotes/"):
         return symbolic.removeprefix("refs/remotes/") not in own
@@ -162,12 +194,15 @@ def require_real_base(base: str) -> str | None:
         print("notice: no git remote is configured, so --base cannot be checked against shared history; "
               "make sure it is the integration branch this one was cut from", file=sys.stderr)
         return None
+    if current_branch() == "HEAD":
+        return "--require: HEAD is detached, so the branch's own remote counterpart cannot be excluded from the anchor check; check out the branch"
     merge_base = run(["git", "merge-base", resolved.stdout.strip(), "HEAD"])
     if merge_base.returncode != 0 or not merge_base.stdout.strip():
         return f"--require: base {base!r} shares no history with HEAD; pass the integration branch this one was cut from"
     if not _anchored_to_remote(base, merge_base.stdout.strip()):
-        return (f"--require: base {base!r} is not anchored to shared history (a remote-tracking ref such as origin/main, or a branch "
-                "cut from one); it would review only part of this branch. Pass the integration branch, after `git fetch`")
+        return (f"--require: base {base!r} is not anchored to shared history (the integration branch such as origin/main, or a branch "
+                "cut from it); it would review only part of this branch. Pass the integration branch, after `git fetch` "
+                "(a repository without refs/remotes/<remote>/HEAD: `git remote set-head <remote> -a`)")
     return None
 
 
@@ -406,6 +441,11 @@ def current_branch() -> str:
     return (proc.stdout.strip() if proc.returncode == 0 else "") or "HEAD"
 
 
+def state_path() -> Path:
+    """The round state file: fixed under the repository, independent of --out-dir (OD-031: a new --out-dir must not reset the cap)."""
+    return REPO_ROOT / ".ai-review" / "state.json"
+
+
 def load_state(path: Path) -> dict:
     """Whole state file: {"branches": {name: {"rounds": int, "findings": [...]}}}. Raises ValueError when unreadable."""
     if not path.exists():
@@ -424,13 +464,13 @@ def load_state(path: Path) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, allow_abbrev=False)
     ap.add_argument("--base", default=os.environ.get("AI_REVIEW_BASE", "origin/main"))
     ap.add_argument("--model", default=os.environ.get("AI_REVIEW_MODEL", "sonnet"),
                     help="model alias or id; env AI_REVIEW_MODEL (default: sonnet)")
     ap.add_argument("--max-chunk-bytes", type=int, default=int(os.environ.get("AI_REVIEW_CHUNK_BYTES", "60000")))
     ap.add_argument("--max-rounds", type=int, default=5, help="review round cap per branch (default: 5; owner decision OD-031)")
-    ap.add_argument("--out-dir", default=".ai-review")
+    ap.add_argument("--out-dir", default=".ai-review", help="where findings.json and findings.md are written (the round state always stays in .ai-review/state.json)")
     ap.add_argument("--claude-bin", default=os.environ.get("CLAUDE_BIN", "claude"))
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
@@ -441,10 +481,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     out_dir = REPO_ROOT / args.out_dir
-    state_path = out_dir / "state.json"
+    state_file = state_path()
     branch = current_branch()
     try:
-        all_state = load_state(state_path)
+        all_state = load_state(state_file)
     except ValueError as exc:
         if not args.reset:
             print(f"error: {exc}\nThe round state is unreadable; run again with --reset to start over.", file=sys.stderr)
@@ -509,7 +549,8 @@ def main(argv: list[str] | None = None) -> int:
     (out_dir / "findings.json").write_text(json.dumps({"round": rnd, "findings": findings}, indent=2), encoding="utf-8")
     (out_dir / "findings.md").write_text(render_markdown(findings, rnd, args.model, args.base), encoding="utf-8")
     all_state["branches"][branch] = {"rounds": rnd, "findings": findings}
-    state_path.write_text(json.dumps(all_state, indent=2), encoding="utf-8")
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps(all_state, indent=2), encoding="utf-8")
 
     blocking = [f for f in findings if f["severity"] == "blocking"]
     print(f"round {rnd}/{args.max_rounds}: {len(findings)} finding(s), {len(blocking)} blocking. See {args.out_dir}/findings.md")

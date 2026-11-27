@@ -46,12 +46,12 @@ A plain search for `{{` also matches GitHub Actions `${{ }}` expressions and Ang
 | `{{OBJECTIVE}}` | One paragraph: what, for whom, which phase, what gate ends it |
 | `{{TECH_LEAD}}`, `{{PRODUCT_OWNER}}` | The people who answer technical and business questions |
 | `{{PRIVACY_OWNER}}` | Optional: whoever answers data-classification and privacy questions. With no such person, delete the whole row from the Team table in `CLAUDE.md` (privacy questions then go to the product owner) so the search finds nothing |
-| `{{DEPLOY_TARGET}}` | The deployment platform. Replace it once the platform is recorded as a TQ or OD; until then leave it, and the agents return a TQ instead of guessing a platform. It appears in `CLAUDE.md`, `README.md`, `solution-architect`, `infrastructure-engineer` and two skills |
+| `{{DEPLOY_TARGET}}` | The deployment platform. Replace it once the platform is recorded as a TQ or OD; until then leave it, and the agents return a TQ instead of guessing a platform. It appears in the root `CLAUDE.md`, `README.md`, and in the agents and skills that deal with deployment |
 | `{{RUNNER_LABEL}}` | CI runner label; set the `RUNNER_LABEL` repository variable too |
 | `{{REALM}}` | Identity-provider realm in the example issuer URL in the doc comment of `src/Api/Options/AuthOptions.cs` |
-| `{{PLACEHOLDER}}` | Generic wording in `CLAUDE.md`, `README.md`, the slides and two QF chunks; not a real token to replace |
+| `{{PLACEHOLDER}}` | Generic wording in framework docs, reference notes and the KB; not a real token to replace |
 
-Check: the command above lists only the generic `{{PLACEHOLDER}}` wording, these docs and `{{DEPLOY_TARGET}}` if the platform is not chosen yet.
+Check: after you replace your tokens, the command still matches the generic `{{PLACEHOLDER}}` wording in framework docs and the framework's own reference notes, any example record you have not yet removed, and any token you chose to keep, such as `{{DEPLOY_TARGET}}`. None of those are tokens to replace.
 
 ### 4. Remove the example domain
 

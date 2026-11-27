@@ -128,7 +128,7 @@ Beyond a trivial one-line fix, delegate; the producer never reviews its own work
 | `docs/**`, `README.md` | `documentation-curator` then `documentation-reviewer`; generated files are regenerated, never hand-edited |
 | `scripts/**` | `code-engineer` |
 
-Run the local AI review before the first push: `python3 scripts/ai_review_local.py --base origin/main --require` (exit 2 if the `claude` CLI is missing; the required gate with the in-session pair; no API key; `--model opus` for auth, data model, migrations, money or core logic). The GitHub review is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; without it the job is skipped and its green check is not a review. A human merges.
+Before the first push (not Trivial) run the local AI review: `python3 scripts/ai_review_local.py --base origin/main --require` (exit 2 if `claude` is missing; required with the in-session pair; no API key; `--model opus` for auth, data model, migrations, money, core logic). The GitHub review is an optional second gate that runs only when `ANTHROPIC_API_KEY` is set; without it the job is skipped and its green check is not a review. A human merges.
 
 ## Verification Commands
 

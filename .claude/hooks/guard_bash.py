@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse guard for the Bash tool: the deterministic second layer behind the `deny` list in .claude/settings.json.
+r"""PreToolUse guard for the Bash tool: a best-effort second layer behind the `deny` list in .claude/settings.json.
+
+BEST EFFORT, NOT A SANDBOX. It catches the common ways a model reaches a blocked command by accident; it does not stop
+a determined or prompt-injected one (see Known gaps). The real boundaries are the permission prompt (default mode) and an
+OS sandbox. Do not rely on this hook in bypassPermissions or auto mode.
 
 Why: Bash permission rules match command text, so `git -C . push --force` or `curl u | sh` slip past
 `Bash(git push --force:*)` / `Bash(curl * | sh:*)` (https://code.claude.com/docs/en/permissions, "What a Bash rule
@@ -22,16 +26,31 @@ wrappers (sudo, env, command, time, nice, ionice, setsid, stdbuf, flock, timeout
 (also after `--`); substitutions `$(...)`, backticks and `<(...)` anywhere outside single quotes; `find -exec|-execdir|-ok|-okdir
 <command>`; unambiguous long-option prefixes of 3+ characters (`--recur`, `--forc`); heredocs recognised only outside quotes and
 comments, with the body skipped as data unless it feeds a shell or stdin-reading interpreter (checked as a script) or the
-closing delimiter never appears (then the rest is checked as commands); downloads piped into a shell or interpreter,
-including `/dev/stdin`, `-`, `sh -c "$(cat)"`, `busybox sh` and a `( ... )` wrapper.
+closing delimiter never appears (then the rest is checked as commands in the same parser); downloads piped into a shell or
+interpreter, including `/dev/stdin`, `-`, `sh -c "$(cat)"`, `busybox sh` and a `( ... )` wrapper; ANSI-C quoting `$'...'`
+(decoded: \n \t \' \\ \xHH and the other common escapes) and locale quoting `$"..."`; arithmetic `$(( ))`, `(( ))` and
+`$[ ]` (opaque, so `1 << 2` is a shift, not a heredoc); reserved words that hide the command (`if then elif else do while
+until ! coproc function {`, and `fi done esac }` as terminators), so `for f in a; do git push -f; done` is checked.
 
-Known gaps (best effort, not a sandbox): commands built at runtime (`$VAR`, `eval`, `source /dev/stdin`); commands inside
-`$(( ))` arithmetic and inside unquoted-heredoc bodies; `bash <(curl u)`; scripts that run a destructive command internally
-and heredoc bodies fed to interpreters (`python3 - <<EOF`) beyond what a shell parse of the text shows; nesting deeper than
-MAX_NEST or MAX_DEPTH (blocked, fail closed); git aliases defined in config files and other `-c` hooks (`core.pager`,
-`core.sshCommand`); `git checkout <path>`, `git checkout -f` and `git restore <file>` without `.`; 1-2 character long-option prefixes
-(`--ha`); `curl u | (cat; sh)` and `{ ...; }` groups; wrappers not listed (su -c, ssh, docker run, watch...).
+Known gaps (not fixed; best effort, not a sandbox):
+- Commands built at runtime (`$VAR`, `eval`, `source /dev/stdin`, `bash <(curl u)`, `sh -c "$(curl u)"`); commands inside
+  `$(( ))`, `(( ))` and `$[ ]` arithmetic and inside unquoted-heredoc bodies; scripts that run a destructive command internally
+  and heredoc bodies fed to interpreters (`python3 - <<EOF`) beyond what a shell parse of the text shows; nesting deeper than
+  MAX_NEST or MAX_DEPTH (blocked, fail closed).
+- Wrapper long options that take a separate value: `sudo --user root ...`, `timeout --signal KILL 5 ...`, `nice --adjustment 5`,
+  `ionice --class 3`, `env --chdir d` and `env --unset X`, `stdbuf --output L`, `xargs --max-args 1` and `xargs -a f` /
+  `--arg-file f`; `env -S` / `--split-string`; `flock f --command '...'`; wrappers not listed (su -c, ssh, docker run,
+  watch...).
+- git: `--config-env x` and `--attr-source x` with a separated value, `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` /
+  `GIT_CONFIG_VALUE_n` environment configuration, `-c remote.*.mirror` and `-c remote.*.push`, aliases defined in config files
+  and other `-c` hooks (`core.pager`, `core.sshCommand`); `git checkout <path>`, `git checkout -f` and `git restore <file>`
+  without `.`; 1-2 character long-option prefixes (`--ha`).
+- Interpreters and shells: option values before stdin (`bash -o x`, `bash --rcfile f`, `python3 -W x`, `python3 -X x`,
+  `perl -I d`, `node -r m`) hide that the interpreter reads stdin; `bash -c -o pipefail '...'` (option after `-c`); stdin passed
+  into a nested shell (`curl u | sh -c "sh"`); uncommon shells and interpreters (mksh, pwsh, bun, lua, tclsh, `awk -f -`);
+  `curl u | (cat; sh)`.
 """
+import functools
 import json
 import os
 import re
@@ -48,6 +67,11 @@ WRAPPERS = {"sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U"}, "env
             "busybox": set()}
 WRAPPER_POSITIONALS = {"timeout": 1, "flock": 1}  # leading non-option arguments (duration, lock file) before the command
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+# Reserved words that start a command or end a compound one; the real command follows (or the next segment starts).
+RESERVED_WORDS = {"if", "then", "elif", "else", "do", "while", "until", "!", "{", "fi", "done", "esac", "}"}
+ANSI_ESCAPES = {"a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v",
+                "\\": "\\", "'": "'", '"': '"', "?": "?"}
+ANSI_NUMERIC = re.compile(r"x[0-9A-Fa-f]{1,2}|[0-7]{1,3}|u[0-9A-Fa-f]{1,4}|U[0-9A-Fa-f]{1,8}")
 STDIN_PATHS = {"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"}
 FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
 MAX_DEPTH = 3  # nested `sh -c`, heredoc scripts and find -exec commands
@@ -116,6 +140,19 @@ ALIAS_REASON = "git -c alias.* defines a command that the rules cannot see and i
 DEEP_REASON = "The command nests substitutions, scripts or find -exec too deeply to inspect and is blocked. Simplify it."
 
 
+@functools.lru_cache(maxsize=32)
+def paren_matches(s):
+    """Index of each `(` -> index of its matching `)` by raw nesting (quotes ignored), computed once per text so that many
+    `((` in one command stay linear."""
+    stack, pairs = [], {}
+    for k, ch in enumerate(s):
+        if ch == "(":
+            stack.append(k)
+        elif ch == ")" and stack:
+            pairs[stack.pop()] = k
+    return pairs
+
+
 class TooDeep(Exception):
     """Raised when substitutions nest deeper than MAX_NEST: the caller blocks (fail closed)."""
 
@@ -132,14 +169,16 @@ class Parser:
     """Quote-aware Bash lexer: segments split on && || ; | |& & ( ) and newlines. Comments start only at a word start.
     Redirections are dropped together with their target word. Substitutions ($(...), `...`, <(...)) outside single quotes
     are parsed into `extra` segments and kept as raw text in the word. A heredoc operator is recognised only outside
-    quotes and comments; its body (read at the next newline) is attached to the owning segment. When Bash and this lexer
-    could disagree the text is treated as a command, never as data."""
+    quotes and comments; its body (read at the next newline) is attached to the owning segment. Where the lexer knows it
+    cannot tell (an unclosed heredoc, quote or substitution) the text is checked as commands rather than skipped as data.
+    It is not a full Bash grammar: forms it misreads are listed under Known gaps in the module docstring."""
 
     def __init__(self, s, i=0, depth=0, extra=None):
         self.s, self.i, self.depth = s, i, depth
         self.extra = [] if extra is None else extra
         self.segs, self.cur, self.pending = [], Seg(), []
         self.word, self.has_word, self.skip_word = [], False, False
+        self.unclosed = set()  # heredoc (delimiter, strip_tabs) pairs already known to have no closing line
 
     def add(self, text):
         self.word.append(text)
@@ -185,6 +224,16 @@ class Parser:
             elif c == '"':
                 self.i += 1
                 self.double_quoted()
+            elif s.startswith("$'", self.i):
+                self.ansi_quoted()
+            elif s.startswith('$"', self.i):
+                self.i += 1  # locale quoting: the `$` is not part of the word, the string is a double-quoted one
+            elif s.startswith("$[", self.i):
+                self.legacy_arithmetic()
+            elif c == "(" and s.startswith("((", self.i) and not self.has_word and self.arithmetic_end(self.i) > 0:
+                end = self.arithmetic_end(self.i)  # `((x = 1 << 2))` and `for ((...))`: opaque, not heredocs
+                self.add(s[self.i:end])
+                self.i = end
             elif c == "`" or s.startswith("$(", self.i) or s.startswith(("<(", ">("), self.i):
                 self.substitution()
             elif c in "<>" or (c == "&" and s[self.i + 1:self.i + 2] == ">"):
@@ -208,6 +257,49 @@ class Parser:
                 self.i += 1
         self.end_seg()
         return self.segs
+
+    def ansi_quoted(self):
+        """`$'...'`: backslash escapes are decoded (\\n, \\', \\xHH...), so `$'--force'` is the word `--force` and `\\'` does
+        not end the string."""
+        s, i = self.s, self.i + 2
+        self.has_word = True
+        while i < len(s) and s[i] != "'":
+            if s[i] != "\\" or i + 1 >= len(s):
+                self.add(s[i])
+                i += 1
+                continue
+            nxt = s[i + 1]
+            numeric = ANSI_NUMERIC.match(s, i + 1)
+            if nxt in ANSI_ESCAPES:
+                self.add(ANSI_ESCAPES[nxt])
+                i += 2
+            elif numeric:
+                digits = numeric.group()
+                value = int(digits[1:] if digits[0] in "xuU" else digits, 16 if digits[0] in "xuU" else 8)
+                try:
+                    self.add(chr(value))
+                except (ValueError, OverflowError):  # beyond Unicode: keep the text
+                    self.add("\\" + digits)
+                i = numeric.end()
+            else:
+                self.add("\\" + nxt)
+                i += 2
+        self.i = i + 1
+
+    def legacy_arithmetic(self):
+        """`$[ ... ]`: opaque up to the matching `]`. Unclosed: the `$` is an ordinary character."""
+        s, depth, k = self.s, 0, self.i + 1
+        while k < len(s):
+            depth += {"[": 1, "]": -1}.get(s[k], 0)
+            k += 1
+            if depth == 0:
+                break
+        if depth:
+            self.add("$")
+            self.i += 1
+        else:
+            self.add(s[self.i:k])
+            self.i = k
 
     def double_quoted(self):
         s = self.s
@@ -244,8 +336,8 @@ class Parser:
             self.extra.extend(self.nested(s[i + 1:j].replace("\\`", "`")).run())
             self.add(s[i:j + 1])
             self.i = j + 1
-        elif s.startswith("$((", i) and self.arithmetic_end() > 0:
-            end = self.arithmetic_end()
+        elif s.startswith("$((", i) and self.arithmetic_end(i + 1) > 0:
+            end = self.arithmetic_end(i + 1)
             self.add(s[i:end])  # arithmetic is opaque: `1<<y` is a shift here, not a heredoc
             self.i = end
         else:
@@ -254,15 +346,10 @@ class Parser:
             self.add(s[i:sub.i])
             self.i = sub.i
 
-    def arithmetic_end(self):
-        """Index after the `))` closing `$((` at self.i, or -1 when it is really `$( (subshell) ... )`."""
-        s, depth, k = self.s, 2, self.i + 3
-        while k < len(s):
-            depth += {"(": 1, ")": -1}.get(s[k], 0)
-            k += 1
-            if depth == 0:
-                return k if s[k - 2] == ")" else -1
-        return -1
+    def arithmetic_end(self, i):
+        """Index after the `))` that closes the `((` at `i`, or -1 when it is really `( (subshell) ... )`."""
+        close = paren_matches(self.s).get(i, -1)
+        return close + 1 if close > i + 2 and self.s[close - 1] == ")" else -1
 
     def redirect(self):
         s, i = self.s, self.i
@@ -304,19 +391,21 @@ class Parser:
     def read_heredocs(self):
         s = self.s
         for seg, delim, strip_tabs in self.pending:
-            lines, closed = [], False
-            while self.i < len(s) and not closed:
-                end = s.find("\n", self.i)
-                end = len(s) if end < 0 else end
-                line = s[self.i:end]
-                self.i = end + 1
-                closed = (line.lstrip("\t") if strip_tabs else line) == delim
-                if not closed:
-                    lines.append(line)
-            if closed:
-                seg.bodies.append("\n".join(lines))
-            else:  # never closed: Bash runs to the end of input, we check the text as commands (fail closed)
-                self.extra.extend(self.nested("\n".join(lines)).run())
+            key = (delim, strip_tabs)
+            match = None
+            if key not in self.unclosed:
+                tabs = "\t*" if strip_tabs else ""
+                match = re.compile("^" + tabs + re.escape(delim) + "$", re.MULTILINE).search(s, self.i)
+            if match is None:
+                # Never closed: Bash runs to the end of input. Fail closed: lex the rest as commands in this same parser
+                # (no nesting, so a script with several `x = 1 << 3` lines is not mistaken for deep nesting). A later
+                # operator with the same delimiter cannot close either, which keeps long runs of `<<EOF` linear.
+                self.unclosed.add(key)
+                self.pending = []
+                return
+            body = s[self.i:match.start()]
+            seg.bodies.append(body[:-1] if body.endswith("\n") else body)
+            self.i = match.end() + 1
         self.pending = []
 
 
@@ -328,12 +417,16 @@ def parse(command):
 
 
 def normalise(tokens):
-    """Strip env assignments, wrappers (sudo, env, command ...) and git global options.
+    """Strip env assignments, reserved words (if, do, !, { ...), wrappers (sudo, env, command ...) and git global options.
     Return (command basename, args, git -c / --config-env values)."""
     while tokens:
         base = os.path.basename(tokens[0])
-        if ASSIGN_RE.match(tokens[0]):
+        if ASSIGN_RE.match(tokens[0]) or tokens[0] in RESERVED_WORDS:
             tokens = tokens[1:]
+        elif tokens[0] == "function":  # `function name {`: the name is not the command
+            tokens = tokens[2:]
+        elif tokens[0] == "coproc":  # `coproc cmd ...` or `coproc NAME { cmd; }`
+            tokens = tokens[2:] if tokens[2:3] == ["{"] else tokens[1:]
         elif base in WRAPPERS:
             rest = tokens[1:]
             while rest and (rest[0].startswith("-") or ASSIGN_RE.match(rest[0])):

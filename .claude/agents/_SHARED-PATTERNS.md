@@ -1,6 +1,6 @@
 # Shared Agent Patterns
 
-Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate only their role. Skills: `.claude/skills/<name>/SKILL.md` (index `SKILL-INDEX.md`); verify before citing one. Budget: 16 KB per agent file; new detail goes in a skill.
+Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate only their role. Skills: `.claude/skills/<name>/SKILL.md` (index `SKILL-INDEX.md`); verify before citing one. Budget: 16 KB per agent file; detail goes in a skill.
 
 ## Principles
 
@@ -10,7 +10,7 @@ Single owner of the cross-agent rules; agent files and root `CLAUDE.md` restate 
 | 2 | No single point of failure | The producer never approves its own work; a different role with fresh context and an equal or stronger model does |
 | 3 | Evidence over verdicts | A finding names `file` + anchor, a failing scenario and a severity |
 | 4 | Vertical slices | One feature end to end, planned in `docs/slices/` |
-| 5 | Delegate | Product code goes through the pipeline; a direct edit skips review |
+| 5 | Delegate | Product code goes through the pipeline; direct edits skip review |
 
 ## Subagent Limits
 
@@ -33,7 +33,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
 | Full | Anything else: new feature, contract change, migration, auth, multi-layer | Every stage above, per its skip reason |
 | Spike | Throwaway exploration the owner explicitly asks for | Local only, no review, never merged; discard the code or rebuild it through Full |
 
-Before starting, state the pipeline in one line: lane, a reason per skipped stage, whether the Alignment Gate applies (root `CLAUDE.md`).
+Before starting, state the pipeline in one line: lane, a reason per skipped stage, Alignment Gate applicability (root `CLAUDE.md`).
 
 ## Never Invent: KBs and Recorded Questions
 
@@ -144,7 +144,7 @@ Stored artifacts (docs, specs, agent and skill bodies, CLAUDE.md) never cite lin
 
 ## Skill Routing
 
-Map changed paths to skills with `routing-to-skills`; a layer with no skill is a gap.
+Map changed paths to skills with `routing-to-skills`; a layer with no skill is a gap, not improvised.
 
 ## Common Tool Permissions
 

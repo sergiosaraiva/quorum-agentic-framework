@@ -5,8 +5,10 @@ name: AI PR Review
 #
 # Trust model: reviewer instructions (CLAUDE.md and .claude/**) are read from the BASE branch checkout, never
 # from the PR head, so a PR cannot weaken its reviewer's instructions. The PR head is checked out in a subfolder (pr-head/, stripped of instruction files) as data.
-# Limit: on `pull_request` GitHub runs THIS workflow file from the PR's merge ref, so a same-repo PR can edit the
-# workflow itself. Protect .github/workflows/** with CODEOWNERS and required review in branch protection.
+# Limit: on `pull_request` GitHub runs THIS workflow file from the PR's merge ref, so a same-repo branch can edit the
+# workflow itself, and the edited copy runs with repository secrets before anyone reviews it (CODEOWNERS and branch
+# protection only gate the merge). Only people with push access can do this. To keep the key from them, store it
+# as an environment secret behind required reviewers and add `environment: <name>` to the review job (TQ-019).
 # The reviewer may not run build, test or script commands (--disallowedTools below): the base settings.json allow
 # list would otherwise let a prompt-injected diff execute PR-head code next to the API key.
 # Without the repository secret ANTHROPIC_API_KEY the review job is skipped (the PR stays green); the gate prints a notice.
@@ -164,7 +166,7 @@ jobs:
             --max-turns 30
             --add-dir ${{ github.workspace }}/pr-head
             --allowedTools "Read,Grep,Glob,Agent,Skill,mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"
-            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(scripts/:*),Bash(./scripts/:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(scripts/*),Bash(./scripts/*),Bash(scripts/run-mutation-tests.sh:*)"
 
       - name: Record the round
         env:

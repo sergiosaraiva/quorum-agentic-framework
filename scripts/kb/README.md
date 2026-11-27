@@ -34,13 +34,11 @@ python3 scripts/kb/search.py --root path/to/tree "refund"  # another tree holdin
 ## PostgreSQL + pgvector mode
 
 ```bash
-cp .env.example .env                     # set POSTGRES_PASSWORD
+cp .env.example .env                     # set POSTGRES_PASSWORD; DATABASE_URL is built from it
 set -a; source .env; set +a              # export the variables: docker compose and the scripts read the environment
 docker compose up -d postgres            # published on 127.0.0.1 only
 python3 -m venv .venv && . .venv/bin/activate   # PEP 668 systems refuse a global pip install
 pip install "psycopg[binary]"
-cp .env.example .env    # set POSTGRES_PASSWORD; DATABASE_URL is built from it
-set -a; source .env; set +a
 python3 scripts/kb/ingest.py             # applies the schemas itself; re-run after editing chunks
 python3 scripts/kb/search.py --backend pg "refund window"
 ```

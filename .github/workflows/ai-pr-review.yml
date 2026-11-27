@@ -9,8 +9,9 @@ name: AI PR Review
 # workflow itself, and the edited copy runs with repository secrets before anyone reviews it (CODEOWNERS and branch
 # protection only gate the merge). Only people with push access can do this. To keep the key from them, store it
 # as an environment secret behind required reviewers and add `environment: <name>` to the review job (TQ-019).
-# The reviewer may not run build, test or script commands (--disallowedTools below): the base settings.json allow
-# list would otherwise let a prompt-injected diff execute PR-head code next to the API key.
+# The reviewer may not run build, test, script or git commands (--disallowedTools below): the base settings.json allow
+# list would otherwise let a prompt-injected diff execute PR-head code next to the API key (git log|diff|show
+# --output=<path> writes files, e.g. a core.fsmonitor entry that the next git command runs). It reads the diff with gh.
 # Without the repository secret ANTHROPIC_API_KEY the review job is skipped (the PR stays green); the gate prints a notice.
 # Uses `pull_request` (not `pull_request_target`): fork PRs get no secrets and are skipped on purpose.
 #
@@ -166,7 +167,7 @@ jobs:
             --max-turns 30
             --add-dir ${{ github.workspace }}/pr-head
             --allowedTools "Read,Grep,Glob,Agent,Skill,mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"
-            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(scripts/*),Bash(./scripts/*),Bash(scripts/run-mutation-tests.sh:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch,Bash(dotnet:*),Bash(npm:*),Bash(npx:*),Bash(node:*),Bash(python3:*),Bash(python:*),Bash(bash:*),Bash(sh:*),Bash(git:*),Bash(scripts/*),Bash(./scripts/*),Bash(scripts/run-mutation-tests.sh:*)"
 
       - name: Record the round
         env:

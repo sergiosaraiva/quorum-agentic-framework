@@ -15,4 +15,4 @@ ux-usability-specialist (Opus, high effort) defines the UX of a new screen befor
 
 code-engineer (Sonnet, high effort) implements the approved design and nothing more. It runs the alignment gate first and loads the matching skill before every task. Its work is never self-approved.
 
-test-automator (Sonnet, high effort) writes tests under `tests/` and `*.spec.ts` and runs them; it never edits product code, and a product bug goes back to code-engineer. It implements the `test_would_catch` hints from regression-detective and rejects vacuous tests.
+test-automator (Sonnet, high effort) writes tests under `tests/`, `*.spec.ts` and `frontend/e2e/**` and runs them; it never edits product code, and a product bug goes back to code-engineer. It implements the `test_would_catch` hints from regression-detective and rejects vacuous tests.

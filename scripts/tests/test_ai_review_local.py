@@ -395,7 +395,7 @@ class ReviewerPromptsFromBaseTests(unittest.TestCase):
 
 
 class RequireRealBaseTests(unittest.TestCase):
-    """--require must not pass an empty review: base == HEAD, or a base HEAD does not descend from, exits 2."""
+    """--require must not pass an empty review: base == HEAD, or a HEAD with no commits of its own, exits 2."""
     GIT = ReviewerPromptsFromBaseTests.GIT
 
     def setUp(self):
@@ -443,12 +443,22 @@ class RequireRealBaseTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("nothing to review", out)
 
-    def test_base_that_head_does_not_descend_from_exits_2_under_require(self):
+    def test_head_behind_base_exits_2_under_require(self):
         self.git("checkout", "-q", "--detach", self.first)  # HEAD is behind the base: the diff is empty, not a review
         code, _, err = self.main_code("--base", self.second, "--require")
         self.assertEqual(code, 2)
-        self.assertIn("does not descend from base", err)
+        self.assertIn("no commits that base", err)
         self.assertEqual(self.main_code("--base", self.second)[0], 0)  # without --require: today's behaviour
+
+    def test_base_that_moved_on_after_the_branch_point_passes_the_check(self):
+        # The normal team flow: main gains a commit after the branch is cut; base...HEAD is still this branch's work.
+        self.git("checkout", "-q", "-b", "feat", self.first)
+        (self.root / "b.txt").write_text("feature\n", encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "feature")
+        code, _, err = self.main_code("--base", self.second, "--require", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("no commits that base", err)
 
     def test_unresolvable_base_exits_2_under_require(self):
         self.assertEqual(self.main_code("--base", "no-such-ref-xyz", "--require")[0], 2)

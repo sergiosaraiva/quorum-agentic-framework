@@ -18,7 +18,7 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md`. A data-model convention
 - Money, rates and quantities: `numeric(p,s)` via `HasPrecision`; the adopter's decision sets p,s (Acme example, OD-001: `numeric(18,2)` amounts + `char(3)` currency, landed `HasPrecision(18, 2)`). Never `float`, `double` or `money`
 - Timestamps are `timestamptz` (`DateTimeOffset`); dates without time are `date` (`DateOnly`)
 - Closed code-owned enum: text column + a `CHECK` built from one vocabulary source (OD-004 records the values; landed `OrderStatuses.All` feeds the `CHECK` in `OrderConfiguration`). A C# enum needs your own string converter. Data-owned or extensible set: a lookup table with a natural `code` key. No native PostgreSQL enums (values cannot be dropped)
-- Audit columns: `created_at`, `updated_at` on every entity, set from `TimeProvider` in the service (landed: `OrdersService.CreateAsync`). When `created_by`/`updated_by` are required, use a `SaveChanges` interceptor so callers never set them. A `CHECK (created_at > '2000-01-01')` (or an integration test asserting the stamp) makes a missed stamp fail. Map `xmin` as the concurrency token (`.IsRowVersion()`)
+- Audit columns: `created_at`, `updated_at` on every entity, set from `TimeProvider` in the service (landed: `OrdersService.CreateAsync`). `created_by`/`updated_by`: interceptor (below). A `CHECK (created_at > '2000-01-01')` (or a test asserting the stamp) catches a missed stamp. Map `xmin` as the concurrency token (`.IsRowVersion()`)
 - No blanket soft delete. Where required: `deleted_at` / `deleted_by`, a partial unique index `WHERE deleted_at IS NULL`, a named EF query filter, never `is_deleted boolean`
 - Period-valid data: `daterange valid_during` + `EXCLUDE USING gist` (`btree_gist`), end-dated, not updated in place
 - `DeleteBehavior` per relationship: `Cascade` only when the child is meaningless without the parent, else `Restrict`/`SetNull`
@@ -64,7 +64,7 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 }
 ```
 
-Interceptor (when `*_by` is required): a `SaveChangesInterceptor` walks `ChangeTracker.Entries<IAudited>()`, stamps `Created*` on `Added`, `Updated*` on `Modified`.
+Interceptor (when `*_by` is required): a `SaveChangesInterceptor` walks `ChangeTracker.Entries<IAudited>()`, stamps `Created*` on `Added`, `Updated*` on `Modified`, from `TimeProvider` and the principal.
 
 ## Quality Checklist
 
@@ -88,4 +88,4 @@ Interceptor (when `*_by` is required): a `SaveChangesInterceptor` walks `ChangeT
 
 ## Related Skills
 
-`writing-postgresql-migrations`, `creating-application-services`, `implementing-caching-strategies`, `tuning-postgresql-queries`.
+`writing-postgresql-migrations`, `creating-application-services`, `creating-configuration-options`, `implementing-caching-strategies`, `tuning-postgresql-queries`.

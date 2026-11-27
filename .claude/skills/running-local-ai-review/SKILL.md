@@ -31,7 +31,7 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
-| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH, and when the base equals HEAD or is not an ancestor of HEAD; use it for the gate |
+| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH, and when HEAD has no commits the base lacks (a base that moved on is fine); use it for the gate |
 | `--reset` | Drop the current branch's saved round count; the next completed round starts from 1 (use after a human review) |
 | `--dry-run` | Print the first prompt, call no model, spend nothing |
 

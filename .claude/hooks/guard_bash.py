@@ -34,7 +34,10 @@ until ! coproc function {`, and `fi done esac }` as terminators), so `for f in a
 
 Known gaps (not fixed; best effort, not a sandbox):
 - Commands built at runtime (`$VAR`, `eval`, `source /dev/stdin`, `bash <(curl u)`, `sh -c "$(curl u)"`); commands inside
-  `$(( ))`, `(( ))` and `$[ ]` arithmetic and inside unquoted-heredoc bodies; scripts that run a destructive command internally
+  `$(( ))`, `(( ))` and `$[ ]` arithmetic, including substitutions such as `(( $(git push -f) ))` (blocked before the
+  arithmetic spans became opaque, which fixed `1 << 2` being read as a heredoc), and inside unquoted-heredoc bodies; a
+  quoted `((` or `))` inside arithmetic, which shifts where the span is taken to end; `for ((...)) do` without a `;`;
+  a NUL inside `$'...'` (Bash cuts the word there, e.g. `$'--force\0x'`); scripts that run a destructive command internally
   and heredoc bodies fed to interpreters (`python3 - <<EOF`) beyond what a shell parse of the text shows; nesting deeper than
   MAX_NEST or MAX_DEPTH (blocked, fail closed).
 - Wrapper long options that take a separate value: `sudo --user root ...`, `timeout --signal KILL 5 ...`, `nice --adjustment 5`,
@@ -348,8 +351,11 @@ class Parser:
 
     def arithmetic_end(self, i):
         """Index after the `))` that closes the `((` at `i`, or -1 when it is really `( (subshell) ... )`."""
-        close = paren_matches(self.s).get(i, -1)
-        return close + 1 if close > i + 2 and self.s[close - 1] == ")" else -1
+        # Bash's rule: `((` is arithmetic only when the inner `(` closes right before the outer `)`; otherwise it is
+        # nested subshells such as `((a) ; (b))`, which run commands and must be lexed as such.
+        pairs = paren_matches(self.s)
+        close = pairs.get(i, -1)
+        return close + 1 if close > i + 2 and pairs.get(i + 1) == close - 1 else -1
 
     def redirect(self):
         s, i = self.s, self.i

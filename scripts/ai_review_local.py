@@ -22,9 +22,16 @@ repository (~/.ssh and the like). These flags and keys come from the CLI referen
 connector and settings behaviour is documented, not exercised by the tests. `--allowedTools` alone would only
 pre-approve the three tools and leave project allow rules (Bash, Edit) and user MCP servers usable by a prompt-injected diff.
 
-The reviewer role prompts (the pr-review skill, quality-guardian, regression-detective) and the Immutable Rules are read
-from the base revision with `git show <base>:<path>`, not from the working tree, so the branch under review cannot weaken
-its own reviewer. A path that does not exist at base (a first adoption) falls back to the working tree with a notice.
+The reviewer role prompts (the pr-review skill, quality-guardian, regression-detective) and the Immutable Rules of the
+root CLAUDE.md are read from the base revision with `git show <base>:<path>`, not from the working tree. That is the whole
+extent of the protection: `claude -p` still runs in the working tree, so the branch's own CLAUDE.md files,
+`.claude/settings.json` and the files the reviewer Reads during the review (for example `_SHARED-PATTERNS.md` and the skills)
+still come from the branch, and this script is the branch's copy. A branch that edits those can still influence its
+reviewer. A path that does not exist at base (a first adoption) falls back to the working tree with a notice.
+
+With --require the review must be a real one: exit 2 when --base resolves to the same commit as HEAD (nothing to compare) or
+HEAD does not descend from it (the diff would not be this branch's work). Without --require an empty diff just reports
+"nothing to review" and exits 0.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
 Critical, High, Blocker -> blocking, Medium -> warning, Low or Info -> info; anything else -> warning.
@@ -111,6 +118,20 @@ def get_diff(base: str) -> str:
     if proc.returncode != 0:
         raise RuntimeError(f"git diff failed: {proc.stderr.strip()}")
     return proc.stdout
+
+
+def require_real_base(base: str) -> str | None:
+    """For --require: an error message when `base` cannot anchor a real review, else None. A base equal to HEAD yields an
+    empty diff, and a base HEAD does not descend from yields a diff of someone else's work; both would pass the gate empty."""
+    head = run(["git", "rev-parse", "HEAD"])
+    resolved = run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"])
+    if head.returncode != 0 or resolved.returncode != 0:
+        return f"cannot resolve HEAD and base {base!r} to commits: {(head.stderr or resolved.stderr).strip()}"
+    if head.stdout.strip() == resolved.stdout.strip():
+        return f"--require: base {base!r} is the same commit as HEAD, so there is nothing to review; pass the integration branch"
+    if run(["git", "merge-base", "--is-ancestor", resolved.stdout.strip(), "HEAD"]).returncode != 0:
+        return f"--require: HEAD does not descend from base {base!r}; rebase or merge it, or pass the branch this one was cut from"
+    return None
 
 
 def _size(text: str) -> int:
@@ -376,7 +397,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--claude-bin", default=os.environ.get("CLAUDE_BIN", "claude"))
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
-    ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing")
+    ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing, or when --base is "
+                    "HEAD itself or not an ancestor of HEAD (an empty review must not pass the gate)")
     ap.add_argument("--dry-run", action="store_true", help="print the prompt, do not call the model")
     args = ap.parse_args(argv)
 
@@ -399,6 +421,11 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    if args.require:
+        problem = require_real_base(args.base)
+        if problem:
+            print(f"error: {problem}", file=sys.stderr)
+            return 2
     if not diff.strip():
         print(f"No diff against {args.base}; nothing to review.")
         return 0

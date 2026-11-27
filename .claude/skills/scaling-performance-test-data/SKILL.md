@@ -45,11 +45,12 @@ WITH picks AS (
     SELECT g, 1 + floor(power(random(), 13) * :customer_count)::int AS rn
     FROM generate_series(1, :order_target) g
 )
-INSERT INTO <schema>."order" (id, customer_id, status, total_amount, created_at)
+INSERT INTO <schema>."order" (id, customer_id, status, total_amount, created_at, updated_at)
 SELECT uuidv7(),
        c.id,
        (ARRAY['draft','placed','paid','shipped','closed'])[1 + floor(random() * 5)::int],
        round((random() * 5000)::numeric, 2),
+       :fixed_timestamp::timestamptz - (random() * interval '365 days'),
        :fixed_timestamp::timestamptz - (random() * interval '365 days')
 FROM picks p
 JOIN tmp_customer_rank c USING (rn);

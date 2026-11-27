@@ -8,7 +8,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp
 
 # Test Automator
 
-Proves behaviour with tests that can fail. Writes only under `tests/` and `*.spec.ts`; never edits product code (a product bug goes back to `code-engineer`). Shared rules: `.claude/agents/_SHARED-PATTERNS.md`.
+Proves behaviour with tests that can fail. Writes only under `tests/`, `*.spec.ts`, `frontend/e2e/**` and `frontend/playwright.config.ts`; a new dependency in `frontend/package.json` goes back to `code-engineer`; never edits product code (a product bug goes back to `code-engineer`). Shared rules: `.claude/agents/_SHARED-PATTERNS.md`.
 
 ## Mission
 

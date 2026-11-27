@@ -51,6 +51,19 @@ BLOCKED = [
     "find . -execdir rm -rf {} +", "find . -name x -exec sh -c 'git push --force' \\;",
     # nesting beyond the lexer cap fails closed
     "echo " + "$(echo " * 10 + "x" + ")" * 10,
+    # ANSI-C quoting is lexed with escapes; locale quoting drops the `$`
+    "echo $'a\\'b'; rm -rf y", "printf $'it\\'s\\n'; git -C . push --force", "git push $'--force'", "rm $'-rf' x",
+    "git push $'\\x2d\\x2dforce'", 'git push $"--force"',
+    # arithmetic commands, `$[ ]` and C-style for loops are not heredocs
+    "((x = 1 << 2))\nrm -rf y\n2", "echo $[1 << 2]\nrm -rf y\n2", "for (( i=0; i<<1; i++ )); do git push -f; done",
+    "(( 1 << 2 )) && git push -f",
+    # reserved words hide the command
+    "for f in a; do git -C . push --force; done", "if true; then git -C . reset --hard; fi", "! git -C . push -f",
+    "while x; do git push -f; done", "if a; then b; else git clean -fd; fi", "coproc git push -f", "f() { git push -f; }; f",
+    "{ git push -f; }", "function f { git push -f; }", "until x; do rm -rf y; done", "if a; then b; elif git push -f; then c; fi",
+    "case x in a) git push -f ;; esac", "coproc NAME { git push -f; }",
+    # an unclosed heredoc inside a script body is still checked as commands
+    "python3 - <<'EOF'\nx = 1 << 3\ngit push --force\nEOF",
     # infrastructure and database
     "dotnet ef database update", "dotnet ef database drop --force", "dotnet ef --project src/Infrastructure database update",
     "terraform apply", "terraform -chdir=infra destroy", "cd infra && terraform apply -auto-approve",
@@ -83,6 +96,16 @@ ALLOWED = [
     "find . -name '*.pyc' -exec rm {} \\;", "find . -exec grep x {} +", "flock /tmp/l git push origin x",
     "setsid git push origin x", "curl u | sh -c 'echo hi'", "bash -c -- 'echo hi'", "curl -o f u && sh f",
     "git log --format='%h <%an>'", "echo a > b 2>&1", "echo done &", "(cd x; ls)",
+    # forms the guard must keep allowing (push -u, commit heredoc, branch and restore forms, rm -r, curl | jq)
+    "git push -u origin feat/x", "git checkout -b feat/y", "git checkout main", "git restore --staged f.txt", "rm -r build",
+    "curl -s u | jq .", "git commit -q -F - <<'EOF'\nmsg\nEOF",
+    # a heredoc script with shift expressions: unclosed inner heredocs must not look like deep nesting
+    "python3 - <<'EOF'\nx = 1 << 3\ny = 2 << 1\nEOF", "python3 - <<'EOF'\n" + "x = 1 << 3\n" * 30 + "EOF",
+    # ANSI-C and locale quoting, arithmetic and reserved words around harmless commands
+    "echo $'a\\'b'; ls", "printf $'it\\'s\\n'; git status", "git push $'-u' origin x", 'echo $"hello"', "echo $'tab\\there'",
+    "((x = 1 << 2))\nls", "echo $[1 << 2]\nls", "for (( i=0; i<<1; i++ )); do echo $i; done", "(( x++ )); git status",
+    "for f in a; do git status; done", "if true; then git push -u origin x; fi", "! git diff --quiet", "f() { git status; }; f",
+    "{ git status; }", "while read l; do echo $l; done < f", "case x in a) git status ;; esac",
 ]
 
 

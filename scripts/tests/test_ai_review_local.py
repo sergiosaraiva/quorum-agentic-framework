@@ -324,7 +324,8 @@ class ReadOnlyReviewerTests(unittest.TestCase):
 
 
 class ReviewerPromptsFromBaseTests(unittest.TestCase):
-    """The reviewer prompts come from the base revision, so a branch cannot weaken its own reviewer."""
+    """The reviewer role prompts and root rules come from the base revision (the working tree and the files the reviewer
+    Reads are still the branch's, see the module docstring)."""
     GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
 
     def make_repo(self, tmp: str) -> tuple[Path, str]:
@@ -391,6 +392,73 @@ class ReviewerPromptsFromBaseTests(unittest.TestCase):
         prompt = air.build_prompt("diff text", 1, 1, "rules", [], ["## Review skill\nBASE skill"])
         self.assertIn("BASE skill", prompt)
         self.assertIn("diff text", prompt)
+
+
+class RequireRealBaseTests(unittest.TestCase):
+    """--require must not pass an empty review: base == HEAD, or a base HEAD does not descend from, exits 2."""
+    GIT = ReviewerPromptsFromBaseTests.GIT
+
+    def setUp(self):
+        import subprocess
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name) / "repo"
+        self.root.mkdir()
+        self.out = str(Path(self._tmp.name) / "out")
+        self.git = lambda *a: subprocess.run([*self.GIT, *a], cwd=self.root, capture_output=True, text=True, check=True).stdout.strip()
+        self.git("init", "-q")
+        (self.root / "CLAUDE.md").write_text("rules\n", encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "first")
+        self.first = self.git("rev-parse", "HEAD")
+        (self.root / "a.txt").write_text("change\n", encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "second")
+        self.second = self.git("rev-parse", "HEAD")
+
+    def main_code(self, *args: str) -> tuple[int, str, str]:
+        import contextlib
+        import io
+        from unittest import mock
+        fw = self.root / ".claude"
+        with mock.patch.object(air, "REPO_ROOT", self.root), mock.patch.object(air, "FRAMEWORK_DIR", fw), \
+                mock.patch.object(air, "SKILL_PATH", fw / "skills" / "pr-review" / "SKILL.md"), \
+                contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()) as out:
+            code = air.main(["--out-dir", self.out, "--claude-bin", "no-such-claude-bin-xyz", *args])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_base_equal_to_head_exits_2_under_require(self):
+        code, _, err = self.main_code("--base", "HEAD", "--require")
+        self.assertEqual(code, 2)
+        self.assertIn("same commit as HEAD", err)
+
+    def test_base_equal_to_head_by_sha_or_branch_name_exits_2_under_require(self):
+        for base in (self.second, self.git("rev-parse", "--abbrev-ref", "HEAD")):
+            with self.subTest(base=base):
+                self.assertEqual(self.main_code("--base", base, "--require")[0], 2)
+
+    def test_base_equal_to_head_without_require_keeps_exiting_0(self):
+        code, out, _ = self.main_code("--base", "HEAD")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing to review", out)
+
+    def test_base_that_head_does_not_descend_from_exits_2_under_require(self):
+        self.git("checkout", "-q", "--detach", self.first)  # HEAD is behind the base: the diff is empty, not a review
+        code, _, err = self.main_code("--base", self.second, "--require")
+        self.assertEqual(code, 2)
+        self.assertIn("does not descend from base", err)
+        self.assertEqual(self.main_code("--base", self.second)[0], 0)  # without --require: today's behaviour
+
+    def test_unresolvable_base_exits_2_under_require(self):
+        self.assertEqual(self.main_code("--base", "no-such-ref-xyz", "--require")[0], 2)
+
+    def test_real_base_passes_the_check_and_reaches_the_next_step(self):
+        code, _, err = self.main_code("--base", self.first, "--require")
+        self.assertEqual(code, 2)  # stopped later, by the missing claude binary, not by the base check
+        self.assertIn("not found on PATH", err)
+        self.assertNotIn("same commit", err)
+        self.assertEqual(self.main_code("--base", self.first, "--require", "--dry-run")[0], 0)
 
 
 class ExtractJsonObjectTests(unittest.TestCase):

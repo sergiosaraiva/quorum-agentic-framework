@@ -9,7 +9,7 @@ Adopting Quorum follows twelve steps, each with a check.
 
 1. Create your repository from the template, keeping the folder layout because agents and docs refer to each other by path.
 2. Activate the framework files already in `.claude/` and `.mcp.json`: install the pre-commit hook and run `python3 scripts/framework_lint.py`.
-3. Replace every placeholder: product name, objective, technical lead, product owner, the optional privacy owner (or delete its row), `RUNNER_LABEL`, `REALM` and, once the platform is recorded as a TQ or OD, `DEPLOY_TARGET`. Find them with `grep -rnE '\{\{[A-Z_]+\}\}' --exclude-dir=node_modules --exclude-dir=.git .`; only the generic `{{PLACEHOLDER}}` wording should remain.
+3. Replace every placeholder: product name, objective, technical lead, product owner, the optional privacy owner (or delete its row), `RUNNER_LABEL`, `REALM` and, once the platform is recorded as a TQ or OD, `DEPLOY_TARGET`. Find them with `grep -rnE '\{\{[A-Z_]+\}\}' --exclude-dir=node_modules --exclude-dir=.git .`; only the generic `{{PLACEHOLDER}}` wording, reference notes, example records and a kept `DEPLOY_TARGET` should remain.
 4. Remove the Acme Orders example domain once the pipeline works end to end: run `python3 scripts/kb/remove_examples.py` (dry run), then `--apply`, rewrite the passages it still lists, delete the example slices and replace the Orders sample code with your first real feature.
 5. Seed the business knowledge base with 10 to 30 chunks and run `scripts/kb/check_chunks.py`.
 6. Seed the questions knowledge base with open BQ and TQ records and past OD decisions.

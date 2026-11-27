@@ -295,7 +295,7 @@ def dangling_refs(root: Path, defined: set[str], prefixes: set[str] | None = Non
     """(relative file, id) for every cited id that is not in `defined`, once per file and id, sorted.
     Ids use `prefixes` (default: DEFAULT_REF_PREFIXES plus the prefix of every defined id); `cited`, when given,
     is an extra set of exact ids to find whatever their prefix (remove_examples passes the ids it just deleted)."""
-    prefixes = set(prefixes or DEFAULT_REF_PREFIXES) | {i.rsplit("-", 1)[0] for i in defined}
+    prefixes = set(prefixes or DEFAULT_REF_PREFIXES) | {i.rsplit("-", 1)[0] for i in defined if ID_RE.match(i)}
     pattern = re.compile(r"\b(?:%s)-\d{3,}\b" % "|".join(sorted(map(re.escape, prefixes))))
     extra = re.compile(r"\b(?:%s)\b" % "|".join(map(re.escape, sorted(cited)))) if cited else None
     out: list[tuple[str, str]] = []

@@ -113,7 +113,8 @@
       "WebSearch",
       "Bash(git push:*)",
       "Bash(npm ci)",
-      "Bash(python3 scripts/kb/remove_examples.py:*)"
+      "Bash(python3 scripts/kb/remove_examples.py:*)",
+      "Bash(git * --output*)"
     ],
     "deny": [
       "Read(./.env.local)",

@@ -18,8 +18,9 @@ SETTINGS = ROOT / ".claude" / "settings.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "ai-pr-review.yml"
 
 # Allow rules that only read: the command text starts with one of these, so no deny entry is needed.
-READ_ONLY_PREFIXES = ("git status", "git diff", "git log", "git show", "git blame", "git ls-files", "git branch --list",
-                      "ls", "pwd")
+# git is NOT read-only: `git log|diff|show --output=<path>` writes any file (e.g. .git/config with core.fsmonitor, which
+# the next `git status` executes), so every allow-listed git rule must be denied for the CI reviewer too.
+READ_ONLY_PREFIXES = ("ls", "pwd")
 READ_ONLY_GH = re.compile(r"^gh [a-z-]+ (view|list|diff|checks)$")
 
 RULE = re.compile(r"^Bash\((.*)\)$")
@@ -99,10 +100,13 @@ class PermissionRuleTests(unittest.TestCase):
 
     def test_the_read_only_exemption_is_narrow(self):
         exempt = {p for p in self.allow if is_read_only(p)}
-        self.assertIn("git status:*", exempt)
         self.assertIn("pwd", exempt)
-        for pattern in ("scripts/run-mutation-tests.sh:*", "python3 scripts/kb/search.py:*", "dotnet build:*", "npm test"):
+        for pattern in ("git log:*", "git diff:*", "git status:*", "scripts/run-mutation-tests.sh:*", "python3 scripts/kb/search.py:*", "dotnet build:*", "npm test"):
             self.assertFalse(is_read_only(pattern), pattern)
+
+    def test_removing_the_git_deny_makes_the_check_fail(self):
+        # git log|diff|show --output=<path> writes files, so the allow-listed git rules must stay denied in CI.
+        self.assertIn("git log:*", uncovered(self.allow, [d for d in self.deny if d != "git:*"]))
 
     def test_removing_the_script_denies_makes_the_check_fail(self):
         # The case the check exists for: the allow rule names a repository script and nothing denies it.

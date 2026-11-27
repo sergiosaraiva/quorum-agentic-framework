@@ -29,8 +29,9 @@ extent of the protection: `claude -p` still runs in the working tree, so the bra
 still come from the branch, and this script is the branch's copy. A branch that edits those can still influence its
 reviewer. A path that does not exist at base (a first adoption) falls back to the working tree with a notice.
 
-With --require the review must be a real one: exit 2 when --base resolves to the same commit as HEAD (nothing to compare) or
-HEAD does not descend from it (the diff would not be this branch's work). Without --require an empty diff just reports
+With --require the review must be a real one: exit 2 when HEAD has no commits that --base lacks
+(base equal to or ahead of HEAD: nothing to compare). A base that moved on after the branch was cut is fine, because the
+diff is taken from the merge-base. Without --require an empty diff just reports
 "nothing to review" and exits 0.
 
 Accepted severity names (case-insensitive): blocking|warning|info, and the agents' scale mapped as
@@ -121,16 +122,18 @@ def get_diff(base: str) -> str:
 
 
 def require_real_base(base: str) -> str | None:
-    """For --require: an error message when `base` cannot anchor a real review, else None. A base equal to HEAD yields an
-    empty diff, and a base HEAD does not descend from yields a diff of someone else's work; both would pass the gate empty."""
+    """For --require: an error message when `base` cannot anchor a real review, else None. The review diffs `base...HEAD`
+    (from the merge-base), so a base that moved on after the branch was cut is fine; only a HEAD with no commits of its
+    own (equal to or behind base) would pass the gate with an empty review."""
     head = run(["git", "rev-parse", "HEAD"])
     resolved = run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"])
     if head.returncode != 0 or resolved.returncode != 0:
         return f"cannot resolve HEAD and base {base!r} to commits: {(head.stderr or resolved.stderr).strip()}"
     if head.stdout.strip() == resolved.stdout.strip():
         return f"--require: base {base!r} is the same commit as HEAD, so there is nothing to review; pass the integration branch"
-    if run(["git", "merge-base", "--is-ancestor", resolved.stdout.strip(), "HEAD"]).returncode != 0:
-        return f"--require: HEAD does not descend from base {base!r}; rebase or merge it, or pass the branch this one was cut from"
+    ahead = run(["git", "rev-list", "--count", f"{resolved.stdout.strip()}..HEAD"])
+    if ahead.returncode != 0 or ahead.stdout.strip() == "0":
+        return f"--require: HEAD has no commits that base {base!r} lacks, so there is nothing to review; pass the branch this one was cut from"
     return None
 
 
@@ -398,7 +401,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--timeout", type=int, default=600, help="seconds per model call")
     ap.add_argument("--reset", action="store_true", help="reset the round counter (use after a human review)")
     ap.add_argument("--require", action="store_true", help="fail (exit 2) instead of skipping when the claude CLI is missing, or when --base is "
-                    "HEAD itself or not an ancestor of HEAD (an empty review must not pass the gate)")
+                    "HEAD itself or HEAD has no commits of its own (an empty review must not pass the gate)")
     ap.add_argument("--dry-run", action="store_true", help="print the prompt, do not call the model")
     args = ap.parse_args(argv)
 

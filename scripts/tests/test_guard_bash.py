@@ -10,6 +10,11 @@ from pathlib import Path
 GUARD = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "guard_bash.py"
 
 BLOCKED = [
+    # nested subshells that start with `((` are not arithmetic (Bash runs both commands)
+    "((git push -f); (true))",
+    "((true); (git push -f))",
+    "((true) && (git push -f))",
+    "((:) | (git -C . push --force))",
     # force pushes, including global-option prefixes and refspecs
     "git push --force", "git push -f", "git push --force-with-lease", "git push origin main --force-with-lease=main",
     "git -C . push --force", "git -c push.default=current push -f origin x", "git --git-dir=.git push -f",

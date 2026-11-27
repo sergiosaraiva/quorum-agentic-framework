@@ -45,7 +45,7 @@ The script builds a review prompt from the branch diff against a base (`python3 
 | `--max-rounds` | round cap (default 3); at the cap the script exits with code 3 |
 | `--out-dir` | where findings and round state are written (default `.ai-review`) |
 | `--claude-bin`, `--timeout` | which `claude` executable to run (default `claude`) and the per-call timeout (default 600 s) |
-| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH; use it for the gate |
+| `--require` | exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH, or when HEAD has no commits the base lacks (a base that moved on is fine); use it for the gate |
 | `--reset` | drop the current branch's saved count after a human review; the next completed round starts from 1 |
 | `--dry-run` | print the prompt without calling a model |
 

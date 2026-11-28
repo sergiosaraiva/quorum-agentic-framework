@@ -27,9 +27,9 @@ Fewer rungs are fine for a small slice; never skip the order of dependencies. R0
 | `main` | releases only; protected |
 | `integration` (optional) | where slice PRs land; promoted to `main` by a release PR |
 | `feature/VS-nnn-<name>` | one rung per branch; the base is the integration branch |
-| stacked rung | a rung that depends on an unmerged rung targets the parent branch; after the parent squash-merges, rebase and retarget |
+| stacked rung | a rung that depends on an unmerged rung targets the parent branch; after the parent squash-merges, rebase and retarget. The required local review gate still uses `--base origin/main` for a stacked rung (a parent base is fine only without `--require`, TQ-022) |
 
-Rules: one rung per PR; the PR title starts with the slice id and rung (`VS-001 R2: orders service and endpoints`); merge only when the local AI review loop (and the GitHub loop, if `ANTHROPIC_API_KEY` is set) is clean and threads are resolved.
+Rules: one rung per PR; the PR title starts with the slice id and rung (`VS-001 R2: orders service and endpoints`); merge only when the local AI review loop (and the GitHub loop, if `AI_REVIEW_ENABLED` is `true`) is clean and threads are resolved.
 
 ## 4. Readiness analysis (steps S1..S5)
 

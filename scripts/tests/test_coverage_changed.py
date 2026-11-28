@@ -57,6 +57,18 @@ class CoverageTests(unittest.TestCase):
             bad.write_text("<coverage")
             self.assertEqual(cc.main(["--base", "main", str(bad)]), 2)
 
+    def test_non_integer_line_number_or_hits_exits_2(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as t:
+            for attr in ('number="x" hits="1"', 'number="1" hits="many"'):
+                bad = Path(t) / "bad.xml"
+                bad.write_text('<coverage><packages><package><classes><class filename="src/A.cs"><lines>'
+                               f"<line {attr}/></lines></class></classes></package></packages></coverage>")
+                with contextlib.redirect_stderr(io.StringIO()) as err:
+                    self.assertEqual(cc.main(["--base", "HEAD", str(bad)]), 2, attr)
+                self.assertIn("coverage_changed:", err.getvalue())
+
     def test_base_starting_with_dash_is_rejected(self):
         self.assertEqual(cc.main(["--base=--output=x", "r.xml"]), 2)
 

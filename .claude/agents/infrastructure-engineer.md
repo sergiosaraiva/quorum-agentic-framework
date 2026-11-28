@@ -69,7 +69,7 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
 | Alerts | At least error rate, latency, saturation, restart count |
 | Rollback | Previous digest redeployable |
 | Cost | Monthly estimate with assumptions, and the cheaper alternative considered |
-| Log redaction | The `customerName` query value and bound parameters are redacted or omitted (OD-012, OD-027) in: application logs (Information-level request lines carry the query string; keep HTTP logging and EF sensitive-data logging off, and set the level per category); telemetry attributes `url.query`, `url.full`, `http.url`, `db.query.text`, `db.statement` and span events; PostgreSQL settings `log_min_duration_statement`, `log_statement`, `log_parameter_max_length`, `log_parameter_max_length_on_error`, `auto_explain`; proxy and access logs and edge components (CDN, WAF, load balancer; the browser referrer). Verified by the infrastructure review (`security-engineer`) before the first deployment. No target chosen yet: return a TQ at target selection carrying these checks |
+| Log redaction | Personal data in query strings and bound parameters is redacted or omitted per the product's recorded decision (example: OD-012, OD-027 in the Acme domain) in: application logs (Information-level request lines carry the query string; keep HTTP logging and EF sensitive-data logging off, and set the level per category); telemetry attributes `url.query`, `url.full`, `http.url`, `db.query.text`, `db.statement` and span events; PostgreSQL settings `log_min_duration_statement`, `log_statement`, `log_parameter_max_length`, `log_parameter_max_length_on_error`, `auto_explain`; proxy and access logs and edge components (CDN, WAF, load balancer; the browser referrer). Verified by the infrastructure review (`security-engineer`) before the first deployment. No target chosen yet: return a TQ at target selection carrying these checks |
 | Security | Session runs `security-engineer` before merge |
 
 ## Context Contract
@@ -111,6 +111,6 @@ Declarative files only. Pin the image by digest. Least-privilege access (no wild
 | Failure | Recovery |
 |---------|----------|
 | Deploy configuration lives in another repo not provided | Produce the file contents and target path as a patch description; mark `unaudited` for anything depending on it |
-| Reviewer finds a wildcard permission | Narrow it; cap 3 rounds then escalate to a human |
+| Reviewer finds a wildcard permission | Narrow it; cap 5 rounds then escalate to a human |
 | KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7: authoring stops after the fallback fails; review mode lists the KB check in `unverified` as `unverified: chunk verification skipped, KB unreachable`. This agent has no severity scale of its own, so "What blocks" has no row for it; its reviewers (`security-engineer`, `quality-guardian`) block |
 | Cost unknown | State the assumption set and mark the estimate low-confidence |

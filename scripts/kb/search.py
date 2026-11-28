@@ -5,13 +5,21 @@
     python3 scripts/kb/search.py --kb qa "invoice numbers" --backend pg  # Q&A KB, pgvector
     python3 scripts/kb/search.py --graph BC-001 --depth 2                # link-graph traversal
     python3 scripts/kb/search.py --get BC-002 | --kb qa --get BQ-001
-    python3 scripts/kb/search.py --stats | --kb qa --open
+    python3 scripts/kb/search.py --stats          # business KB only
+    python3 scripts/kb/search.py --kb qa --open
 """
-from __future__ import annotations
+import sys  # builtin: cannot be shadowed. Nothing else is imported before the next statement (not even `from __future__`, which imports a module)
+if __name__ == "__main__" and not sys.flags.isolated and not getattr(sys.flags, "safe_path", False) and sys.path and sys.path[0]:
+    _here = sys.path.pop(0)  # the script directory: a planted scripts/kb/<stdlib-name>.* must not shadow the standard library (OD-032); not even last on the path (nt, psycopg ... are imported when absent)
+    import importlib.util  # the sibling modules are loaded by path and registered under their names, so `import lib` below finds them
+    for _name in ("lib", "backends"):
+        _spec = importlib.util.spec_from_file_location(_name, _here + "/" + _name + ".py")
+        sys.modules[_name] = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(sys.modules[_name])
 
 import argparse
 import json
-import sys
+from pathlib import Path
 
 import backends
 import lib
@@ -33,11 +41,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", help="qa: BQ|TQ|OD")
     ap.add_argument("--status", help="qa: open|answered|decided|closed")
     ap.add_argument("--json", action="store_true", help="raw JSON output")
+    ap.add_argument("--root", type=Path, help="local backend: directory holding kb/chunks and questions/records "
+                                              "(default: this repository)")
     a = ap.parse_args(argv)
     a.depth = lib.clamp_int(a.depth, 0, lib.MAX_DEPTH, 1)
     a.k = lib.clamp_int(a.k, 1, lib.MAX_K, 5)
 
-    store = backends.make_store(a.backend)
+    if a.stats and a.kb != "business":
+        ap.error("--stats reports the business KB only; drop --kb qa")
+    if a.root is not None:
+        if a.backend != "local":
+            ap.error("--root only applies to the local backend; the pg backend reads the database. Drop --root or use --backend local")
+        missing = [rel for rel in ("kb/chunks", "questions/records") if not (a.root / rel).is_dir()]
+        if missing:
+            ap.error(f"--root {a.root} has no {' and no '.join(missing)}; point it at a directory holding kb/chunks and questions/records")
+    try:
+        store = backends.make_store(a.backend, a.root)
+    except (ValueError, RuntimeError) as exc:  # unknown backend, or pg without psycopg or DATABASE_URL
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     biz = a.kb == "business"
     try:
         if a.stats:

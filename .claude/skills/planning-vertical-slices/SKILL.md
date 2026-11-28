@@ -74,6 +74,6 @@ Status: `Proposed`, `Analysed`, `Ready`, `In progress`, `Done`, `Blocked`. Every
 ## Workflow
 
 1. `requirements-analyst` extracts outcomes from the spec and records gaps.
-2. `solution-architect` cuts slices, sets dependencies and rungs, scores priority.
-3. Run the readiness analysis per slice; record blockers.
-4. Fill `INDEX.md`; hand the first `ready` slice to the pipeline.
+2. `solution-architect` proposes the slicing, dependencies and rungs in its design document (it has no Write on slice specs or `INDEX.md`, `_SHARED-PATTERNS.md` Common Tool Permissions).
+3. `requirements-analyst` writes each slice spec and its `INDEX.md` row (scores, priority) from that design, and runs the readiness analysis; blockers go in the analysis.
+4. Status upkeep (every code PR updates its row and rung, `docs/slices/CLAUDE.md`): `documentation-curator`. Hand the first `Ready` slice to the pipeline.

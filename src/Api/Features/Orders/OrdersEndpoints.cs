@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Api.Options;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
 namespace Api.Features.Orders;
@@ -17,30 +18,31 @@ public static class OrdersEndpoints
         // The paging and filter values bind as strings and are parsed explicitly, so a malformed value gives
         // validation problem details (TQ-005, OD-016) and a calendar date is exactly yyyy-MM-dd (OD-005).
         // Rate limited per user (TQ-007, OD-018): each call costs two scans.
-        group.MapGet("/", async (
+        group.MapGet("/", async Task<Results<Ok<PagedResponse<OrderResponse>>, ValidationProblem>> (
             string? page, string? pageSize, string? createdFrom, string? createdTo, string? customerName, string? status,
             OrdersService service, IOptions<OrdersOptions> orders, CancellationToken ct) =>
         {
             var (filter, errors) = OrderListFilter.Parse(createdFrom, createdTo, customerName, status);
             var (pageNumber, size) = PagingQuery.Parse(page, pageSize, orders.Value.MaxPageNumber, errors);
             return errors.Count > 0
-                ? Results.ValidationProblem(errors)
-                : Results.Ok(await service.ListAsync(pageNumber, size, filter, ct));
+                ? TypedResults.ValidationProblem(errors)
+                : TypedResults.Ok(await service.ListAsync(pageNumber, size, filter, ct));
         }).RequireRateLimiting(OrdersRateLimit.PolicyName);
 
-        group.MapGet("/{id:guid}", async (Guid id, OrdersService service, CancellationToken ct) =>
-            await service.GetAsync(id, ct) is { } order ? Results.Ok(order) : Results.NotFound());
+        group.MapGet("/{id:guid}", async Task<Results<Ok<OrderResponse>, NotFound>> (Guid id, OrdersService service, CancellationToken ct) =>
+            await service.GetAsync(id, ct) is { } order ? TypedResults.Ok(order) : TypedResults.NotFound());
 
-        group.MapPost("/", async (CreateOrderRequest request, OrdersService service, CancellationToken ct) =>
+        group.MapPost("/", async Task<Results<Created<OrderResponse>, ValidationProblem>> (
+            CreateOrderRequest request, OrdersService service, CancellationToken ct) =>
         {
             var errors = Validate(request);
             if (errors.Count > 0)
             {
-                return Results.ValidationProblem(errors);
+                return TypedResults.ValidationProblem(errors);
             }
 
             var created = await service.CreateAsync(request, ct);
-            return Results.Created($"/api/orders/{created.Id}", created);
+            return TypedResults.Created($"/api/orders/{created.Id}", created);
         });
 
         return app;

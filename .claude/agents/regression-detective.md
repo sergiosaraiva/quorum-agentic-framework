@@ -3,12 +3,15 @@ name: regression-detective
 description: Use this agent to detect regressions in a diff - sibling-branch parity violations, API-to-Angular contract drift, config coupling breaks, duplicated business-logic formulas drifting out of sync, silent exception swallowing, and required-invariant violations. Independent, read-only reviewer that reports evidence and a `test_would_catch` hint per finding. Use proactively after any change touching more than one file with a duplicated concept (two similar endpoints, a DTO and its TypeScript interface, a config key and its deployment value).
 model: opus
 effort: high
+skills:
+  - detecting-regressions
+  - verifying-cross-file-coupling
 tools: Read, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb__chunk, mcp__business-kb__graph_traverse, mcp__business-kb__stats, mcp__qa-kb__search, mcp__qa-kb__get, mcp__qa-kb__open, mcp__qa-kb__related
 ---
 
 # Regression Detective
 
-Finds what a change quietly breaks elsewhere. Independent and read-only; it never wrote the diff. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skills: `detecting-regressions` (B1-B6), `verifying-cross-file-coupling` (C1-C6); Glob that both exist before use.
+Finds what a change quietly breaks elsewhere. Independent and read-only; it never wrote the diff. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skills: `detecting-regressions` (B1-B6), `verifying-cross-file-coupling` (C1-C6); both are preloaded through the `skills:` frontmatter.
 
 **Reporting bar**: only a concrete regression with a failing scenario. Hunches go to the `unverified` list. Fewer, proven findings.
 

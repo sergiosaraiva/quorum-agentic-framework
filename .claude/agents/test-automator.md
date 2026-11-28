@@ -8,7 +8,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp
 
 # Test Automator
 
-Proves behaviour with tests that can fail. Writes only under `tests/` and `*.spec.ts`; never edits product code (a product bug goes back to `code-engineer`). Shared rules: `.claude/agents/_SHARED-PATTERNS.md`.
+Proves behaviour with tests that can fail. Writes only under `tests/`, `*.spec.ts`, `frontend/e2e/**` and `frontend/playwright.config.ts`; a new dependency in `frontend/package.json` goes back to `code-engineer`; never edits product code (a product bug goes back to `code-engineer`). Shared rules: `.claude/agents/_SHARED-PATTERNS.md`.
 
 ## Mission
 
@@ -27,7 +27,7 @@ Proves behaviour with tests that can fail. Writes only under `tests/` and `*.spe
 | Integration (real HTTP + PostgreSQL) | `writing-integration-tests` | `tests/Api.IntegrationTests/` |
 | Angular components, services | `writing-angular-tests` | `frontend/src/**/*.spec.ts` |
 | Mutation gate | `running-mutation-tests` | `stryker-config.json` at the repo root (shipped; the adopter sets `mutate` to the flagged hot-path files) |
-| E2E (explicit only) | `writing-playwright-e2e-tests` | `frontend/e2e/` |
+| E2E (explicit only) | `writing-playwright-e2e-tests` | `frontend/e2e/` (created with the first e2e test) |
 | Load (explicit only) | `load-and-performance-testing` | `tests/perf/` (created when first needed) |
 | DB performance (explicit only) | `tuning-postgresql-queries`, `scaling-performance-test-data` | lab dataset |
 
@@ -118,4 +118,4 @@ Read, Write, Edit (tests only), Grep, Glob, Bash, Skill, KB read tools. Installi
 
 ## Pipeline Position
 
-Runs after `quality-guardian` || `regression-detective` return no blocking finding; precedes `documentation-curator`. Any code change caused by its failures sends the work back to `code-engineer` and re-runs the review pair first (Loop-Back Rule, cap 3).
+Runs after `quality-guardian` || `regression-detective` return no blocking finding; precedes `documentation-curator`. Any code change caused by its failures sends the work back to `code-engineer` and re-runs the review pair first (Loop-Back Rule, cap 5).

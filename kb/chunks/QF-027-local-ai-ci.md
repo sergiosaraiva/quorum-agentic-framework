@@ -5,21 +5,23 @@ topics: [ai-ci, review]
 links: [QF-028, QF-026, QF-029, QF-031]
 sources: ["scripts/ai_review_local.py", ".claude/skills/running-local-ai-review/SKILL.md", "docs/concepts/08-ai-ci-local-and-github.md"]
 ---
-The local AI CI is the script `scripts/ai_review_local.py`, the required AI review, together with the in-session review pair. It uses the `claude` CLI with the user's own sign-in and needs no API key. It runs before the first push; a human then merges.
+The local AI CI is the script `scripts/ai_review_local.py`, the required AI review together with the in-session review pair. It uses the `claude` CLI with the user's sign-in.
 
-How it works: it collects `git diff <base>...HEAD`, by default against `origin/main`; splits the diff into chunks under a byte limit (60000 by default) without dropping code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions only, and the Immutable Rules of `CLAUDE.md`; runs `claude -p` headless with the read-only tools `Read Grep Glob`; merges the findings; and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
+How it works: it collects `git diff <base>...HEAD`; splits the diff into chunks, dropping no code; builds one prompt per chunk from the `pr-review` skill, the quality-guardian and regression-detective instructions and the Immutable Rules, read at the merge-base; runs `claude -p` read-only (`--strict-mcp-config` skips `.mcp.json`, user and plugin MCP servers); merges the findings (on later rounds it re-checks earlier findings and re-reports one only if still present); and writes `findings.md`, `findings.json` and `state.json` to `.ai-review/`.
 
 | Option | Meaning |
 |--------|---------|
-| `--base` | Diff base; the parent branch for a stacked pull request |
-| `--model` | Model alias or id; default `sonnet` |
-| `--max-rounds` | Round cap, default 3 |
-| `--require` | Exit 2 instead of skipping when the `claude` CLI is missing; use it for the gate |
-| `--reset` | Reset the round counter after a human review |
-| `--dry-run` | Print the first prompt without calling a model |
+| `--base` | Diff base, default `origin/main`; a stacked rung uses `origin/main` too under `--require` (TQ-022), a parent base is fine only without `--require` (not the gate) |
+| `--model` | Model alias or id, default `sonnet` |
+| `--max-rounds` | Round cap, default 5 |
+| `--require` | Exit 2 instead of skipping when `claude` is missing, HEAD has no new commits or, with a remote, HEAD is detached or the base is not the remote default branch (`origin/main`) at the fork point (`git remote set-head <remote> -a` if `<remote>/HEAD` is missing); use it for the gate. Flags are exact; reads are fenced to the repository |
+| `--reset` | Reset the round counter after a human review; each of `--reset`, `--max-rounds`, `--claude-bin` and `--out-dir` has its own `ask` rule in settings |
+| `--dry-run` | Print the first prompt, no model call |
 
-Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings; 2 usage or environment error, including malformed model output; 3 round cap reached.
+`--out-dir` moves only the findings files; round state stays in `.ai-review/state.json`. A branch rename starts a new round count.
 
-Choose the model by risk: a routine branch uses the default Sonnet, while authentication, data model, migrations, money or core logic can use `--model opus`, which is closer to the Opus default of the optional GitHub review. Each later round receives the previous findings and re-reports only those still present. The standard prompt is fixed so results compare round to round.
+Exit codes: 0 no blocking findings, or skipped when `claude` is missing without `--require`; 1 blocking findings; 2 usage or environment error, including malformed model output; 3 round cap reached.
 
-The local review is the required gate only together with the in-session review pair over the whole branch. It complements, and does not replace, the in-session pair or a human merge decision. The GitHub AI review is an optional, stronger second gate that needs `ANTHROPIC_API_KEY`. Run tests and format first.
+Use the default Sonnet for routine branches and `--model opus` for risky changes (authentication, data model, migrations, money, core logic).
+
+It does not replace the in-session pair or the human merge. The GitHub AI review is an optional second gate needing `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY`.

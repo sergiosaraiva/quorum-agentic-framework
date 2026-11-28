@@ -63,6 +63,9 @@ export default function () {
 ## Example: ramping load
 
 ```javascript
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
 export const options = {
   stages: [
     { duration: '2m', target: 50 },   // ramp to expected peak

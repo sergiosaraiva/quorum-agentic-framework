@@ -5,18 +5,20 @@ description: Runs scripts/ai_review_local.py, the required local AI review of th
 
 # Running the local AI review
 
-The script reviews your branch diff with the `claude` CLI and your own sign-in; no `ANTHROPIC_API_KEY` is needed. It is the required AI review: together with the in-session pair `quality-guardian || regression-detective` over the whole branch (Pre-Push Branch Gate) it is the gate, and a human then merges. The GitHub review (`pr-review`) is an optional, stronger second gate that runs only when `ANTHROPIC_API_KEY` is set; without the key its job is skipped and the green check is not a review. The script does not replace tests.
+The script reviews your branch diff with the `claude` CLI and your own sign-in. It is the required AI review: together with the in-session pair `quality-guardian || regression-detective` over the whole branch (Pre-Push Branch Gate) it is the gate, and a human then merges. The GitHub review (`pr-review`) is an optional, stronger second gate that runs only when `AI_REVIEW_ENABLED` is `true` (TQ-019); otherwise its job is skipped and the green check is not a review. The script does not replace tests.
 
 ## What it does
 
 | Step | Detail |
 |------|--------|
-| 1 | Computes `git diff <base>...HEAD` (default base `origin/main`; the parent branch for a stacked PR) |
+| 1 | Computes `git diff <base>...HEAD` (default base `origin/main`; a stacked rung too under `--require`, TQ-022; a parent base is fine only without `--require`, not the gate) |
 | 2 | Splits the diff into chunks under `--max-chunk-bytes`; no code is dropped |
 | 3 | Builds one prompt per chunk from the `pr-review` skill plus the `quality-guardian` and `regression-detective` instructions only (no security or infra reviewer), and runs `claude -p` headless |
-| 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary |
+| 4 | Merges findings, writes `.ai-review/findings.md`, `findings.json` and `state.json` (the round counter), prints a summary; later rounds re-check earlier findings, re-reported only if still present |
 
-Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (including malformed model output), 3 round cap reached.
+The reviewer runs read-only (`call_model` in the script): `--tools Read,Grep,Glob` restricts the built-in tools, `--disallowedTools` denies Bash, the write tools, web tools and `mcp__*`, `--strict-mcp-config` skips `.mcp.json`, `~/.claude.json` and plugin servers, `ENABLE_CLAUDEAI_MCP_SERVERS=false` turns off claude.ai connectors, and `--settings` sets `blockReadsOutsideWorkingDirectories` (Claude Code 2.1.257+) so reads cannot leave the repository. The prompts (pr-review skill, quality-guardian, regression-detective, root `CLAUDE.md` rules) are read at the merge-base of `--base` and HEAD (shared history) with `git show`, so a moved base does not change them (working-tree fallback with a notice when absent there). That is the whole protection: the branch's own `CLAUDE.md` files, `.claude/settings.json`, the files the reviewer reads and this script still come from the branch.
+
+Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing and `--require` is not set; 1 blocking findings, 2 usage or environment error (incl. malformed model output), 3 round cap reached.
 
 ## Flags
 
@@ -25,15 +27,15 @@ Exit codes: 0 no blocking findings, or skipped when the `claude` CLI is missing 
 | `--base` | Base ref (env `AI_REVIEW_BASE`, default `origin/main`) |
 | `--model` | Model alias or id (env `AI_REVIEW_MODEL`, default `sonnet`) |
 | `--max-chunk-bytes` | Chunk size limit (default 60000) |
-| `--max-rounds` | Local round cap (default 3) |
+| `--max-rounds` | Local round cap (default 5) |
 | `--out-dir` | Output directory (default `.ai-review`) |
 | `--claude-bin` | Claude CLI binary (env `CLAUDE_BIN`) |
 | `--timeout` | Seconds per model call (default 600) |
-| `--require` | Exit 2 instead of skipping (exit 0) when the `claude` binary is not on PATH; use it for the gate |
-| `--reset` | Drop the current branch's saved round count; the next completed round starts from 1 (use after a human review) |
+| `--require` | Exit 2 instead of skipping (exit 0) when `claude` is not on PATH or HEAD has no commits the base lacks. With a remote configured it also exits 2 when HEAD is detached, when `<remote>/HEAD` is missing (run `git remote set-head <remote> -a`) or points at the branch's own ref, or when the base is not the remote default branch (`<remote>/HEAD`, e.g. `origin/main`) at the fork point; `HEAD~1` and a stacked parent fail (TQ-022). No remote: a notice only. Use for the gate |
+| `--reset` | Reset the branch's round count (after a human review) |
 | `--dry-run` | Print the first prompt, call no model, spend nothing |
 
-The round number is kept in `.ai-review/state.json`; there is no `--round` flag. Run `python3 scripts/ai_review_local.py --help` to confirm the current flags.
+Flags are exact (no abbreviations). A branch rename starts a new round count (known limit). The round number is kept in the fixed `.ai-review/state.json`, even with `--out-dir`; there is no `--round` flag. In `.claude/settings.json`, each of `--reset`, `--max-rounds`, `--claude-bin` and `--out-dir` has its own `ask` rule. Run `python3 scripts/ai_review_local.py --help` to confirm the current flags.
 
 ```bash
 python3 scripts/ai_review_local.py --dry-run                       # inspect the prompt
@@ -51,7 +53,7 @@ python3 scripts/ai_review_local.py --reset                         # after a hum
 
 ## Rounds and triage
 
-Round cap 3 (round = review, fix, review). After round 3 with findings still open, stop and escalate to a human; do not loop further.
+Round cap 5 (round = review, fix, review). After round 5 with findings still open, stop and escalate to a human; do not loop further.
 
 | Severity | Action |
 |----------|--------|
@@ -67,10 +69,10 @@ The script also accepts severities from the reviewer agents, case-insensitively:
 
 ## Counters
 
-Three counters exist and none shares state: the in-session Loop-Back cap (3 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt state file exits 2 telling you to run `--reset`, and an old-format file is rejected the same way until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS`, edited in the workflow on the PR branch; removing the label `needs-human-review` is optional housekeeping). Finishing local rounds does not use up GitHub rounds, and the reverse. See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
+Three counters exist and none shares state: the in-session Loop-Back cap (5 per gate chain; no stored state; it resets with each new gate chain), this script's `--max-rounds` (stored in `.ai-review/state.json` as `{"branches": {name: {rounds, findings}}}`, one entry per branch; `--reset` drops the current branch's saved count, and the next completed review round starts from 1 (the state file is rewritten only after a full round finishes). A corrupt or old-format state file exits 2 until `--reset`), and the GitHub `MAX_ROUNDS` (marker comments by `github-actions[bot]` on the PR, across pushes; rounds resume when a human deletes the markers or raises `MAX_ROUNDS` through its own PR to the integration branch). See `.claude/agents/_SHARED-PATTERNS.md` Loop-Back Rule.
 
 ## Order
 
 1. Build, tests and format green locally.
-2. In-session pair over the whole branch, then this script with `--require`, up to 3 rounds (`--model opus` for risky changes).
-3. Push and open the PR; a human merges. If `ANTHROPIC_API_KEY` is set, the GitHub review (`pr-review`) also runs as an optional second gate.
+2. In-session pair over the whole branch, then this script with `--require`, up to 5 rounds (`--model opus` for risky changes).
+3. Push and open the PR; a human merges. If `AI_REVIEW_ENABLED` is `true`, the GitHub review (`pr-review`) also runs as an optional second gate.

@@ -9,8 +9,9 @@ Python 3.11+, standard library only for local mode. Run all commands from the re
 | `search.py` | CLI search, `--get`, `--graph`, `--open`, `--related`, `--stats` |
 | `mcp_server.py` | stdio MCP server, `--kb business` or `--kb qa` |
 | `ingest.py` | applies `kb/schema.sql` and `questions/schema.sql`, loads chunks and records with embeddings |
-| `check_chunks.py` | lint (unique ids, links resolve, word limits, frontmatter; warns on one-way `related`); `--against REF` warns on record ids whose title differs on another git ref (offline, fetched refs only); `--write-toc` regenerates `kb/TOC.md` |
-| `tests/` | `python3 -m unittest discover -s scripts/kb/tests` |
+| `check_chunks.py` | lint (unique ids, links resolve, word limits, frontmatter; warns on one-way `related`); `--against REF` warns on record ids whose title differs on another git ref (offline, fetched refs only); `--write-toc` regenerates `kb/TOC.md`; warns on a stale `kb/TOC.md` and on dangling references (a chunk or record id cited in CLAUDE.md, agent, skill, doc, README, chunk or record files that nothing defines; `--strict-refs` makes them errors); `ref-ignore.txt` lists deliberately hypothetical ids (`ID` or `PATH:ID` per line, `#` comments); `--root DIR` checks another tree |
+| `remove_examples.py` | removes the example domain: dry run by default lists every chunk and record with `example: true`; `--apply` deletes them, regenerates `kb/TOC.md`, and lists every remaining citation of a removed id by file; the Orders sample code and the example slices are removed separately |
+| `tests/` | `python3 -m unittest discover -s scripts/kb/tests`; they read `tests/fixtures/` (a copy of a few example chunks and records), never the live `kb/` and `questions/`, so they pass after the examples are removed |
 
 ## What each backend actually does
 
@@ -27,16 +28,17 @@ With the default `hash` embedding stub, `pg` mode matches shared words only. It 
 python3 scripts/kb/search.py "refund window"
 python3 scripts/kb/search.py --graph BC-001 --depth 2     # depth is clamped to 0..10
 python3 scripts/kb/search.py --kb qa --open
+python3 scripts/kb/search.py --root path/to/tree "refund"  # another tree holding kb/chunks and questions/records
 ```
 
 ## PostgreSQL + pgvector mode
 
 ```bash
-cp .env.example .env                     # set POSTGRES_PASSWORD
+cp .env.example .env                     # set POSTGRES_PASSWORD; DATABASE_URL is built from it
 set -a; source .env; set +a              # export the variables: docker compose and the scripts read the environment
 docker compose up -d postgres            # published on 127.0.0.1 only
+python3 -m venv .venv && . .venv/bin/activate   # PEP 668 systems refuse a global pip install
 pip install "psycopg[binary]"
-export DATABASE_URL=postgresql://app_user:${POSTGRES_PASSWORD}@127.0.0.1:5432/app
 python3 scripts/kb/ingest.py             # applies the schemas itself; re-run after editing chunks
 python3 scripts/kb/search.py --backend pg "refund window"
 ```

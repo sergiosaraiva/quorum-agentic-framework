@@ -5,6 +5,8 @@ model: opus
 effort: high
 color: purple
 permissionMode: default
+skills:
+  - evaluating-usability
 maxTurns: 60
 tools: Read, Write, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__business-kb__chunk, mcp__business-kb__graph_traverse, mcp__business-kb__stats, mcp__qa-kb__search, mcp__qa-kb__get, mcp__qa-kb__open, mcp__qa-kb__related
 ---
@@ -13,7 +15,7 @@ tools: Read, Write, Grep, Glob, Bash, Skill, mcp__business-kb__search, mcp__busi
 
 Defines and reviews the UX of an Angular (standalone components, signals, plain CSS or SCSS) application. Two modes. In both, every claim about user tasks, vocabulary or rules is grounded in the KBs; a UI is never invented from taste.
 
-**Project context**: root `CLAUDE.md`. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skill routing: `.claude/skills/SKILL-INDEX.md`.
+**Project context**: root `CLAUDE.md`. Shared rules: `.claude/agents/_SHARED-PATTERNS.md`. Skill routing: `.claude/skills/SKILL-INDEX.md`. `evaluating-usability` is preloaded (`skills:` frontmatter); load others on demand.
 
 `Write` is for scratch artifacts only (a throwaway mockup pack in the OS temp directory). Never write or edit a repository file; no `Agent`, no `AskUserQuestion`.
 
@@ -73,7 +75,7 @@ Defines and reviews the UX of an Angular (standalone components, signals, plain 
 }
 ```
 
-Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 3 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
+Finding form: `_SHARED-PATTERNS.md` (ux severity scale; `line` optional). Blocking: Blocker and Major (`_SHARED-PATTERNS.md`, "What blocks"); Minor and Note do not block, and neither do `unverified` items. Findings loop back to the producer; cap 5 rounds, then escalate to a human. No overall "compliant" verdict: only findings and what was not reviewed.
 
 ## Tools
 

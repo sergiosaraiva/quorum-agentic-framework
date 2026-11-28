@@ -9,7 +9,7 @@ Claude Code offers several ways to shape what a model does. They are easy to con
 | `CLAUDE.md` | Standing project instructions | Automatically every session; sub-files when working in their folder | `CLAUDE.md`, `<dir>/CLAUDE.md` |
 | Agent (subagent) | A specialised worker with its own context window, tool allow-list and model | When the session delegates to it, by explicit call or by matching its `description` | `.claude/agents/<name>.md` |
 | Skill | A packaged procedure: instructions, optionally scripts and reference files | Name and description always visible; body loaded only when the task matches | `.claude/skills/<name>/SKILL.md` |
-| Hook | A command run on an event (a Claude Code event configured in `settings.json`, or a git hook such as the shipped pre-commit lint, installed with `.claude/hooks/install-framework-check-hook.sh`) | By the harness or git, not by the model | `settings.json`, `.claude/hooks/` |
+| Hook | A command run on an event (a Claude Code event configured in `settings.json`, or a git hook such as the shipped pre-commit lint, installed with `.claude/hooks/install-framework-check-hook.sh`; the shipped `guard_bash.py` is a PreToolUse hook that blocks destructive Bash commands the deny list can miss, best effort and not a sandbox; the permission prompt and a sandbox are the boundaries, so do not rely on it in bypassPermissions or auto mode) | By the harness or git, not by the model | `settings.json`, `.claude/hooks/` |
 | MCP server | An external tool provider the model can call | Configured once; tools appear in the tool list | `.mcp.json` |
 
 Rules of thumb: facts and rules every task needs go in `CLAUDE.md`. A role with a distinct job, tools and model is an agent. A procedure only some tasks need is a skill. Something that must happen every time, deterministically, regardless of what the model decides, is a hook (the model cannot forget a hook). Access to a system outside the repo is an MCP server.
@@ -97,6 +97,7 @@ The "Used by" column of `.claude/skills/SKILL-INDEX.md` is the source; the same 
 | test-automator | the testing skills plus `tuning-postgresql-queries` and `scaling-performance-test-data` |
 | documentation-curator | `updating-internal-docs`, `updating-external-docs`, `writing-kb-chunks`, `maintaining-agent-framework` |
 | documentation-reviewer | `reviewing-documentation`, `reviewing-kb-chunks`, `verifying-cross-file-coupling` |
+| security-engineer | `backend`, `creating-dtos-and-validation`, `creating-configuration-options`, `implementing-observability`, `database`, `writing-postgresql-migrations`, `deploying-the-application`, `implementing-infrastructure-as-code`, `frontend` |
 | infrastructure-engineer | `deploying-the-application`, `implementing-infrastructure-as-code`, `creating-configuration-options`, `implementing-observability`, `managing-application-lifecycle` |
 | prompt-engineer | `writing-world-class-prompts` |
 

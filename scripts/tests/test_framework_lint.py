@@ -184,6 +184,108 @@ class StagedTests(unittest.TestCase):
         self.git("add", ".")
         self.assertTrue(any("Agent" in e for e in self.run_staged().errors))
 
+    def test_staged_deletion_of_a_skill_is_seen_and_checks_the_index(self):
+        self.git("add", ".")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "base",
+                 "--no-verify")
+        self.git("rm", "-rq", ".claude/skills/s")
+        self.assertIn(".claude/skills/s/SKILL.md", fl.staged_paths(self.repo))
+        errors = self.run_staged().errors
+        self.assertTrue(any("lists 's'" in e for e in errors), errors)  # SKILL-INDEX.md still lists the skill
+
+    def test_staged_deletion_kept_in_the_working_tree_is_not_read_and_still_checks_the_index(self):
+        # `git rm --cached` removes the path from the index but leaves the file: reading `git show :path` would fail
+        self.git("add", ".")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "base",
+                 "--no-verify")
+        self.git("rm", "-rq", "--cached", ".claude/skills/s", ".claude/agents/a.md")
+        self.assertTrue((self.root / "skills" / "s" / "SKILL.md").exists())
+        errors = self.run_staged().errors  # must not raise OSError
+        self.assertTrue(any("lists 's'" in e for e in errors), errors)
+
+
+class FrontmatterVocabularyTests(unittest.TestCase):
+    def run_lint(self, agents=None, skills=None, strict=False, extra=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build(Path(tmp) / ".claude", agents or {}, skills or {})
+            for rel, data in (extra or {}).items():
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            return fl.lint(root, strict)
+
+    def agent_with(self, tools):
+        return GOOD_AGENT.format(n="a").replace("Read, Grep", tools)
+
+    def test_unknown_tool_name_is_a_warning_and_an_error_with_strict(self):
+        report = self.run_lint({"a": self.agent_with("Read, Grpe")})
+        self.assertFalse(any("unknown tool" in e for e in report.errors), report.errors)
+        self.assertTrue(any("unknown tool 'Grpe'" in w for w in report.warnings), report.warnings)
+        strict = self.run_lint({"a": self.agent_with("Read, Grpe")}, strict=True)
+        self.assertTrue(any("unknown tool 'Grpe'" in e for e in strict.errors), strict.errors)
+
+    def test_legacy_task_tool_is_an_error_that_suggests_agent(self):
+        errors = self.run_lint({"a": self.agent_with("Read, Task")}).errors
+        self.assertTrue(any("'Task'" in e and "'Agent'" in e for e in errors), errors)
+
+    def test_builtin_and_mcp_tools_are_accepted(self):
+        tools = ", ".join(t for t in fl.KNOWN_TOOLS if t != "Agent") + ", mcp__qa-kb__search, Bash(git diff:*)"
+        self.assertEqual(self.run_lint({"a": self.agent_with(tools)}).errors, [])
+
+    def test_agent_tool_keeps_its_own_forbidden_error_not_unknown(self):
+        errors = self.run_lint({"a": self.agent_with("Read, Agent")}).errors
+        self.assertTrue(any("must not list Agent" in e for e in errors))
+        self.assertFalse(any("unknown tool" in e for e in errors))
+
+    def test_permission_mode_is_validated(self):
+        base = GOOD_AGENT.format(n="a")
+        for mode in fl.PERMISSION_MODES:
+            ok = base.replace("tools:", f"permissionMode: {mode}\ntools:")
+            self.assertEqual(self.run_lint({"a": ok}).errors, [], mode)
+        bad = base.replace("tools:", "permissionMode: yolo\ntools:")
+        self.assertTrue(any("permissionMode 'yolo'" in e for e in self.run_lint({"a": bad}).errors))
+
+    def test_unknown_frontmatter_keys_warn_for_agents_and_skills_even_when_strict(self):
+        agent = GOOD_AGENT.format(n="a").replace("tools:", "permisionMode: plan\ntools:")
+        skill = GOOD_SKILL.format(n="s").replace("description:", "allowed_tools: Read\ndescription:")
+        r = self.run_lint({"a": agent}, {"s": skill}, strict=True)
+        self.assertEqual(r.errors, [])
+        text = "\n".join(r.warnings)
+        self.assertIn("permisionMode", text)
+        self.assertIn("allowed_tools", text)
+
+    def test_known_keys_do_not_warn(self):
+        agent = GOOD_AGENT.format(n="a").replace("tools:", "effort: high\ncolor: blue\nmaxTurns: 5\ntools:")
+        skill = GOOD_SKILL.format(n="s").replace("description:", "when_to_use: x\nallowed-tools: Read\ndescription:")
+        self.assertEqual(self.run_lint({"a": agent}, {"s": skill}).warnings, [])
+
+
+class SizeAndLayoutTests(unittest.TestCase):
+    def run_lint(self, agents=None, skills=None, strict=False, extra=None):
+        return FrontmatterVocabularyTests.run_lint(self, agents, skills, strict, extra)
+
+    def test_crlf_does_not_inflate_the_size(self):
+        lf = GOOD_SKILL.format(n="s") + "x\n" * 3000  # about 6 KB with LF, about 9 KB with CRLF
+        self.assertLess(len(lf.encode()), fl.MAX_SKILL_BYTES)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = build(Path(tmp) / ".claude", {}, {"s": GOOD_SKILL.format(n="s")})
+            (root / "skills" / "s" / "SKILL.md").write_bytes(lf.replace("\n", "\r\n").encode())
+            r = fl.lint(root)
+        self.assertEqual((r.errors, r.warnings), ([], []))
+
+    def test_supporting_skill_markdown_is_size_checked_as_warning_only(self):
+        big = b"x" * (fl.MAX_SKILL_SUPPORT_BYTES + 1)
+        r = self.run_lint(skills={"s": GOOD_SKILL.format(n="s")}, strict=True,
+                          extra={"skills/s/reference/big.md": big, "skills/s/reference/small.md": b"ok"})
+        self.assertEqual(r.errors, [])
+        self.assertEqual(len(r.warnings), 1)
+        self.assertIn("big.md", r.warnings[0])
+
+    def test_markdown_in_an_agents_subfolder_warns(self):
+        r = self.run_lint(agents={"a": GOOD_AGENT.format(n="a")}, extra={"agents/team/helper.md": b"# nested\n"})
+        self.assertEqual(r.errors, [])
+        self.assertTrue(any("helper.md" in w and "subfolder" in w for w in r.warnings), r.warnings)
+
 
 SHARED = """# Shared
 Field `unverified` (optional list): defined here. Subagent Limits: `probe_requests` entries.

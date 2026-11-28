@@ -9,7 +9,7 @@ description: Use when verifying that files which must agree have not drifted. Si
 
 | Code | Coupling | File A | File B |
 |------|----------|--------|--------|
-| C1 | DTO and TypeScript interface | `src/Api/Features/**/Dtos.cs` | `frontend/src/app/**/*.model.ts` or inline interface |
+| C1 | DTO and TypeScript interface | `src/Api/Features/**/Dtos.cs` | `frontend/src/app/**/models.ts` (landed `features/orders/models.ts`), `**/*.model.ts` or inline interface |
 | C2 | EF Core entity or query shape and raw SQL | `src/Infrastructure/**/Entities`, configurations | hand-written SQL: migrations, reports, seed scripts |
 | C3 | `appsettings*.json` / `IOptions<T>` and deployment configuration | `**/*Options.cs`, `appsettings.json` | Deployment configuration `env` entries (possibly in another repo) |
 | C4 | Container or deployment config and app startup expectations | `Dockerfile`, compose file, deployment health checks/resources/`env` | `Program.cs` required config, health endpoints |
@@ -35,7 +35,7 @@ For each category the diff touches:
 public sealed record ReportDto(Guid Id, string Title, string Status);
 ```
 ```typescript
-// report.model.ts
+// models.ts
 export interface ReportDto { id: string; title: string; state: string }   // drift: wire name is "status"
 ```
 Finding: `state` is always `undefined` at runtime. The compiler cannot catch it because HTTP responses are untyped at the boundary.

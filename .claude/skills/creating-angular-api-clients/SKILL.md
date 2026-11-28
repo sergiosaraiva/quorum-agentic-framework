@@ -11,12 +11,12 @@ Design Principles: `.claude/agents/_SHARED-PATTERNS.md` `## Design Principles`.
 
 | Topic | Rule |
 |-------|------|
-| Shape | One injectable service per resource (`ReportsApi` in `core/api/reports.api.ts`); never a god API service |
+| Shape | One injectable service per resource (`ReportsApi` in the feature folder, `features/reports/reports-api.service.ts`; landed `features/orders/orders-api.service.ts`); never a god API service |
 | Typing | Every call generic-typed (`http.get<ReportDto>`); no `any` responses |
 | Interfaces | Mirror the backend DTO record field for field: names (camelCase JSON), types, nullability. Drift is a regression (`verifying-cross-file-coupling` C1) |
 | Cross-cutting | Auth header, API origin and error mapping live in `HttpInterceptorFn`s registered once in `app.config.ts`; never per service |
 | No wrappers | Call `HttpClient`/`httpResource` directly. No generic `BaseApiService<T>`, repository or mapper layer; no generated client unless OpenAPI generation is adopted deliberately |
-| Config | Page sizes, polling intervals, timeouts, origin are config, not literals. The resource path is a fixed constant of the service |
+| Config | Page sizes, polling intervals, timeouts, origin are config, not literals. The base URL comes from the `API_BASE_URL` token (`core/api-config.ts`); the resource path is a fixed constant of the service |
 | Errors | The error interceptor maps every failure to one `ApiError` (`status`, `message`, problem `traceId`/`code`; status 0 = unreachable). Client methods do not catch or re-map; the component reads the error from the observable or the resource `.error()` |
 | Allowed catch | A documented expected-status recovery (404 to `null`) that rethrows or logs everything else |
 
@@ -41,7 +41,7 @@ export interface Page<T> { items: T[]; page: number; pageSize: number; totalCoun
 @Injectable({ providedIn: 'root' })
 export class ReportsApi {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = '/api/reports';
+  private readonly baseUrl = `${inject(API_BASE_URL)}/reports`;
 
   create(request: { title: string }): Observable<ReportDto> {
     return this.http.post<ReportDto>(this.baseUrl, request);
@@ -60,9 +60,10 @@ export class ReportsApi {
 ## Example: interceptors
 
 ```typescript
-export const bearerTokenInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = inject(AuthTokenStore).token();            // in-memory signal store
-  if (!token || !req.url.startsWith('/api/')) return next(req);   // never send the token to other origins
+// Landed: core/auth.interceptor.ts. AUTH_TOKEN supplies the token; isTrustedUrl allows this origin and URLs under API_BASE_URL
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = inject(AUTH_TOKEN)();
+  if (!token || !isTrustedUrl(req.url, inject(API_BASE_URL))) return next(req);   // never send the token to other hosts
   return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
 };
 
@@ -70,10 +71,10 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) =>
   next(req).pipe(catchError((e: unknown) => throwError(() => toApiError(e))));
 
 // app.config.ts: bearer first (request side), error mapping sees the response
-provideHttpClient(withInterceptors([bearerTokenInterceptor, errorInterceptor]));
+provideHttpClient(withInterceptors([authInterceptor, errorInterceptor]));
 ```
 
-Keep tokens in memory (or an httpOnly cookie flow), not `localStorage`, unless a security review accepted it.
+A `startsWith('/api/')` prefix check is wrong: it never matches an absolute `API_BASE_URL`, so the token is silently dropped. Keep tokens in memory (or an httpOnly cookie flow), not `localStorage`, unless a security review accepted it.
 
 ## Quality Checklist
 

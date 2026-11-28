@@ -12,7 +12,7 @@ The Quorum cost guide lists levers in the order to try them:
 3. Right-size the model per agent.
 4. Right-size effort per agent.
 5. Batch work that can wait.
-6. Cap loops: the three-round review cap bounds the worst case.
+6. Cap loops: the five re-loop review cap bounds the worst case.
 7. Cap output with `max_tokens` and structured findings.
 8. Use task budgets on long runs.
 9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs.
@@ -21,4 +21,4 @@ Prompt caching: the cache-read price is a fraction of the input price. In the pr
 
 Batch: the Batch API gives a 50 percent discount for work that can wait, with results arriving asynchronously in any order. Suitable jobs are nightly knowledge-base re-embedding, bulk chunk review and overnight regression sweeps.
 
-Worked example: with a 30,000-token input and 5,000-token output per call, an Opus 5.5 review costs about $0.22 and a Sonnet 5.5 review about $0.11, before thinking tokens. Two parallel Opus reviewers make about $0.44 per round, so a three-round cap bounds that stage at $1.32. Fast mode, a premium for output speed, suits interactive sessions and never unattended CI.
+Worked example: with a 30,000-token input and 5,000-token output per call, an Opus 5.5 review costs about $0.22 and a Sonnet 5.5 review about $0.11, before thinking tokens. Two parallel Opus reviewers make about $0.44 per round, so a five-round cap bounds that stage at $2.20. Fast mode, a premium for output speed, suits interactive sessions and never unattended CI.

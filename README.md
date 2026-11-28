@@ -14,7 +14,7 @@ An AI assistant working alone tends to fail in three ways: it invents plausible 
 |---|---|
 | Invents | Agents consult two knowledge bases and cite ids. If both are silent, they record a question and continue with unblocked work. |
 | Forgets | Every question, answer and decision is a record in a searchable Q&A knowledge base. Agents search it before asking. |
-| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most three rounds, then a human decides. |
+| Self-approves | Independent reviewer agents with fresh context, no Write or Edit tools (ux-usability-specialist: scratch Write only) and an equal or stronger model validate every change. Findings loop back, at most five re-loops per gate chain, then a human decides. |
 
 ## The ideas
 
@@ -25,7 +25,7 @@ An AI assistant working alone tends to fail in three ways: it invents plausible 
 5. **CLAUDE.md files**: a root guide plus small guides next to the code they govern. The nearest one wins.
 6. **Vertical slices** (`docs/slices/`): plan features end to end with ids, dependencies, readiness analysis and priorities.
 7. **Independent validation**: no single point of failure. The producer never approves its own work.
-8. **Two AI CIs**: a local review script before you push (the required gate with the in-session pair), and an optional GitHub workflow on every pull request when `ANTHROPIC_API_KEY` is set.
+8. **Two AI CIs**: a local review script before you push (the required gate with the in-session pair), and an optional GitHub workflow on every pull request when the repository variable `AI_REVIEW_ENABLED` is `true`.
 9. **Model and cost guidance**: which Claude model and effort level for each agent, with prices and levers. See [docs/reference/model-selection-and-costs.md](docs/reference/model-selection-and-costs.md).
 
 ## The pipeline
@@ -43,7 +43,7 @@ requirements-analyst -> solution-architect -> [ux-usability-specialist] -> code-
                                   documentation-curator -> documentation-reviewer
 ```
 
-`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes. `prompt-engineer` sharpens a prompt on request.
+`security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infra changes. `prompt-engineer` sharpens a prompt on request.
 
 | Agent | Model | Role |
 |---|---|---|
@@ -67,7 +67,7 @@ CLAUDE.md                 root guide (rules, stack, pipeline, delegation)
 .claude/agents/           the twelve agents + _SHARED-PATTERNS.md
 .claude/skills/           39 skills, with SKILL-INDEX.md
 .claude/settings.json     permissions
-.claude/hooks/            pre-commit framework lint
+.claude/hooks/            pre-commit framework lint; guard_bash.py, a PreToolUse guard behind the deny list (best effort, not a sandbox; the permission prompt and a sandbox are the boundaries, so do not rely on it in bypassPermissions or auto mode)
 .mcp.json                 registers the two knowledge-base servers
 kb/                       business knowledge base (chunks, schema)
 questions/                Q&A knowledge base (records, schema)
@@ -82,7 +82,7 @@ docker-compose.yml        PostgreSQL with pgvector
 
 ## Quick start
 
-Prerequisites: [Claude Code](https://code.claude.com), .NET 10 SDK, Node.js, Python 3.11+, Docker (optional).
+Prerequisites: [Claude Code](https://code.claude.com), .NET 10 SDK, Node.js, Python 3.11+, and Docker (required for `dotnet test`: the integration tests use Testcontainers). PostgreSQL with pgvector and the `psycopg` package are needed only for the optional pgvector KB backend.
 
 ```bash
 # 1. Try the knowledge bases with no database
@@ -92,9 +92,10 @@ python3 -m unittest discover -s scripts/kb/tests
 python3 scripts/framework_lint.py
 
 # 2. Optional: PostgreSQL with pgvector
-cp .env.example .env            # then set your own password
+cp .env.example .env            # then set your own POSTGRES_PASSWORD; DATABASE_URL is built from it
 set -a; source .env; set +a     # export the variables for the commands below
 docker compose up -d
+python3 -m venv .venv && . .venv/bin/activate && pip install "psycopg[binary]"   # system pip is refused on Ubuntu (PEP 668)
 python3 scripts/kb/ingest.py    # applies the schemas itself; see scripts/kb/README.md for embedding options
 
 # 3. Build and test the sample backend
@@ -103,6 +104,8 @@ dotnet build Quorum.slnx && dotnet test --solution Quorum.slnx && dotnet format 
 # 4. Open Claude Code in this folder; it reads CLAUDE.md and registers the MCP servers
 claude
 ```
+
+For the pg backend, start Claude Code from the shell where the virtual environment is activated: `.mcp.json` runs `python3` from `PATH`. The local backend needs no package.
 
 Install the pre-commit lint hook with `bash .claude/hooks/install-framework-check-hook.sh`.
 
@@ -116,11 +119,11 @@ The example knowledge-base content describes an invented "Acme Orders" domain. R
 | When | Before the first push | Every pull request |
 | Reviewers | quality-guardian and regression-detective prompts | the same two reviewer agents, instructions read from the base branch |
 | Model | default `sonnet`; use `--model opus` for auth, data model, migrations, money or core logic | default `opus`; repository variable `AI_REVIEW_MODEL` overrides |
-| Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
-| Needs | the `claude` CLI and your own sign-in; no API key | repository secret `ANTHROPIC_API_KEY`; without it the review job is skipped by design and the PR stays green, which is not a review |
-| Status | required gate, together with the in-session reviewer pair; a human then merges | optional, stronger second gate for adopters who set the key |
+| Cap | `--max-rounds`, default 5 | `MAX_ROUNDS` in the workflow, default 5, then label `needs-human-review` |
+| Needs | the `claude` CLI and your own sign-in; no API key | repository variable `AI_REVIEW_ENABLED=true` and the environment secret `ANTHROPIC_API_KEY` on the environment `ai-review` (required reviewers, "prevent self-review"); otherwise the review job is skipped by design and the PR stays green, which is not a review |
+| Status | required gate, together with the in-session reviewer pair; a human then merges | optional, stronger second gate when `AI_REVIEW_ENABLED` is `true` and the `ai-review` environment holds the key |
 
-The local review and the in-session pair are the required gate. The GitHub review runs only when `ANTHROPIC_API_KEY` is set; a green check without it means the job was skipped.
+The local review and the in-session pair are the required gate. The GitHub review runs only when the repository variable `AI_REVIEW_ENABLED` is `true`; a green check without it means the job was skipped. Required reviewers on the environment protect the key on public repositories on all plans, but on private or internal repositories only on GitHub Enterprise; on other plans the environment does not protect the key. Details in [docs/concepts/08-ai-ci-local-and-github.md](docs/concepts/08-ai-ci-local-and-github.md).
 
 Local flags: `--base --model --max-chunk-bytes --max-rounds --out-dir --claude-bin --timeout --require --reset --dry-run`. Run `python3 scripts/ai_review_local.py --dry-run` to see the prompt without calling a model. The GitHub review posts one summary and up to 20 inline comments per round, with the reviewer instructions read from the base branch. It does not resolve threads, tier models by path or chunk large diffs; those are optional extensions, not implemented in the template.
 
@@ -130,7 +133,7 @@ The template contains no keys. Every key is optional and has a placeholder; when
 
 | Key | Where it goes | When unset |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | repository secret (GitHub review) | the review job is skipped with a notice; the PR stays green |
+| `ANTHROPIC_API_KEY` | environment secret on the environment `ai-review` (GitHub review, with the repository variable `AI_REVIEW_ENABLED=true`); create the environment with required reviewers and "prevent self-review" | the review is skipped: the gate prints an "AI review off" notice when `AI_REVIEW_ENABLED` is not `true`, and a notice when it is enabled but the key is missing; the PR stays green |
 | `claude` CLI and sign-in | your machine (local review, required) | with a missing `claude` binary the script skips (exit 0) unless `--require` is passed, which makes it exit 2; use `--require` for the gate |
 | `EMBED_API_KEY` | `.env` (optional, `EMBED_PROVIDER=http` only) | the default hash provider needs no key |
 | `POSTGRES_PASSWORD`, `DATABASE_URL` | `.env` (only for the optional PostgreSQL backend) | local file backend works without them |
@@ -163,7 +166,7 @@ The template also assumes no cloud provider: containers and PostgreSQL only, and
 | Framework lint, local review script | unit tests under `scripts/tests/` (`python3 -m unittest discover -s scripts/tests`) |
 | Sample backend (Orders) | xUnit unit and integration tests (Testcontainers needs Docker) |
 | Frontend skeleton | builds and passes its 10 tests; `frontend/package-lock.json` is committed (public npm registry), so the CI frontend job runs. If your organisation uses a private registry, regenerate it (see `frontend/CLAUDE.md`) |
-| GitHub workflow `ai-pr-review.yml` | optional second gate, not run end to end in this template: it needs your repository, `ANTHROPIC_API_KEY` and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
+| GitHub workflow `ai-pr-review.yml` | optional second gate, not run end to end in this template: it needs your repository, `AI_REVIEW_ENABLED`, `ANTHROPIC_API_KEY` and a real PR; actions are pinned to commit SHAs (tag in a comment), re-resolve the SHA when you bump one |
 | Agents, skills, hooks | linted for structure only; behaviour was not evaluated on real tasks |
 | pgvector search quality | not measured; the default embedding is a hash stub |
 | Prices and model ids in the cost doc | prices re-verified 2026-11-19 against the pricing page; model ids and effort defaults from the API reference cached 2026-11-03; still a snapshot, check before budgeting |

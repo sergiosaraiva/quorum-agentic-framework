@@ -16,7 +16,7 @@ The Quorum model guide assigns models by the cost of being wrong, and it treats 
 | Prompt sharpening, classification, routing, bulk triage | Haiku |
 | A task that failed twice on Sonnet | Opus once, then back to Sonnet |
 | Local AI CI (required review) | Sonnet by default, Opus for risky changes |
-| Optional GitHub AI CI on every pull request (needs `ANTHROPIC_API_KEY`) | Opus by default, overridable with the repository variable `AI_REVIEW_MODEL` |
+| Optional GitHub AI CI on every pull request (needs `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY`) | Opus by default, overridable with the repository variable `AI_REVIEW_MODEL` |
 | Hardest long-horizon work | Fable 5.2, reserved because it costs twice the Opus input price |
 
 The rule of thumb is to spend on the checker and save on the maker.

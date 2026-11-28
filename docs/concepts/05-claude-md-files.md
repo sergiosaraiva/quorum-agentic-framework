@@ -42,11 +42,11 @@ The template root has these sections; keep them, replace the placeholders.
 | Section | Purpose |
 |---------|---------|
 | Objective | One paragraph: what, for whom, which phase, what gate decides the next phase |
-| Working Style | The autonomy rules: act by default, "flag" is not "ask", batch questions, standing authorizations (branch, commit, push, PR, AI review loop: local rounds, plus GitHub rounds when the key is set) |
+| Working Style | The autonomy rules: act by default, "flag" is not "ask", batch questions, standing authorizations (branch, commit, push, PR, AI review loop: local rounds, plus GitHub rounds when `AI_REVIEW_ENABLED` is `true` and the `ai-review` environment holds the key) |
 | Never Invent | The grounding rule |
 | Team and Communication | Roles and who decides what; how to address technical versus business readers |
-| Tech Stack | A table, one line per layer, with the file that holds the detail |
-| Architecture Style | Vertical slices and the folder tree |
+| Tech Stack | A table, one line per layer; sub-guides are listed once, in the Multi-CLAUDE.md Map |
+| Architecture Style | Vertical slices and a one-line layout |
 | Design Principles | Simplest design, reuse first, no hard-coded values, built-ins first |
 | Immutable Rules | Numbered, non-negotiable: secrets, migrations reviewed, infrastructure as code, nullable enabled, standalone Angular, explicit auth on every endpoint, pinned CI runner |
 | Multi-CLAUDE.md Map | The table above |

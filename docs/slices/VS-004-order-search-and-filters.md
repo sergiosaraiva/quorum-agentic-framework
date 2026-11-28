@@ -80,6 +80,7 @@ Hard: `VS-001` (all rungs); `VS-005` (rung R2 only, the status filter). Soft: no
 | 2026-11-20 | Security review follow-up: per-user concurrency limit and `Retry-After` on the 503 (`OD-029`), `TQ-016` raised (open, non-blocking: pool size and load test) (code-engineer) |
 | 2026-11-20 | `TQ-013` to `TQ-015` answered (`OD-026`, `OD-027`, `OD-025`): Contract (page cap and 400 key, 503 row, new defaults), Deferred, S3 rate-limit row and S5 rows updated; open-question mentions removed (code-engineer, documentation-curator) |
 | 2026-11-20 | `TQ-016` answered by `OD-030` from a local 1M-row measurement: `Database:MaxPoolSize` (default 20), `Orders:MaxPageNumber` default 10000 lowered to 1000 (Contract: page cap row and 400 message), trigram index threshold reached, raised as the open non-blocking `TQ-017` (code-engineer, documentation-curator) |
+| 2026-11-27 | Result types updated to TypedResults per TQ-018 (wording only) (documentation-curator) |
 
 ---
 
@@ -136,7 +137,7 @@ No Contradicted or Missing item for R1. Chunks read: `BC-001`, `BC-005` (`BC-005
 | Decision | Chosen | Rejected and why |
 |----------|--------|------------------|
 | Where filtering lives | `OrdersService.ListAsync` applies the filter to the `IQueryable` before `CountAsync`; the endpoint parses and validates | A new endpoint or search service: no second consumer; the same route with optional parameters keeps criterion 1 |
-| Binding of the new parameters | `string?`, parsed by `OrderListFilter.Parse`, errors returned with `Results.ValidationProblem` | Typed `DateOnly?`: a malformed value gives a bodiless 400 in Production and a 500 in Development, and `11/19/2026` or `2026-11-19T10:00:00` are accepted silently (probe, `TQ-005`). This would fail criterion 5 |
+| Binding of the new parameters | `string?`, parsed by `OrderListFilter.Parse`, errors returned with `TypedResults.ValidationProblem` | Typed `DateOnly?`: a malformed value gives a bodiless 400 in Production and a 500 in Development, and `11/19/2026` or `2026-11-19T10:00:00` are accepted silently (probe, `TQ-005`). This would fail criterion 5 |
 | Date semantics | `yyyy-MM-dd` calendar dates as UTC days (`OD-005`); `created_at >= from 00:00Z` and `created_at < (to + 1 day) 00:00Z`, so both bounds are inclusive (criterion 7) | Full ISO instants (`DateTimeOffset`): the caller picks the zone, but "bounds inclusive" over instants is ambiguous, and `OD-005` fixed UTC days |
 | Case-insensitive substring | `EF.Functions.ILike(o.CustomerName, pattern, "\\")` with `pattern = "%" + EscapeLikePattern(term) + "%"`; the SQL is `customer_name ILIKE @pattern ESCAPE '\'` (verified with `ToQueryString()` on Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3) | `CustomerName.ToLower().Contains(term)`: EF escapes the pattern itself (verified), but it folds the column in PostgreSQL (`lower()`) and the term in .NET, which can disagree on non-ASCII letters, and a future trigram index would have to be an expression index |
 | Wildcard escaping | Escape `\` first, then `%` and `_`, each prefixed with `\` | Escaping `[`, `]`, `^` as the Npgsql XML doc for `ILike` suggests: those are SQL Server wildcards; PostgreSQL `LIKE`/`ILIKE` has only `%` and `_` |
@@ -169,7 +170,7 @@ Responses:
 | Status | When | Body |
 |--------|------|------|
 | 200 | valid input | `PagedResponse<OrderResponse>` unchanged: `items`, `page`, `pageSize`, `totalCount` (the filtered count) |
-| 400 | any filter value invalid | `Results.ValidationProblem(errors)`: `application/problem+json`, `title` "One or more validation errors occurred.", `status` 400, `errors` keyed by parameter name. All errors are reported at once |
+| 400 | any filter value invalid | `TypedResults.ValidationProblem(errors)`: `application/problem+json`, `title` "One or more validation errors occurred.", `status` 400, `errors` keyed by parameter name. All errors are reported at once |
 | 401 | no credentials | from the group |
 | 503 | a database command exceeds `Database:CommandTimeoutSeconds` (default 10) | `application/problem+json`, `status` 503, fixed `title` "Service temporarily unavailable.", fixed `detail`, `type`, `traceId`; header `Retry-After` of `Database:RetryAfterSeconds` (default 5, `OD-029`); no exception text (`OD-025`, `TQ-015`) |
 | 429 | the per-user limit is exceeded (`RateLimiting:PermitLimit` per `WindowSeconds`), or more than `RateLimiting:ConcurrentRequestsPerUser` of the user's requests are in flight (`OD-029`; no `Retry-After` then) | `application/problem+json`, `status` 429, fixed `title` "Too many requests.", `type`, `traceId`; header `Retry-After` in seconds (`OD-018`, `TQ-007`) |
@@ -197,7 +198,7 @@ Ordering: unchanged, `CreatedAt` descending, then `Id` ascending (`BQ-005` worki
 | 1 | Add `public const int CustomerNameMaxLength = 200;` to `Order`; use it in `HasMaxLength(Order.CustomerNameMaxLength)` | `src/Infrastructure/Persistence/Entities/Order.cs`, `src/Infrastructure/Persistence/Configurations/OrderConfiguration.cs` | `database` | - | `dotnet ef migrations has-pending-model-changes --project src/Infrastructure --startup-project src/Api` reports no changes |
 | 2 | `CreateOrderRequest`: `StringLength(Order.CustomerNameMaxLength, MinimumLength = 1)`. Add `OrderListFilter` (below) | `src/Api/Features/Orders/Dtos.cs` | `creating-dtos-and-validation` | 1 | existing `Create_CustomerNameOf201Characters_ReturnsValidationProblem` stays green; unit tests U1-U5 |
 | 3 | `ListAsync(int? page, int? pageSize, OrderListFilter filter, CancellationToken ct)`; add `ApplyFilter` and `EscapeLikePattern` (below); apply before `CountAsync` | `src/Api/Features/Orders/OrdersService.cs` | `creating-application-services` | 2 | U6; integration I1-I9 |
-| 4 | List handler takes `string? createdFrom, string? createdTo, string? customerName`, calls `OrderListFilter.Parse`, returns `Results.ValidationProblem(errors)` on errors, else `Results.Ok(await service.ListAsync(page, pageSize, filter, ct))` | `src/Api/Features/Orders/OrdersEndpoints.cs` | `backend` | 3 | I5, I6 |
+| 4 | List handler takes `string? createdFrom, string? createdTo, string? customerName`, calls `OrderListFilter.Parse`, returns `TypedResults.ValidationProblem(errors)` on errors, else `TypedResults.Ok(await service.ListAsync(page, pageSize, filter, ct))` | `src/Api/Features/Orders/OrdersEndpoints.cs` | `backend` | 3 | I5, I6 |
 | 5 | Unit tests | `tests/Api.UnitTests/OrderListFilterTests.cs` (new) | `creating-xunit-tests` | 2, 3 | U1-U6 |
 | 6 | Integration tests | `tests/Api.IntegrationTests/OrdersSearchTests.cs` (new, own `IClassFixture<ApiFactory>`) | `writing-integration-tests` | 4 | I1-I9 |
 | 7 | `INDEX.md` row (status, rung) and this file's revision log | `docs/slices/INDEX.md`, this file | `updating-internal-docs` | 6 | - |

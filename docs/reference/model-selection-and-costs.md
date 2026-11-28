@@ -46,8 +46,8 @@ Notes:
 | Prompt sharpening, classification, routing, log triage, bulk summaries | Haiku | Cheap and quick. Output is checked or low-stakes. |
 | A task that failed twice on Sonnet | Opus once, then return to Sonnet | Pay for judgment only where it is needed. |
 | Hardest long-horizon work (large refactor plan, migration strategy, incident root cause) | Fable 5.2 | Highest capability. At $8 / $40 per MTok it is twice Opus input price, so reserve it. |
-| Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 3 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
-| GitHub AI CI on every PR (optional, needs `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
+| Local AI CI before you push | Sonnet (the script default) | The required review with the in-session pair; no API key, capped at 5 rounds. Use `opus` for auth, data model, migrations, money or core logic. |
+| GitHub AI CI on every PR (optional, needs `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY`) | Opus (the workflow default, overridable with the repository variable `AI_REVIEW_MODEL`) | An optional second gate. Do not economize on the reviewer. |
 
 Rule of thumb: spend on the checker, save on the maker. Reviewer errors cost an escaped defect. Implementer errors cost a review round.
 
@@ -102,7 +102,7 @@ An executor model does the work. A stronger advisor model is consulted at key po
 3. Right-size the model per agent (section 3).
 4. Right-size effort per agent (section 4).
 5. Batch work that can wait (50% discount): nightly KB re-embedding, bulk chunk review, overnight regression sweeps.
-6. Cap loops: the 3-round review cap bounds the worst case at a known number of calls.
+6. Cap loops: the 5-round review cap bounds the worst case at a known number of calls.
 7. Cap output: set `max_tokens` and ask for structured findings, not essays.
 8. Use task budgets on long agent runs so the model paces itself instead of being cut off.
 9. Run the local AI CI first so the optional GitHub review, if enabled, starts from clean diffs and ends in fewer rounds.
@@ -117,11 +117,11 @@ Illustrative only. Assume a PR diff plus context of 30,000 input tokens and 5,00
 | Sonnet 5.5 | 30,000 x $2 / 1M = $0.06 | 5,000 x $10 / 1M = $0.05 | $0.11 |
 | Haiku 5.5 | 30,000 x $0.10 / 1M = $0.003 | 5,000 x $0.50 / 1M = $0.0025 | $0.0055 |
 
-The default pipeline runs two Opus reviewers in parallel (quality-guardian and regression-detective), so one round is 2 x $0.22 = $0.44 before thinking tokens, and a three-round cap bounds it at 3 x $0.44 = $1.32 for that stage. Haiku 5.5 is used here at prompts under 100K tokens; above that, the higher tier applies. Real runs add thinking tokens and tool calls, so measure your own. The point: a review round costs cents, an escaped defect costs hours.
+The default pipeline runs two Opus reviewers in parallel (quality-guardian and regression-detective), so one round is 2 x $0.22 = $0.44 before thinking tokens, and a five-round cap bounds it at 5 x $0.44 = $2.20 for that stage. Haiku 5.5 is used here at prompts under 100K tokens; above that, the higher tier applies. Real runs add thinking tokens and tool calls, so measure your own. The point: a review round costs cents, an escaped defect costs hours.
 
 ## 8. Subscription plans versus API billing
 
-Claude Code can run on a subscription plan or on API billing. A plan limits usage by allowance rather than by dollars per token, and the allowance differs by plan and changes over time. For CI you normally use an API key stored as a repository secret (`ANTHROPIC_API_KEY`) so that cost is metered per run. Check your plan's current terms before you rely on it for automation.
+Claude Code can run on a subscription plan or on API billing. A plan limits usage by allowance rather than by dollars per token, and the allowance differs by plan and changes over time. For CI you normally use an API key stored as an environment secret (`ANTHROPIC_API_KEY` on the `ai-review` environment) so that cost is metered per run. Check your plan's current terms before you rely on it for automation.
 
 ## 9. Keep this page current
 

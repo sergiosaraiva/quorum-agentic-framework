@@ -155,7 +155,7 @@ flowchart LR
 
 - `ux-usability-specialist` only when a screen is added or redesigned.
 - `quality-guardian` and `regression-detective` run **in parallel**, with fresh context.
-- `security-engineer` and `infrastructure-engineer` run proactively on auth, data, API or infrastructure changes.
+- `security-engineer` and `infrastructure-engineer` run proactively on auth, data, API, secret or infra changes.
 
 ---
 
@@ -183,7 +183,7 @@ A critical system must never rely on one checker, and the author is never the ch
 | Equal or stronger model | Reviewer model is equal or stronger than the producer's: judgement-heavy reviewers run Opus, documentation-reviewer runs Sonnet (mechanical grounding check) |
 | Different lenses | Quality asks "is it right?", regression asks "what did it break?" |
 | Evidence, not verdicts | Each finding has a file and anchor, a failing scenario and a severity (Critical and High block; Medium and Low do not) |
-| Bounded loops | Findings return to the producer, 3 rounds at most, then a human |
+| Bounded loops | Findings return to the producer, 5 re-loops at most per gate chain, then a human |
 
 ---
 
@@ -193,13 +193,13 @@ A critical system must never rely on one checker, and the author is never the ch
 |---|---|---|
 | Runs | On your machine, before the first push | On every PR, in GitHub Actions |
 | Entry | `scripts/ai_review_local.py` | `.github/workflows/ai-pr-review.yml` |
-| Purpose | Required gate with the in-session pair; no API key | Optional second gate the author cannot skip; needs `ANTHROPIC_API_KEY` |
+| Purpose | Required gate with the in-session pair; no API key | Optional second gate the author cannot skip; needs `AI_REVIEW_ENABLED` and `ANTHROPIC_API_KEY` |
 | Model | Default `sonnet`; `--model opus` for risky changes | Default `opus` (variable `AI_REVIEW_MODEL` overrides) |
 | Reviewers | quality-guardian and regression-detective prompts | the same two agents, read from the base branch |
 | Output | `.ai-review/` findings (JSON and Markdown) | one summary plus up to 20 inline comments |
-| Cap | `--max-rounds`, default 3 | `MAX_ROUNDS` in the workflow, default 3, then label `needs-human-review` |
+| Cap | `--max-rounds`, default 5 | `MAX_ROUNDS` in the workflow, default 5, then label `needs-human-review` |
 
-The local run is the required review. The GitHub run is an optional second gate: without the key it is skipped and its green check is not a review. Thread resolution, path-based model tiers and diff chunking are optional extensions, not implemented.
+The local run is the required review. The GitHub run is an optional second gate: it is skipped unless `AI_REVIEW_ENABLED` is `true` and the `ai-review` environment holds the key, and a green check without the review is not a review. Thread resolution, path-based model tiers and diff chunking are optional extensions, not implemented.
 
 ---
 
@@ -213,7 +213,7 @@ sequenceDiagram
     participant Rev as review job
     Dev->>GH: push to PR
     GH->>Gate: count round markers from github-actions[bot]
-    alt rounds < MAX_ROUNDS (default 3)
+    alt rounds < MAX_ROUNDS (default 5)
       Gate->>Rev: run reviewer agents on the diff (untrusted input)
       Rev->>GH: summary comment + inline findings + round marker
       Dev->>GH: fix and push
@@ -406,8 +406,8 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 2. State the pipeline lane in one line.
 3. **Alignment gate**: check the spec against both KBs, cite chunk ids, record any gap as a question.
 4. Design, build, then review in parallel with independent agents.
-5. Tests and docs, then the **local AI CI** (required, rounds capped at 3, then a human).
-6. Push, open a PR; if `ANTHROPIC_API_KEY` is set, **GitHub AI CI** also loops until a round is clean (`MAX_ROUNDS`, default 3). A human merges.
+5. Tests and docs, then the **local AI CI** (required, rounds capped at 5, then a human).
+6. Push, open a PR; if `AI_REVIEW_ENABLED` is `true`, **GitHub AI CI** also loops until a round is clean (`MAX_ROUNDS`, default 5). A human merges.
 7. Merge, update the slice status, record any new decision.
 
 ---
@@ -420,7 +420,7 @@ Levers, in order: cache repeated context, send diffs not files, right-size model
 4. Check the two MCP servers register (`.mcp.json`).
 5. Build your first slice list with the planning skill.
 6. Tune models and effort per agent after measuring a few real tasks.
-7. Optional: add the repository secret `ANTHROPIC_API_KEY` for the GitHub AI CI.
+7. Optional: set the repository variable `AI_REVIEW_ENABLED` to `true` and add the environment secret `ANTHROPIC_API_KEY` (environment `ai-review`) for the GitHub AI CI.
 
 Full guide: `docs/concepts/10-adopting-the-template.md`.
 

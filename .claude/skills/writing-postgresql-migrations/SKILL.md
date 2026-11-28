@@ -35,11 +35,13 @@ Large backfill?                      -> batched, set-based, outside the schema m
 
 A plain `CREATE INDEX` blocks every write for the whole build. `CREATE INDEX CONCURRENTLY` holds a lighter lock (reads and writes continue; `ALTER TABLE` waits) at the cost of about two table scans, and it cannot run inside a transaction.
 
+Hypothetical schema for the rows below: an `<schema>."order"` table with a `customer_id` FK to a `customer` table (the landed `order` has neither).
+
 | Part | Pattern |
 |------|---------|
 | Migration | Holds nothing else: EF commits the transactional part, then runs the build, then writes the history row, so a mixed migration that fails leaves a committed half and an INVALID index |
-| `Up` | `migrationBuilder.Sql("CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_order_customer_id ON sales.\"order\" (customer_id);", suppressTransaction: true);` one statement per call, ending with `;` |
-| `Down` | `migrationBuilder.Sql("DROP INDEX CONCURRENTLY IF EXISTS sales.ix_order_customer_id;", suppressTransaction: true);` |
+| `Up` | `migrationBuilder.Sql("CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_order_customer_id ON <schema>.\"order\" (customer_id);", suppressTransaction: true);` one statement per call, ending with `;` |
+| `Down` | `migrationBuilder.Sql("DROP INDEX CONCURRENTLY IF EXISTS <schema>.ix_order_customer_id;", suppressTransaction: true);` |
 | Idempotent | `IF NOT EXISTS` so a crash between the build and the history row can be re-run |
 | Fail closed | A failed or cancelled build leaves `pg_index.indisvalid = false`; a bare rerun reports success while the index stays invalid. Run a preflight first that raises if any index in a non-system schema is invalid, naming it and the `DROP INDEX CONCURRENTLY` fix |
 | Model | The raw-SQL index is not in the EF model; document it with the table so a parity test can credit it |

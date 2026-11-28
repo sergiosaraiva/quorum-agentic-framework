@@ -39,14 +39,21 @@ Compute targets from the loaded dataset and record them. Keep only the retention
 | 5. Manifest | Write the manifest next to the test output |
 
 ```sql
--- Skewed foreign-key fill (placeholders): 80% of orders to 5% of customers
-INSERT INTO sales."order" (id, customer_id, status, total_amount, created_at)
+-- Skewed foreign-key fill (hypothetical schema with a customer FK, not the landed order table; statuses and scale 2 follow the Acme example, OD-004 and OD-001): about 80% of orders to 5% of customers (exponent 13: 0.05^(1/13) = 0.79); confirm the shape with pg_stats
+-- The rank is drawn per row first: a scalar subquery with random() inside is uncorrelated, runs once (InitPlan) and gives every row the same customer
+WITH picks AS (
+    SELECT g, 1 + floor(power(random(), 13) * :customer_count)::int AS rn
+    FROM generate_series(1, :order_target) g
+)
+INSERT INTO <schema>."order" (id, customer_id, status, total_amount, created_at, updated_at)
 SELECT uuidv7(),
-       (SELECT id FROM tmp_customer_rank WHERE rn = 1 + floor(power(random(), 4) * :customer_count)::int),
-       (ARRAY['DRAFT','SUBMITTED','PAID','CANCELLED'])[1 + floor(random() * 4)::int],
-       round((random() * 5000)::numeric, 4),
-       :fixed_timestamp::timestamptz - (random() * interval '365 days')
-FROM generate_series(1, :order_target);
+       c.id,
+       (ARRAY['draft','placed','paid','shipped','closed'])[1 + floor(random() * 5)::int],
+       round((random() * 5000)::numeric, 2),
+       :fixed_timestamp::timestamptz - (random() * interval '365 days'),
+       :fixed_timestamp::timestamptz  -- updated_at: never before created_at
+FROM picks p
+JOIN tmp_customer_rank c USING (rn);
 ```
 
 `uuidv7()` is built in from PostgreSQL 18; on 16 or 17 generate keys in the test or with an extension (verify). Run `ANALYZE` and `VACUUM` after load, and create indexes after bulk fill when the plan under test allows it.
@@ -56,7 +63,7 @@ FROM generate_series(1, :order_target);
 ```json
 { "tier": "load-2-3x", "source": "reference", "seed": 0.42, "image": "postgres:16",
   "targets_assumed": false,
-  "tables": { "sales.order": { "reference_rows": 120000, "target": 300000, "actual": 300000, "skew_source": "pg_stats" } },
+  "tables": { "<schema>.order": { "reference_rows": 120000, "target": 300000, "actual": 300000, "skew_source": "pg_stats" } },
   "fk_violations": 0, "analyzed": true, "generated_at": "<fixed-timestamp>" }
 ```
 

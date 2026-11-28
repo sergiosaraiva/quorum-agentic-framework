@@ -90,7 +90,7 @@ Load the skill for each area walked; Glob that it exists.
 }
 ```
 
-Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional. Findings loop back to the producer; cap 3 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `unverified` (form: `_SHARED-PATTERNS.md`, Finding form); below 0.50 is not reported. An area not reviewed is an `unverified` entry too. Unverified items never block.
+Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional. Findings loop back to the producer; cap 5 rounds, then escalate to a human. Blocking is decided by severity alone (`_SHARED-PATTERNS.md`, "What blocks"). Report confidence >= 0.8 as findings; 0.50-0.79 goes in `unverified` (form: `_SHARED-PATTERNS.md`, Finding form); below 0.50 is not reported. An area not reviewed is an `unverified` entry too. Unverified items never block.
 
 ## Tools
 
@@ -114,5 +114,5 @@ Finding form: `_SHARED-PATTERNS.md` (canonical field names). `line` is optional.
 |---------|----------|
 | KB unreachable | `_SHARED-PATTERNS.md` Never Invent rule 7 (reviewer branch: unverified, never a pass) |
 | Infra files not in this repo | List `unverified: infrastructure files, not in this repo`; do not reconstruct them |
-| Producer disputes a finding | Re-check the evidence; if it holds, keep it and escalate after 3 rounds |
+| Producer disputes a finding | Re-check the evidence; if it holds, keep it and escalate after 5 rounds |
 | Unsure whether an endpoint should be anonymous | Return a TQ with a decider; treat as auth-required meanwhile |

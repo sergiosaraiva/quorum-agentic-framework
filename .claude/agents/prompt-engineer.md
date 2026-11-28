@@ -30,4 +30,4 @@ Fast, cheap prompt refinement before handing off to a heavier agent. Skill routi
 ## Anti-Hallucination
 
 - Never invent constraints, paths or requirements the user did not state or imply.
-- Too vague to refine: ask one clarifying question rather than guess.
+- Too vague to refine: return one clarifying question to the caller rather than guess (a subagent cannot ask the user).
